@@ -1,0 +1,128 @@
+import SwiftUI
+
+/// App iconography: Phosphor Bold (https://phosphoricons.com), bundled as 24pt template vectors
+/// in `Resources/Icons.xcassets`.
+///
+/// Views use semantic names (`.library`), never asset names, so swapping an icon or the whole
+/// set is a one-line change here. To add one: put its Phosphor name in `scripts/fetch-icons.sh`,
+/// run the script, and add a case.
+public enum Glyph: String, CaseIterable, Sendable {
+    case home = "house"
+    case library = "stack"
+    case downloads = "arrow-circle-down"
+    case search = "magnifying-glass"
+    case profile = "user-circle"
+    case playlist
+    case artist = "microphone-stage"
+    case album = "vinyl-record"
+    case song = "music-note"
+    case genre = "guitar"
+    case waveform
+    case warning
+    case lockOpen = "lock-open"
+    case lock
+    case copy
+    case check
+    case play
+    case pause
+    case next = "skip-forward"
+    case previous = "skip-back"
+    case settings = "gear-six"
+    case signOut = "sign-out"
+    case appearance = "palette"
+    case server = "hard-drives"
+    case address = "globe"
+    case close = "x"
+
+    /// 24pt template image; tints with `foregroundStyle`. Add `.resizable()` for other sizes.
+    public var image: Image {
+        Image(rawValue, bundle: .module)
+    }
+}
+
+public extension Label where Title == Text, Icon == Image {
+    /// `Label("Library", glyph: .library)`: the Phosphor equivalent of `Label(_:systemImage:)`.
+    init(_ title: String, glyph: Glyph) {
+        self.init { Text(title) } icon: { glyph.image }
+    }
+}
+
+public extension Button where Label == SwiftUI.Label<Text, Image> {
+    /// `Button("Settings", glyph: .profile) { ... }`: the Phosphor equivalent of `Button(_:systemImage:action:)`.
+    init(_ title: String, glyph: Glyph, role: ButtonRole? = nil, action: @escaping () -> Void) {
+        self.init(role: role, action: action) { SwiftUI.Label(title, glyph: glyph) }
+    }
+}
+
+/// Empty and error states with a large Phosphor glyph (replaces `ContentUnavailableView(_:systemImage:)`).
+public struct EmptyState<Actions: View>: View {
+    @Environment(\.theme) private var theme
+    @ScaledMetric(relativeTo: .largeTitle) private var glyphSize: CGFloat = 48
+    private let title: String
+    private let glyph: Glyph
+    private let message: String?
+    private let actions: Actions
+
+    public init(_ title: String, glyph: Glyph, message: String? = nil, @ViewBuilder actions: () -> Actions = { EmptyView() }) {
+        self.title = title
+        self.glyph = glyph
+        self.message = message
+        self.actions = actions()
+    }
+
+    public var body: some View {
+        ContentUnavailableView {
+            SwiftUI.Label {
+                Text(title).font(theme.typography.title)
+            } icon: {
+                glyph.image
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: glyphSize, height: glyphSize)
+                    .foregroundStyle(theme.palette.textSecondary)
+            }
+        } description: {
+            if let message {
+                Text(message).font(theme.typography.body)
+            }
+        } actions: {
+            actions
+        }
+    }
+}
+
+public extension View {
+    /// Gentle opacity pulse for "live" indicators (now playing, waiting). Off with Reduce Motion.
+    func pulsing(_ active: Bool = true) -> some View {
+        modifier(Pulsing(active: active))
+    }
+}
+
+private struct Pulsing: ViewModifier {
+    let active: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        if active && !reduceMotion {
+            content.phaseAnimator([1.0, 0.35]) { view, opacity in
+                view.opacity(opacity)
+            } animation: { _ in .easeInOut(duration: 0.8) }
+        } else {
+            content
+        }
+    }
+}
+
+#Preview {
+    ScrollView {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 72))], spacing: 20) {
+            ForEach(Glyph.allCases, id: \.self) { glyph in
+                VStack(spacing: 6) {
+                    glyph.image
+                    Text(String(describing: glyph)).font(.caption2)
+                }
+            }
+        }
+        .padding()
+    }
+}

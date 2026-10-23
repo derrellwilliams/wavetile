@@ -1,0 +1,7 @@
+build/
+DerivedData/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+.swiftpm/
+Packages/WavetileKit/.build/
+.DS_Store

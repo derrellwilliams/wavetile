@@ -1,0 +1,70 @@
+name: Wavetile
+options:
+  bundleIdPrefix: com.derrellwilliams
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+    SWIFT_APPROACHABLE_CONCURRENCY: YES
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    TARGETED_DEVICE_FAMILY: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    DEVELOPMENT_TEAM: ""
+  configs:
+    Debug:
+      # Hot reload (InjectionNext / Inject). Never applied to Release.
+      OTHER_LDFLAGS: ["$(inherited)", "-Xlinker", "-interposable"]
+      EMIT_FRONTEND_COMMAND_LINES: YES
+
+packages:
+  WavetileKit:
+    path: Packages/WavetileKit
+
+targets:
+  Wavetile:
+    type: application
+    platform: iOS
+    sources:
+      - App
+    dependencies:
+      - package: WavetileKit
+        product: WavetileKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.derrellwilliams.wavetile
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Wavetile
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+    info:
+      path: App/Info.plist
+      properties:
+        # Security: allow plain HTTP only to LAN hosts (typical home Jellyfin).
+        # Internet traffic must be HTTPS so the access token is never sent in cleartext.
+        NSLocalNetworkUsageDescription: Wavetile connects to Jellyfin servers on your home network.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+
+schemes:
+  Wavetile:
+    build:
+      targets:
+        Wavetile: all
+    test:
+      config: Debug
+      testPlans: []
+      targets:
+        - package: WavetileKit/JellyfinKitTests
+    run:
+      config: Debug
