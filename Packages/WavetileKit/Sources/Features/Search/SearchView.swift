@@ -1,35 +1,88 @@
 import DesignSystem
+import Library
+import Persistence
 import SwiftUI
 
-/// Content of the search tab. The search field itself comes from `.searchable` on the
-/// `TabView`, which is what makes the system render the detached Liquid Glass search button.
+/// Offline full-text search over the synced library. The search field itself is attached here
+/// (scoped to this tab); `.tabViewSearchActivation` on the TabView makes the tab detach.
 struct SearchView: View {
     @ObserveInjection var inject
+    @Environment(\.theme) private var theme
+    @Environment(LibraryStore.self) private var store
+    @Namespace private var zoom
     @Binding var text: String
+    @State private var results = LibraryDatabase.SearchResults()
 
     var body: some View {
         NavigationStack {
-            EmptyState(
-                text.isEmpty ? "Search Your Library" : "No Results for “\(text)”",
-                glyph: .search,
-                message: text.isEmpty ? "Find artists, albums, and songs." : "Search arrives with library sync (milestone 3)."
-            )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .themedBackground()
-                .reportsTabRoot()
-                .navigationTitle("Search")
+            List {
+                if !results.artists.isEmpty {
+                    Section("Artists") {
+                        ForEach(results.artists) { artist in
+                            NavigationLink(value: LibraryRoute.artist(id: artist.id, name: artist.name)) {
+                                HStack(spacing: theme.spacing.md) {
+                                    ArtworkView(store.artwork(itemID: artist.id, tag: artist.imageTag, maxPixelWidth: 144))
+                                        .frame(width: theme.artwork.rowThumbnail)
+                                        .clipShape(.circle)
+                                    Text(artist.name).font(theme.typography.body)
+                                }
+                            }
+                            .listRowBackground(Color.clear)
+                        }
+                    }
+                }
+                if !results.albums.isEmpty {
+                    Section("Albums") {
+                        ForEach(results.albums) { album in
+                            NavigationLink(value: LibraryRoute.album(AlbumRoute(album: album.summary, sourceID: "search-\(album.id)"))) {
+                                TrackRow(
+                                    title: album.title,
+                                    subtitle: album.artistName,
+                                    leading: .artwork(store.artwork(itemID: album.id, tag: album.imageTag, maxPixelWidth: 144))
+                                )
+                            }
+                            .listRowBackground(Color.clear)
+                        }
+                    }
+                }
+                if !results.tracks.isEmpty {
+                    Section("Songs") {
+                        ForEach(results.tracks) { track in
+                            TrackRow(
+                                title: track.title,
+                                subtitle: "\(track.artistName) · \(track.albumTitle)",
+                                duration: track.durationMs.map { .milliseconds($0) },
+                                leading: .artwork(store.artwork(itemID: track.albumID, maxPixelWidth: 144))
+                            )
+                            .listRowBackground(Color.clear)
+                        }
+                    }
+                }
+            }
+            .listStyle(.plain)
+            .scrollDismissesKeyboard(.immediately)
+            .overlay { emptyState }
+            .themedBackground()
+            .reportsTabRoot()
+            .navigationTitle("Search")
+            .libraryDestinations(zoom: zoom)
         }
         // Scoped to this tab's stack so the field doesn't leak into other tabs' navigation bars.
         .searchable(text: $text, prompt: "Artists, albums, songs")
+        .task(id: text) {
+            // Debounce typing; FTS queries are fast but there's no need to run one per keystroke.
+            try? await Task.sleep(for: .milliseconds(150))
+            guard !Task.isCancelled else { return }
+            results = (try? store.database.search(text)) ?? .init()
+        }
         .enableInjection()
     }
-}
 
-#Preview {
-    @Previewable @State var text = ""
-    TabView {
-        Tab { Text("Home") } label: { Label("Home", glyph: .home) }
-        Tab(role: .search) { SearchView(text: $text) }
+    @ViewBuilder private var emptyState: some View {
+        if text.trimmingCharacters(in: .whitespaces).isEmpty {
+            EmptyState("Search Your Library", glyph: .search, message: "Find artists, albums, and songs, even offline.")
+        } else if results.isEmpty {
+            EmptyState("No Results", glyph: .search, message: "Nothing in your library matches “\(text)”.")
+        }
     }
-    .tabViewSearchActivation(.searchTabSelection)
 }

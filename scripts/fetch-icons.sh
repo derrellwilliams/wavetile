@@ -13,6 +13,7 @@ ICONS=(
   waveform warning lock-open lock copy check
   play pause skip-forward skip-back
   gear-six sign-out palette hard-drives globe x
+  shuffle sort-ascending caret-right
 )
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

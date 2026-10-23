@@ -11,11 +11,16 @@ struct AlbumDetailView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: theme.spacing.xl) {
-                header
+                VStack(spacing: theme.spacing.md) {
+                    ArtworkHero(artwork: model.artwork)
+                    header
+                }
                 trackList
             }
             .padding(.bottom, theme.spacing.xxl)
         }
+        .scrollIndicators(.hidden)
+        .ignoresSafeArea(edges: .top)
         .themedBackground()
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }
@@ -23,27 +28,19 @@ struct AlbumDetailView: View {
     }
 
     private var header: some View {
-        VStack(spacing: theme.spacing.md) {
-            ArtworkView(model.artwork)
-                .frame(maxWidth: 300)
-                .shadow(color: .black.opacity(0.4), radius: 24, y: 12)
-                .padding(.horizontal, theme.spacing.xxl)
-                .padding(.top, theme.spacing.sm)
-
-            VStack(spacing: theme.spacing.xs) {
-                Text(model.album.title)
-                    .font(theme.typography.title)
-                    .foregroundStyle(theme.palette.textPrimary)
-                    .multilineTextAlignment(.center)
-                Text(model.album.artist)
-                    .font(theme.typography.sectionHeader)
-                    .foregroundStyle(theme.palette.accent)
-                Text(metadata)
-                    .font(theme.typography.caption)
-                    .foregroundStyle(theme.palette.textSecondary)
-            }
-            .padding(.horizontal, theme.spacing.screenInset)
+        VStack(spacing: theme.spacing.xs) {
+            Text(model.album.title)
+                .font(theme.typography.title)
+                .foregroundStyle(theme.palette.textPrimary)
+                .multilineTextAlignment(.center)
+            Text(model.album.artist)
+                .font(theme.typography.sectionHeader)
+                .foregroundStyle(theme.palette.accent)
+            Text(metadata)
+                .font(theme.typography.caption)
+                .foregroundStyle(theme.palette.textSecondary)
         }
+        .padding(.horizontal, theme.spacing.screenInset)
     }
 
     private var metadata: String {

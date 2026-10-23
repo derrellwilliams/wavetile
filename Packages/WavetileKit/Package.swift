@@ -24,6 +24,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/jellyfin/jellyfin-sdk-swift.git", from: "3.3.0"),
         .package(url: "https://github.com/kean/Nuke.git", from: "13.2.0"),
+        .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.11.1"),
         .package(url: "https://github.com/krzysztofzablocki/Inject.git", from: "1.6.0"),
     ],
     targets: [
@@ -33,9 +34,20 @@ let package = Package(
             swiftSettings: serviceSettings
         ),
         .target(
+            name: "Persistence",
+            dependencies: [.product(name: "GRDB", package: "GRDB.swift")],
+            swiftSettings: serviceSettings
+        ),
+        .target(
+            name: "Library",
+            dependencies: ["JellyfinKit", "Persistence"],
+            swiftSettings: serviceSettings
+        ),
+        .target(
             name: "DesignSystem",
             dependencies: [
                 .product(name: "NukeUI", package: "Nuke"),
+                .product(name: "Nuke", package: "Nuke"),
                 .product(name: "Inject", package: "Inject"),
             ],
             resources: [.process("Resources")],
@@ -48,8 +60,13 @@ let package = Package(
         ),
         .target(
             name: "Features",
-            dependencies: ["JellyfinKit", "DesignSystem", "PreviewSupport"],
+            dependencies: ["JellyfinKit", "Library", "Persistence", "DesignSystem", "PreviewSupport"],
             swiftSettings: uiSettings
+        ),
+        .testTarget(
+            name: "LibraryTests",
+            dependencies: ["Library", "Persistence"],
+            swiftSettings: serviceSettings
         ),
         .testTarget(
             name: "JellyfinKitTests",

@@ -10,7 +10,7 @@ struct HomeView: View {
     let userName: String
     @Binding var showSettings: Bool
     @Namespace private var zoom
-    @State private var path: [AlbumRoute] = []
+    @State private var path: [LibraryRoute] = []
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -18,12 +18,7 @@ struct HomeView: View {
                 LazyVStack(alignment: .leading, spacing: theme.spacing.xxl) {
                     ForEach(model.shelves) { shelf in
                         ShelfSection(shelf.title, items: shelf.albums) { album in
-                            let route = AlbumRoute(album: album, sourceID: "\(shelf.kind.rawValue)-\(album.id)")
-                            NavigationLink(value: route) {
-                                AlbumTile(title: album.title, subtitle: album.artist, artwork: model.artwork(for: album))
-                                    .matchedTransitionSource(id: route.sourceID, in: zoom)
-                            }
-                            .buttonStyle(.pressable)
+                            AlbumLink(album: album, context: shelf.kind.rawValue)
                         }
                     }
                 }
@@ -51,17 +46,15 @@ struct HomeView: View {
                 }
                 .sharedBackgroundVisibility(.hidden)
             }
-            .navigationDestination(for: AlbumRoute.self) { route in
-                AlbumDetailView(model: model.detailModel(for: route.album))
-                    .navigationTransition(.zoom(sourceID: route.sourceID, in: zoom))
-            }
+            .libraryDestinations(zoom: zoom)
             .refreshable { await model.load() }
             // Root reappears after every pop, so only load the first time; pull to refresh after that.
             .task {
                 guard model.shelves.isEmpty else { return }
                 await model.load()
-                if DebugFlags.openFirstAlbum, let shelf = model.shelves.first, let album = shelf.albums.first {
-                    path = [AlbumRoute(album: album, sourceID: "\(shelf.kind.rawValue)-\(album.id)")]
+                if DebugFlags.openFirstAlbum, let shelf = model.shelves.first,
+                   let album = shelf.albums.dropFirst(DebugFlags.albumIndex).first {
+                    path = [.album(AlbumRoute(album: album, sourceID: "\(shelf.kind.rawValue)-\(album.id)"))]
                 }
             }
         }
@@ -81,9 +74,13 @@ struct HomeView: View {
 }
 
 #Preview {
-    HomeView(model: HomeModel(previewShelves: [
-        .init(kind: .recentlyPlayed, albums: Array(Fixtures.albums.prefix(6))),
-        .init(kind: .mostPlayed, albums: Fixtures.albums.reversed()),
-        .init(kind: .recentlyAdded, albums: Array(Fixtures.albums.suffix(5))),
-    ]), userName: "Derrell", showSettings: .constant(false))
+    let app = AppModel.preview()
+    if case let .signedIn(signedIn) = app.phase {
+        HomeView(model: HomeModel(previewShelves: [
+            .init(kind: .recentlyPlayed, albums: Array(Fixtures.albums.prefix(6))),
+            .init(kind: .mostPlayed, albums: Fixtures.albums.reversed()),
+            .init(kind: .recentlyAdded, albums: Array(Fixtures.albums.suffix(5))),
+        ]), userName: "Derrell", showSettings: .constant(false))
+        .environment(signedIn.library)
+    }
 }

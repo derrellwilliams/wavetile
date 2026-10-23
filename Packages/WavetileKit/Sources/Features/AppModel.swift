@@ -2,6 +2,7 @@ import DesignSystem
 import Foundation
 import JellyfinKit
 import Observation
+import Persistence
 import PreviewSupport
 
 /// Root app state: who is signed in, and the selected theme.
@@ -15,7 +16,7 @@ public final class AppModel {
 
     public struct SignedIn {
         public let session: ServerSession
-        public let library: LibraryClient
+        let library: LibraryStore
     }
 
     public private(set) var phase: Phase = .launching
@@ -37,7 +38,7 @@ public final class AppModel {
     public func restore() {
         guard case .launching = phase else { return }
         if let (session, token) = store.load() {
-            phase = .signedIn(.init(session: session, library: LibraryClient(session: session, token: token, auth: auth)))
+            phase = .signedIn(makeSignedIn(session, token: token))
         } else {
             phase = .signedOut
         }
@@ -45,12 +46,23 @@ public final class AppModel {
 
     public func didSignIn(_ session: ServerSession, token: String) throws {
         try store.save(session, token: token)
-        phase = .signedIn(.init(session: session, library: LibraryClient(session: session, token: token, auth: auth)))
+        phase = .signedIn(makeSignedIn(session, token: token))
+    }
+
+    private func makeSignedIn(_ session: ServerSession, token: String) -> SignedIn {
+        // A corrupt or unreadable cache shouldn't block sign-in; fall back to a fresh temp database.
+        let database = (try? LibraryDatabase.open(serverID: session.serverID, userID: session.userID))
+            ?? (try! LibraryDatabase.temporary())
+        return SignedIn(session: session, library: LibraryStore(session: session, token: token, auth: auth, database: database))
     }
 
     public func signOut() async {
         if let (session, token) = store.load() {
             await auth.signOut(session, token: token)
+        }
+        if case let .signedIn(signedIn) = phase {
+            // The cached library is private to this account; don't leave it on disk.
+            LibraryDatabase.delete(serverID: signedIn.session.serverID, userID: signedIn.session.userID)
         }
         store.clear()
         phase = .signedOut
@@ -63,7 +75,8 @@ extension AppModel {
         let model = AppModel(deviceName: "Preview", store: SessionStore(keychain: Keychain(service: "preview"), defaults: UserDefaults(suiteName: "preview")!))
         if signedIn {
             let session = Fixtures.session
-            model.phase = .signedIn(.init(session: session, library: LibraryClient(session: session, token: "", auth: model.auth)))
+            let store = LibraryStore(session: session, token: "", auth: model.auth, database: try! LibraryDatabase.temporary())
+            model.phase = .signedIn(.init(session: session, library: store))
         } else {
             model.phase = .signedOut
         }

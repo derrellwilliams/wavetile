@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 /// Plexamp-style ambient background: a slowly drifting mesh gradient tinted by the artwork.
 public struct ArtworkBackground: View {
@@ -9,7 +8,7 @@ public struct ArtworkBackground: View {
     private let colors: [Color]
     @State private var drift = false
 
-    /// - Parameter colors: dominant artwork colors, e.g. from `ArtworkColors.extract(from:)`. 2–4 work best.
+    /// - Parameter colors: artwork colors, e.g. an `ArtworkPalette`'s background and accent. 2–4 work best.
     public init(colors: [Color]) {
         self.colors = colors.isEmpty ? [.gray] : colors
     }
@@ -34,40 +33,6 @@ public struct ArtworkBackground: View {
             withAnimation(theme.motion.ambient) { drift = true }
         }
         .animation(theme.motion.smooth, value: colors)
-    }
-}
-
-/// Extracts a small palette from an image by downsampling. Call off the main actor.
-public enum ArtworkColors {
-    public nonisolated static func extract(from image: UIImage, count: Int = 4) -> [Color] {
-        guard let cgImage = image.cgImage else { return [] }
-        let side = 4
-        var pixels = [UInt8](repeating: 0, count: side * side * 4)
-        guard let context = CGContext(
-            data: &pixels,
-            width: side,
-            height: side,
-            bitsPerComponent: 8,
-            bytesPerRow: side * 4,
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else { return [] }
-        context.interpolationQuality = .medium
-        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: side, height: side))
-
-        let samples = stride(from: 0, to: pixels.count, by: 4).map { i in
-            (Double(pixels[i]) / 255, Double(pixels[i + 1]) / 255, Double(pixels[i + 2]) / 255)
-        }
-        // Prefer saturated samples so the background isn't muddy.
-        return samples
-            .sorted { saturation($0) > saturation($1) }
-            .prefix(count)
-            .map { Color(red: $0.0, green: $0.1, blue: $0.2) }
-    }
-
-    private nonisolated static func saturation(_ rgb: (Double, Double, Double)) -> Double {
-        let maxV = max(rgb.0, rgb.1, rgb.2), minV = min(rgb.0, rgb.1, rgb.2)
-        return maxV == 0 ? 0 : (maxV - minV) / maxV
     }
 }
 

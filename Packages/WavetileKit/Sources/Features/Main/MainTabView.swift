@@ -10,16 +10,16 @@ struct MainTabView: View {
     @State private var searchText = ""
     // Debug launch argument `-openSettings` starts with the drawer open (screenshots, design review).
     @State private var showSettings = DebugFlags.openSettings
-    @State private var selection: AppTab = .home
+    @State private var selection: AppTab = DebugFlags.initialTab
     /// Whether each tab's navigation stack is showing its root screen (drives edge-swipe-to-open).
     @State private var atRoot: [AppTab: Bool] = [:]
 
-    enum AppTab: Hashable { case home, library, downloaded, search }
+    enum AppTab: String, Hashable { case home, library, downloaded, search }
 
     init(app: AppModel, signedIn: AppModel.SignedIn) {
         self.app = app
         self.signedIn = signedIn
-        _home = State(initialValue: HomeModel(library: signedIn.library))
+        _home = State(initialValue: HomeModel(library: signedIn.library.api))
     }
 
     var body: some View {
@@ -28,6 +28,9 @@ struct MainTabView: View {
         } drawer: {
             SettingsDrawer(app: app, session: signedIn.session, isOpen: $showSettings)
         }
+        .environment(signedIn.library)
+        // Background library sync: on launch if stale (>1h); pull to refresh in Library forces one.
+        .task { await signedIn.library.syncIfNeeded() }
         .enableInjection()
     }
 
@@ -103,8 +106,14 @@ enum DebugFlags {
     #if DEBUG
     static let openSettings = ProcessInfo.processInfo.arguments.contains("-openSettings")
     static let openFirstAlbum = ProcessInfo.processInfo.arguments.contains("-openFirstAlbum")
+    /// With `-openFirstAlbum`, `-albumIndex 2` opens the third album on the first shelf.
+    static let albumIndex = UserDefaults.standard.integer(forKey: "albumIndex")
+    /// `-tab library` starts on that tab.
+    static let initialTab: MainTabView.AppTab = UserDefaults.standard.string(forKey: "tab").flatMap(MainTabView.AppTab.init) ?? .home
     #else
     static let openSettings = false
     static let openFirstAlbum = false
+    static let initialTab: MainTabView.AppTab = .home
+    static let albumIndex = 0
     #endif
 }

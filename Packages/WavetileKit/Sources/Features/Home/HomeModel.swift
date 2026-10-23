@@ -56,18 +56,6 @@ final class HomeModel {
         let allFailed = results.allSatisfy { (try? $0.1.get()) == nil }
         errorMessage = allFailed ? "Couldn't reach your server." : (shelves.isEmpty ? "Your music library is empty." : nil)
     }
-
-    func detailModel(for album: AlbumSummary) -> AlbumDetailModel {
-        library == nil
-            ? AlbumDetailModel(previewAlbum: album, tracks: Fixtures.tracks)
-            : AlbumDetailModel(album: album, library: library)
-    }
-
-    /// 156pt tiles × 3x scale ≈ 480px; one size keeps the image cache hit rate high.
-    func artwork(for album: AlbumSummary) -> ArtworkSource {
-        guard let library else { return Fixtures.artwork(for: album) }
-        return .url(library.imageURL(itemID: album.id, tag: album.imageTag, maxPixelWidth: 480))
-    }
 }
 
 extension Result where Failure == any Error {

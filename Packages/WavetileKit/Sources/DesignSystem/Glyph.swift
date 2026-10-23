@@ -33,6 +33,9 @@ public enum Glyph: String, CaseIterable, Sendable {
     case server = "hard-drives"
     case address = "globe"
     case close = "x"
+    case shuffle
+    case sort = "sort-ascending"
+    case chevron = "caret-right"
 
     /// 24pt template image; tints with `foregroundStyle`. Add `.resizable()` for other sizes.
     public var image: Image {

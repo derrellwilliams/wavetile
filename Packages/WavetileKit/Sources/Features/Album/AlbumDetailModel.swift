@@ -1,6 +1,7 @@
 import DesignSystem
 import Foundation
 import JellyfinKit
+import Library
 import Observation
 import PreviewSupport
 
@@ -17,18 +18,22 @@ final class AlbumDetailModel {
     private(set) var tracks: [TrackSummary] = []
     private(set) var isLoading = false
     private(set) var errorMessage: String?
-    private let library: LibraryClient?
+    private let store: LibraryStore?
 
-    init(album: AlbumSummary, library: LibraryClient?) {
+    init(album: AlbumSummary, store: LibraryStore?) {
         self.album = album
-        self.library = library
+        self.store = store
+        // Synchronous local read: tracks are on screen in the first frame when the library is synced.
+        if let store, let local = try? store.database.tracks(albumID: album.id), !local.isEmpty {
+            tracks = local.map(\.summary)
+        }
     }
 
     /// Preview initializer with fixed tracks and no network.
     init(previewAlbum album: AlbumSummary, tracks: [TrackSummary]) {
         self.album = album
         self.tracks = tracks
-        self.library = nil
+        self.store = nil
     }
 
     var totalDuration: Duration {
@@ -42,21 +47,22 @@ final class AlbumDetailModel {
         return grouped.keys.sorted { ($0 ?? 0) < ($1 ?? 0) }.map { ($0, grouped[$0] ?? []) }
     }
 
+    /// Hero art spans the screen width (~440pt × 3x).
+    var artwork: ArtworkSource {
+        guard let store else { return Fixtures.artwork(for: album) }
+        return store.artwork(itemID: album.id, tag: album.imageTag, maxPixelWidth: 1320)
+    }
+
+    /// Falls back to the server when the album isn't in the local library yet (first sync running).
     func load() async {
-        guard let library, tracks.isEmpty else { return }
+        guard let store, tracks.isEmpty else { return }
         isLoading = true
         defer { isLoading = false }
         do {
-            tracks = try await library.albumTracks(albumID: album.id)
+            tracks = try await store.api.albumTracks(albumID: album.id)
             errorMessage = nil
         } catch {
             errorMessage = "Couldn't load tracks."
         }
-    }
-
-    /// Hero art is ~300pt wide; 3x scale.
-    var artwork: ArtworkSource {
-        guard let library else { return Fixtures.artwork(for: album) }
-        return .url(library.imageURL(itemID: album.id, tag: album.imageTag, maxPixelWidth: 960))
     }
 }

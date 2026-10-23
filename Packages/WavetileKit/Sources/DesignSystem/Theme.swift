@@ -22,6 +22,12 @@ public struct Theme: Sendable, Identifiable, Hashable {
     public struct Palette: Sendable, Equatable {
         /// Brand color: tint for controls, selection, progress.
         public var accent: Color
+        /// Solid fill for primary buttons (Play). Same as `accent` unless an artwork palette sets a more vivid one.
+        public var accentFill: Color?
+        /// Text/glyphs placed on an accent fill.
+        public var onAccent: Color = .white
+
+        public var resolvedAccentFill: Color { accentFill ?? accent }
         public var background: Color
         public var surface: Color
         public var textPrimary: Color
