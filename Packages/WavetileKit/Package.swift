@@ -17,7 +17,7 @@ let serviceSettings: [SwiftSetting] = [
 
 let package = Package(
     name: "WavetileKit",
-    platforms: [.iOS(.v26)],
+    platforms: [.iOS("26.1")],
     products: [
         .library(name: "WavetileKit", targets: ["Features"]),
     ],
@@ -44,6 +44,11 @@ let package = Package(
             swiftSettings: serviceSettings
         ),
         .target(
+            name: "Playback",
+            dependencies: ["JellyfinKit"],
+            swiftSettings: serviceSettings
+        ),
+        .target(
             name: "DesignSystem",
             dependencies: [
                 .product(name: "NukeUI", package: "Nuke"),
@@ -60,8 +65,13 @@ let package = Package(
         ),
         .target(
             name: "Features",
-            dependencies: ["JellyfinKit", "Library", "Persistence", "DesignSystem", "PreviewSupport"],
+            dependencies: ["JellyfinKit", "Library", "Persistence", "Playback", "DesignSystem", "PreviewSupport"],
             swiftSettings: uiSettings
+        ),
+        .testTarget(
+            name: "PlaybackTests",
+            dependencies: ["Playback"],
+            swiftSettings: serviceSettings
         ),
         .testTarget(
             name: "LibraryTests",

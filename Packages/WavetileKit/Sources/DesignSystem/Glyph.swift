@@ -36,6 +36,14 @@ public enum Glyph: String, CaseIterable, Sendable {
     case shuffle
     case sort = "sort-ascending"
     case chevron = "caret-right"
+    case `repeat`
+    case repeatOne = "repeat-once"
+    case queue
+    case dismiss = "caret-down"
+    case airplay = "speaker-hifi"
+    case more = "dots-three"
+    case addToQueue = "list-plus"
+    case playNext = "arrow-bend-down-right"
 
     /// 24pt template image; tints with `foregroundStyle`. Add `.resizable()` for other sizes.
     public var image: Image {
@@ -54,6 +62,34 @@ public extension Button where Label == SwiftUI.Label<Text, Image> {
     /// `Button("Settings", glyph: .profile) { ... }`: the Phosphor equivalent of `Button(_:systemImage:action:)`.
     init(_ title: String, glyph: Glyph, role: ButtonRole? = nil, action: @escaping () -> Void) {
         self.init(role: role, action: action) { SwiftUI.Label(title, glyph: glyph) }
+    }
+}
+
+/// Icon-only button at an arbitrary size (Phosphor assets are 24pt templates).
+/// Keeps a 44pt minimum hit target and an accessibility label.
+public struct GlyphButton: View {
+    private let title: String
+    private let glyph: Glyph
+    private let size: CGFloat
+    private let action: () -> Void
+
+    public init(_ title: String, glyph: Glyph, size: CGFloat = 24, action: @escaping () -> Void) {
+        self.title = title
+        self.glyph = glyph
+        self.size = size
+        self.action = action
+    }
+
+    public var body: some View {
+        Button(action: action) {
+            glyph.image
+                .resizable()
+                .scaledToFit()
+                .frame(width: size, height: size)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(.rect)
+        }
+        .accessibilityLabel(title)
     }
 }
 

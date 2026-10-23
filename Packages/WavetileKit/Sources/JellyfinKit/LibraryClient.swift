@@ -43,11 +43,15 @@ public struct TrackSummary: Identifiable, Hashable, Sendable {
 /// Milestone 2 hits the API directly; milestone 3 puts a GRDB cache in front of it.
 public struct LibraryClient: Sendable {
     public let session: ServerSession
-    private let client: JellyfinAPI.JellyfinClient
+    let client: JellyfinAPI.JellyfinClient
+    let identity: ClientIdentity
+    let token: String
 
     public init(session: ServerSession, token: String, auth: AuthService) {
         self.session = session
         self.client = auth.makeClient(for: session.serverURL, token: token)
+        self.identity = auth.identity
+        self.token = token
     }
 
     /// Newest albums added to the library.

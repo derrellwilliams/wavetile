@@ -14,6 +14,7 @@ ICONS=(
   play pause skip-forward skip-back
   gear-six sign-out palette hard-drives globe x
   shuffle sort-ascending caret-right
+  repeat repeat-once queue caret-down speaker-hifi dots-three list-plus arrow-bend-down-right
 )
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

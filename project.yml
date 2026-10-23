@@ -2,7 +2,7 @@ name: Wavetile
 options:
   bundleIdPrefix: com.derrellwilliams
   deploymentTarget:
-    iOS: "26.0"
+    iOS: "26.1"
   createIntermediateGroups: true
   developmentLanguage: en
 
@@ -52,6 +52,8 @@ targets:
       properties:
         # Security: allow plain HTTP only to LAN hosts (typical home Jellyfin).
         # Internet traffic must be HTTPS so the access token is never sent in cleartext.
+        # Keep playing when the app is backgrounded or the screen is locked.
+        UIBackgroundModes: [audio]
         NSLocalNetworkUsageDescription: Wavetile connects to Jellyfin servers on your home network.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true

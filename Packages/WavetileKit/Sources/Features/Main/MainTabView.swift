@@ -10,6 +10,8 @@ struct MainTabView: View {
     @State private var searchText = ""
     // Debug launch argument `-openSettings` starts with the drawer open (screenshots, design review).
     @State private var showSettings = DebugFlags.openSettings
+    @State private var showNowPlaying = false
+    @Namespace private var playerZoom
     @State private var selection: AppTab = DebugFlags.initialTab
     /// Whether each tab's navigation stack is showing its root screen (drives edge-swipe-to-open).
     @State private var atRoot: [AppTab: Bool] = [:]
@@ -29,6 +31,7 @@ struct MainTabView: View {
             SettingsDrawer(app: app, session: signedIn.session, isOpen: $showSettings)
         }
         .environment(signedIn.library)
+        .environment(signedIn.player)
         // Background library sync: on launch if stale (>1h); pull to refresh in Library forces one.
         .task { await signedIn.library.syncIfNeeded() }
         .enableInjection()
@@ -64,12 +67,39 @@ struct MainTabView: View {
         // Required on iOS 27 for the detached search button (searchable lives in SearchView).
         .tabViewSearchActivation(.searchTabSelection)
         .tabBarMinimizeBehavior(.onScrollDown)
-        // Mini player is attached here once playback lands (milestone 4):
-        // .tabViewBottomAccessory { MiniPlayerBar(...) }
+        .onChange(of: signedIn.player.hasQueue) { _, hasQueue in
+            if hasQueue, DebugFlags.openNowPlaying { showNowPlaying = true }
+        }
+        .tabViewBottomAccessory(isEnabled: signedIn.player.hasQueue) {
+            miniPlayer
+        }
+        .sheet(isPresented: $showNowPlaying) {
+            NowPlayingView()
+                .presentationBackground(theme.palette.background)
+                .navigationTransition(.zoom(sourceID: "miniPlayer", in: playerZoom))
+        }
     }
 }
 
 extension MainTabView {
+    @ViewBuilder fileprivate var miniPlayer: some View {
+        let player = signedIn.player
+        if let track = player.current {
+            MiniPlayerBar(
+                title: track.title,
+                subtitle: track.artist,
+                artwork: signedIn.library.artwork(itemID: track.albumID, tag: track.albumImageTag, maxPixelWidth: 144),
+                isPlaying: player.isPlaying,
+                onPlayPause: { player.togglePlayPause() },
+                onNext: { player.next() }
+            )
+            .contentShape(.rect)
+            .onTapGesture { showNowPlaying = true }
+            .matchedTransitionSource(id: "miniPlayer", in: playerZoom)
+            .accessibilityAction(named: "Open Now Playing") { showNowPlaying = true }
+        }
+    }
+
     private func reporter(for tab: AppTab) -> TabRootReporter {
         TabRootReporter { isRoot in atRoot[tab] = isRoot }
     }
@@ -108,6 +138,9 @@ enum DebugFlags {
     static let openFirstAlbum = ProcessInfo.processInfo.arguments.contains("-openFirstAlbum")
     /// With `-openFirstAlbum`, `-albumIndex 2` opens the third album on the first shelf.
     static let albumIndex = UserDefaults.standard.integer(forKey: "albumIndex")
+    /// `-autoplay` starts the album opened by `-openFirstAlbum`; `-openNowPlaying` then shows the player.
+    static let autoplay = ProcessInfo.processInfo.arguments.contains("-autoplay")
+    static let openNowPlaying = ProcessInfo.processInfo.arguments.contains("-openNowPlaying")
     /// `-tab library` starts on that tab.
     static let initialTab: MainTabView.AppTab = UserDefaults.standard.string(forKey: "tab").flatMap(MainTabView.AppTab.init) ?? .home
     #else
@@ -115,5 +148,7 @@ enum DebugFlags {
     static let openFirstAlbum = false
     static let initialTab: MainTabView.AppTab = .home
     static let albumIndex = 0
+    static let autoplay = false
+    static let openNowPlaying = false
     #endif
 }

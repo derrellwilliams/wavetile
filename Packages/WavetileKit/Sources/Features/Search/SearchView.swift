@@ -1,6 +1,7 @@
 import DesignSystem
 import Library
 import Persistence
+import Playback
 import SwiftUI
 
 /// Offline full-text search over the synced library. The search field itself is attached here
@@ -10,6 +11,7 @@ struct SearchView: View {
     @Environment(\.theme) private var theme
     @Environment(LibraryStore.self) private var store
     @Namespace private var zoom
+    @Environment(AudioPlayer.self) private var player
     @Binding var text: String
     @State private var results = LibraryDatabase.SearchResults()
 
@@ -47,13 +49,16 @@ struct SearchView: View {
                 }
                 if !results.tracks.isEmpty {
                     Section("Songs") {
-                        ForEach(results.tracks) { track in
-                            TrackRow(
-                                title: track.title,
-                                subtitle: "\(track.artistName) · \(track.albumTitle)",
-                                duration: track.durationMs.map { .milliseconds($0) },
-                                leading: .artwork(store.artwork(itemID: track.albumID, maxPixelWidth: 144))
-                            )
+                        ForEach(Array(results.tracks.enumerated()), id: \.element.id) { index, track in
+                            PlayableRow(index: index, tracks: { results.tracks.map(QueuedTrack.init) }) {
+                                TrackRow(
+                                    title: track.title,
+                                    subtitle: "\(track.artistName) · \(track.albumTitle)",
+                                    duration: track.durationMs.map { .milliseconds($0) },
+                                    leading: .artwork(store.artwork(itemID: track.albumID, maxPixelWidth: 144)),
+                                    isPlaying: player.current?.trackID == track.id
+                                )
+                            }
                             .listRowBackground(Color.clear)
                         }
                     }

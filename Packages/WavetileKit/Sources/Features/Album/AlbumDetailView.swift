@@ -1,11 +1,13 @@
 import DesignSystem
 import JellyfinKit
+import Playback
 import PreviewSupport
 import SwiftUI
 
 struct AlbumDetailView: View {
     @ObserveInjection var inject
     @Environment(\.theme) private var theme
+    @Environment(AudioPlayer.self) private var player
     @State var model: AlbumDetailModel
 
     var body: some View {
@@ -23,7 +25,10 @@ struct AlbumDetailView: View {
         .ignoresSafeArea(edges: .top)
         .themedBackground()
         .navigationBarTitleDisplayMode(.inline)
-        .task { await model.load() }
+        .task {
+            await model.load()
+            if DebugFlags.autoplay, !player.hasQueue { player.play(queue()) }
+        }
         .enableInjection()
     }
 
@@ -41,6 +46,10 @@ struct AlbumDetailView: View {
                 .foregroundStyle(theme.palette.textSecondary)
         }
         .padding(.horizontal, theme.spacing.screenInset)
+    }
+
+    private func queue() -> [QueuedTrack] {
+        model.tracks.map { QueuedTrack($0, album: model.album) }
     }
 
     private var metadata: String {
@@ -73,14 +82,17 @@ struct AlbumDetailView: View {
                             .padding(.bottom, theme.spacing.xs)
                     }
                     ForEach(disc.tracks) { track in
-                        TrackRow(
-                            title: track.title,
-                            subtitle: track.artist == model.album.artist ? nil : track.artist,
-                            duration: track.duration,
-                            leading: .number(track.trackNumber)
-                        )
-                        .padding(.horizontal, theme.spacing.screenInset)
-                        .padding(.vertical, theme.spacing.md)
+                        PlayableRow(index: model.tracks.firstIndex(of: track) ?? 0, tracks: queue) {
+                            TrackRow(
+                                title: track.title,
+                                subtitle: track.artist == model.album.artist ? nil : track.artist,
+                                duration: track.duration,
+                                leading: .number(track.trackNumber),
+                                isPlaying: player.current?.trackID == track.id
+                            )
+                            .padding(.horizontal, theme.spacing.screenInset)
+                            .padding(.vertical, theme.spacing.md)
+                        }
                         if track.id != disc.tracks.last?.id {
                             Divider()
                                 .overlay(theme.palette.separator)
