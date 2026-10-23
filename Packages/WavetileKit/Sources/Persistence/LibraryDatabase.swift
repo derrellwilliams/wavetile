@@ -146,6 +146,26 @@ public final class LibraryDatabase: Sendable {
                 t.column("albumTitle")
             }
         }
+        registerDownloadMigrations(&migrator)
+
+        migrator.registerMigration("v3-favorites-collections") { db in
+            try db.alter(table: "album") { t in t.add(column: "isFavorite", .boolean).notNull().defaults(to: false) }
+            try db.alter(table: "artist") { t in t.add(column: "isFavorite", .boolean).notNull().defaults(to: false) }
+            try db.create(table: "collection") { t in
+                t.primaryKey("id", .text)
+                t.column("name", .text).notNull()
+                t.column("sortName", .text).notNull().indexed()
+                t.column("imageTag", .text)
+                t.column("albumCount", .integer).notNull()
+                t.column("generation", .integer).notNull()
+            }
+            try db.create(table: "collectionAlbum") { t in
+                t.column("collectionID", .text).notNull().references("collection", onDelete: .cascade)
+                t.column("albumID", .text).notNull()
+                t.column("position", .integer).notNull()
+                t.primaryKey(["collectionID", "albumID"])
+            }
+        }
         return migrator
     }
 }

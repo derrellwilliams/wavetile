@@ -12,17 +12,22 @@ import Persistence
 final class LibraryStore {
     let database: LibraryDatabase
     let api: LibraryClient
+    let editor: LibraryEditor
     private let sync: LibrarySync
 
     private(set) var progress: LibrarySync.Progress?
     private(set) var isSyncing = false
     private(set) var syncError: String?
     private(set) var hasSyncedOnce = false
+    /// Runs after each successful sync (downloaded-playlist refresh).
+    @ObservationIgnored var afterSync: (() async -> Void)?
 
     init(session: ServerSession, token: String, auth: AuthService, database: LibraryDatabase) {
         self.database = database
         self.api = LibraryClient(session: session, token: token, auth: auth)
-        self.sync = LibrarySync(session: session, token: token, auth: auth, database: database)
+        let sync = LibrarySync(session: session, token: token, auth: auth, database: database)
+        self.sync = sync
+        self.editor = LibraryEditor(session: session, token: token, auth: auth, database: database, sync: sync)
         self.hasSyncedOnce = (try? database.syncState()?.lastCompleted) != nil
     }
 
@@ -44,6 +49,7 @@ final class LibraryStore {
                 Task { @MainActor in self?.progress = progress }
             }
             hasSyncedOnce = true
+            await afterSync?()
         } catch is CancellationError {
         } catch {
             syncError = "Library sync failed. Pull to retry."
@@ -71,6 +77,7 @@ final class LibraryStore {
         case .albums: "Syncing albums… \(count)"
         case .tracks: "Syncing songs… \(count)"
         case .playlists: "Syncing playlists…"
+        case .collections: "Syncing collections…"
         case .finishing: "Finishing up…"
         }
     }

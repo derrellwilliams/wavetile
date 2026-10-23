@@ -23,21 +23,26 @@ struct NowPlayingView: View {
 
             Spacer(minLength: 0)
 
-            VStack(alignment: .leading, spacing: theme.spacing.xs) {
-                Text(player.current?.title ?? "")
-                    .font(theme.typography.nowPlayingTitle)
-                    .foregroundStyle(theme.palette.textPrimary)
-                Text(player.current?.artist ?? "")
-                    .font(theme.typography.nowPlayingSubtitle)
-                    .foregroundStyle(theme.palette.accent)
-                if let error = player.errorMessage {
-                    Label(error, glyph: .warning)
-                        .font(theme.typography.caption)
-                        .foregroundStyle(theme.palette.textSecondary)
+            HStack(alignment: .center, spacing: theme.spacing.md) {
+                VStack(alignment: .leading, spacing: theme.spacing.xs) {
+                    Text(player.current?.title ?? "")
+                        .font(theme.typography.nowPlayingTitle)
+                        .foregroundStyle(theme.palette.textPrimary)
+                    Text(player.current?.artist ?? "")
+                        .font(theme.typography.nowPlayingSubtitle)
+                        .foregroundStyle(theme.palette.accent)
+                    if let error = player.errorMessage {
+                        Label(error, glyph: .warning)
+                            .font(theme.typography.caption)
+                            .foregroundStyle(theme.palette.textSecondary)
+                    }
+                }
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if let trackID = player.current?.trackID {
+                    FavoriteButton(itemID: trackID, size: 28)
                 }
             }
-            .lineLimit(1)
-            .frame(maxWidth: .infinity, alignment: .leading)
             .contentTransition(.opacity)
             .animation(theme.motion.smooth, value: player.current?.queueID)
 

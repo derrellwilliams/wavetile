@@ -13,13 +13,18 @@ public struct TrackRow: View {
     private let duration: Duration?
     private let leading: Leading
     private let isPlaying: Bool
+    private let isDownloaded: Bool
 
-    public init(title: String, subtitle: String? = nil, duration: Duration? = nil, leading: Leading, isPlaying: Bool = false) {
+    public init(
+        title: String, subtitle: String? = nil, duration: Duration? = nil, leading: Leading,
+        isPlaying: Bool = false, isDownloaded: Bool = false
+    ) {
         self.title = title
         self.subtitle = subtitle
         self.duration = duration
         self.leading = leading
         self.isPlaying = isPlaying
+        self.isDownloaded = isDownloaded
     }
 
     public var body: some View {
@@ -37,6 +42,13 @@ public struct TrackRow: View {
             }
             .lineLimit(1)
             Spacer(minLength: theme.spacing.sm)
+            if isDownloaded {
+                Glyph.downloads.image
+                    .resizable()
+                    .frame(width: 14, height: 14)
+                    .foregroundStyle(theme.palette.textSecondary)
+                    .accessibilityLabel("Downloaded")
+            }
             if let duration {
                 Text(duration, format: .time(pattern: .minuteSecond))
                     .font(theme.typography.itemSubtitle.monospacedDigit())

@@ -54,8 +54,16 @@ struct ArtistDetailView: View {
         }
         .scrollIndicators(.hidden)
         .ignoresSafeArea(edges: .top)
+        // Full-bleed art: no dimming/blur band under the navigation bar.
+        .scrollEdgeEffectHidden(true, for: .top)
+        .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .themedBackground()
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                FavoriteButton(itemID: artistID)
+            }
+        }
         .task {
             do {
                 for try await value in store.observe(store.database.albums(artistID: artistID)) { albums = value }

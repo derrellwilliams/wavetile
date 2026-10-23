@@ -8,6 +8,8 @@ struct AlbumDetailView: View {
     @ObserveInjection var inject
     @Environment(\.theme) private var theme
     @Environment(AudioPlayer.self) private var player
+    @Environment(DownloadsStore.self) private var downloads
+    @Environment(LibraryActions.self) private var actions
     @State var model: AlbumDetailModel
 
     var body: some View {
@@ -23,11 +25,34 @@ struct AlbumDetailView: View {
         }
         .scrollIndicators(.hidden)
         .ignoresSafeArea(edges: .top)
+        // Full-bleed art: no dimming/blur band under the navigation bar.
+        .scrollEdgeEffectHidden(true, for: .top)
+        .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .themedBackground()
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                FavoriteButton(itemID: model.album.id)
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button("Add to Playlist", glyph: .addToQueue) { actions.addToPlaylist(model.tracks.map(\.id)) }
+                        .disabled(model.tracks.isEmpty)
+                    Button("Add to Collection", glyph: .collection) { actions.addToCollection([model.album.id]) }
+                    Divider()
+                    Button("Play Next", glyph: .playNext) { player.playNext(queue()) }
+                        .disabled(model.tracks.isEmpty)
+                    Button("Add to Queue", glyph: .queue) { player.addToQueue(queue()) }
+                        .disabled(model.tracks.isEmpty)
+                } label: {
+                    Label("More", glyph: .more)
+                }
+            }
+        }
         .task {
             await model.load()
             if DebugFlags.autoplay, !player.hasQueue { player.play(queue()) }
+            if DebugFlags.autodownload { downloads.download(album: model.album, trackIDs: model.tracks.map(\.id)) }
         }
         .enableInjection()
     }
@@ -44,6 +69,11 @@ struct AlbumDetailView: View {
             Text(metadata)
                 .font(theme.typography.caption)
                 .foregroundStyle(theme.palette.textSecondary)
+            DownloadButton(collectionID: model.album.id) {
+                downloads.download(album: model.album, trackIDs: model.tracks.map(\.id))
+            }
+            .padding(.top, theme.spacing.sm)
+            .disabled(model.tracks.isEmpty)
         }
         .padding(.horizontal, theme.spacing.screenInset)
     }
@@ -82,13 +112,14 @@ struct AlbumDetailView: View {
                             .padding(.bottom, theme.spacing.xs)
                     }
                     ForEach(disc.tracks) { track in
-                        PlayableRow(index: model.tracks.firstIndex(of: track) ?? 0, tracks: queue) {
+                        PlayableRow(trackID: track.id, index: model.tracks.firstIndex(of: track) ?? 0, tracks: queue) {
                             TrackRow(
                                 title: track.title,
                                 subtitle: track.artist == model.album.artist ? nil : track.artist,
                                 duration: track.duration,
                                 leading: .number(track.trackNumber),
-                                isPlaying: player.current?.trackID == track.id
+                                isPlaying: player.current?.trackID == track.id,
+                                isDownloaded: downloads.isDownloaded(track.id)
                             )
                             .padding(.horizontal, theme.spacing.screenInset)
                             .padding(.vertical, theme.spacing.md)

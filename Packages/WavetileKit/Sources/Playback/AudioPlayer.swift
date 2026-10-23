@@ -22,6 +22,9 @@ public final class AudioPlayer {
     public private(set) var errorMessage: String?
 
     public var current: QueuedTrack? { queue.current }
+
+    /// Returns a downloaded file for a track ID; when set, local files play instead of streams.
+    @ObservationIgnored public var localFile: ((String) -> URL?)?
     public var hasQueue: Bool { !queue.isEmpty }
 
     @ObservationIgnored private let library: LibraryClient
@@ -201,6 +204,12 @@ public final class AudioPlayer {
     }
 
     private func makeItem(for track: QueuedTrack) -> AVPlayerItem? {
+        if let file = localFile?(track.trackID) {
+            let item = AVPlayerItem(url: file)
+            entries[ObjectIdentifier(item)] = Entry(track: track, playSessionID: UUID().uuidString)
+            observeStatus(of: item)
+            return item
+        }
         guard let request = library.streamRequest(trackID: track.trackID) else { return nil }
         // Header-based auth keeps the token out of the URL.
         let asset = AVURLAsset(url: request.url, options: ["AVURLAssetHTTPHeaderFieldsKey": request.headers])

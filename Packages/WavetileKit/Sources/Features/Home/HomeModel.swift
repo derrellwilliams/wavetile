@@ -54,7 +54,9 @@ final class HomeModel {
             return Shelf(kind: kind, albums: albums)
         }
         let allFailed = results.allSatisfy { (try? $0.1.get()) == nil }
-        errorMessage = allFailed ? "Couldn't reach your server." : (shelves.isEmpty ? "Your music library is empty." : nil)
+        errorMessage = allFailed
+            ? "Couldn't reach your server. Your downloads are in the Downloaded tab."
+            : (shelves.isEmpty ? "Your music library is empty." : nil)
     }
 }
 

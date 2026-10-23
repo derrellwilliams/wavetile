@@ -44,6 +44,11 @@ let package = Package(
             swiftSettings: serviceSettings
         ),
         .target(
+            name: "Downloads",
+            dependencies: ["JellyfinKit", "Persistence"],
+            swiftSettings: serviceSettings
+        ),
+        .target(
             name: "Playback",
             dependencies: ["JellyfinKit"],
             swiftSettings: serviceSettings
@@ -65,7 +70,7 @@ let package = Package(
         ),
         .target(
             name: "Features",
-            dependencies: ["JellyfinKit", "Library", "Persistence", "Playback", "DesignSystem", "PreviewSupport"],
+            dependencies: ["JellyfinKit", "Library", "Persistence", "Playback", "Downloads", "DesignSystem", "PreviewSupport"],
             swiftSettings: uiSettings
         ),
         .testTarget(
@@ -75,7 +80,7 @@ let package = Package(
         ),
         .testTarget(
             name: "LibraryTests",
-            dependencies: ["Library", "Persistence"],
+            dependencies: ["Library", "Persistence", "Downloads"],
             swiftSettings: serviceSettings
         ),
         .testTarget(

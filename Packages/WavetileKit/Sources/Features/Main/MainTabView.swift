@@ -11,6 +11,8 @@ struct MainTabView: View {
     // Debug launch argument `-openSettings` starts with the drawer open (screenshots, design review).
     @State private var showSettings = DebugFlags.openSettings
     @State private var showNowPlaying = false
+    @State private var connectivity = Connectivity()
+    @State private var actions = LibraryActions()
     @Namespace private var playerZoom
     @State private var selection: AppTab = DebugFlags.initialTab
     /// Whether each tab's navigation stack is showing its root screen (drives edge-swipe-to-open).
@@ -32,6 +34,11 @@ struct MainTabView: View {
         }
         .environment(signedIn.library)
         .environment(signedIn.player)
+        .environment(signedIn.downloads)
+        .environment(connectivity)
+        .environment(actions)
+        .libraryActionSheets(actions)
+        .task { await signedIn.downloads.observe() }
         // Background library sync: on launch if stale (>1h); pull to refresh in Library forces one.
         .task { await signedIn.library.syncIfNeeded() }
         .enableInjection()
@@ -141,6 +148,8 @@ enum DebugFlags {
     /// `-autoplay` starts the album opened by `-openFirstAlbum`; `-openNowPlaying` then shows the player.
     static let autoplay = ProcessInfo.processInfo.arguments.contains("-autoplay")
     static let openNowPlaying = ProcessInfo.processInfo.arguments.contains("-openNowPlaying")
+    /// `-autodownload` downloads the album opened by `-openFirstAlbum`.
+    static let autodownload = ProcessInfo.processInfo.arguments.contains("-autodownload")
     /// `-tab library` starts on that tab.
     static let initialTab: MainTabView.AppTab = UserDefaults.standard.string(forKey: "tab").flatMap(MainTabView.AppTab.init) ?? .home
     #else
@@ -150,5 +159,6 @@ enum DebugFlags {
     static let albumIndex = 0
     static let autoplay = false
     static let openNowPlaying = false
+    static let autodownload = false
     #endif
 }

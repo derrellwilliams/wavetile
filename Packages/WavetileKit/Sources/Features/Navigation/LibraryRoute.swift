@@ -9,17 +9,20 @@ enum LibraryRoute: Hashable {
     case artist(id: String, name: String)
     case genre(String)
     case playlist(PlaylistRecord)
+    case collection(CollectionRecord)
     case section(LibrarySection)
 }
 
 enum LibrarySection: String, CaseIterable, Hashable {
-    case playlists, artists, albums, songs, genres
+    case playlists, collections, favorites, artists, albums, songs, genres
 
     var title: String { rawValue.capitalized }
 
     var glyph: Glyph {
         switch self {
         case .playlists: .playlist
+        case .collections: .collection
+        case .favorites: .favorite
         case .artists: .artist
         case .albums: .album
         case .songs: .song
@@ -61,6 +64,12 @@ private struct LibraryDestination: View {
             AlbumGridView(title: genre, source: .genre(genre))
         case let .playlist(playlist):
             PlaylistDetailView(playlist: playlist)
+        case let .collection(collection):
+            CollectionDetailView(collection: collection)
+        case .section(.collections):
+            CollectionsView()
+        case .section(.favorites):
+            FavoritesView()
         case .section(.albums):
             AlbumGridView(title: "Albums", source: .all)
         case .section(.artists):
@@ -78,6 +87,7 @@ private struct LibraryDestination: View {
 /// Album tile that pushes the album with a zoom transition from the tapped artwork.
 struct AlbumLink: View {
     @Environment(LibraryStore.self) private var store
+    @Environment(LibraryActions.self) private var actions
     @Environment(\.libraryZoom) private var zoom
     let album: AlbumSummary
     /// Disambiguates the same album appearing in several places on one screen.
@@ -94,6 +104,12 @@ struct AlbumLink: View {
             .modifier(ZoomSource(id: route.sourceID, namespace: zoom))
         }
         .buttonStyle(.pressable)
+        .contextMenu {
+            Button("Add to Collection", glyph: .collection) { actions.addToCollection([album.id]) }
+            Button("Favorite", glyph: .favorite) {
+                Task { try? await store.editor.setFavorite(itemID: album.id, true) }
+            }
+        }
     }
 }
 

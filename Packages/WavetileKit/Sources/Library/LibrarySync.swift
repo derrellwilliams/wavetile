@@ -11,7 +11,7 @@ import Persistence
 public actor LibrarySync {
     public struct Progress: Sendable, Equatable {
         public enum Phase: String, Sendable {
-            case artists, albums, tracks, playlists, finishing
+            case artists, albums, tracks, playlists, collections, finishing
         }
 
         public var phase: Phase
@@ -49,6 +49,7 @@ public actor LibrarySync {
         if try await syncAlbums(generation, progress) { complete.insert(AlbumRecord.databaseTableName) }
         if try await syncTracks(generation, progress) { complete.insert(TrackRecord.databaseTableName) }
         if try await syncPlaylists(generation, progress) { complete.insert(PlaylistRecord.databaseTableName) }
+        if try await syncCollections(generation, progress) { complete.insert(CollectionRecord.databaseTableName) }
 
         progress(.init(phase: .finishing, completed: 0, total: nil))
         let tables = complete
@@ -70,7 +71,7 @@ public actor LibrarySync {
             params.limit = limit
             params.fields = [.sortName]
             params.sortBy = [.sortName]
-            params.enableUserData = false
+            params.enableUserData = true
             return try await client.send(Paths.getAlbumArtists(parameters: params)).value
         } write: { db, items in
             for item in items {
@@ -78,7 +79,8 @@ public actor LibrarySync {
                 let name = item.name ?? "Unknown Artist"
                 try ArtistRecord(
                     id: id, name: name, sortName: SortKey.make(item.sortName ?? name),
-                    imageTag: item.imageTags?["Primary"], generation: generation
+                    imageTag: item.imageTags?["Primary"], isFavorite: item.userData?.isFavorite ?? false,
+                    generation: generation
                 ).upsert(db)
             }
         }
@@ -100,6 +102,7 @@ public actor LibrarySync {
                     year: item.productionYear,
                     imageTag: item.imageTags?["Primary"],
                     dateAdded: item.dateCreated,
+                    isFavorite: item.userData?.isFavorite ?? false,
                     generation: generation
                 ).upsert(db)
                 try AlbumGenreRecord.filter(Column("albumID") == id).deleteAll(db)
@@ -145,25 +148,91 @@ public actor LibrarySync {
 
         for (index, playlist) in playlists.enumerated() {
             progress(.init(phase: .playlists, completed: index, total: playlists.count))
-            guard let id = playlist.id else { continue }
-            let entries = try await playlistEntries(id)
-            try await database.pool.write { db in
-                try PlaylistRecord(
-                    id: id,
-                    name: playlist.name ?? "Untitled Playlist",
-                    imageTag: playlist.imageTags?["Primary"],
-                    trackCount: entries.count,
-                    durationMs: entries.compactMap { $0.runTimeTicks.map { $0 / 10_000 } }.reduce(0, +),
-                    generation: generation
-                ).upsert(db)
-                try PlaylistEntryRecord.filter(Column("playlistID") == id).deleteAll(db)
-                for (position, entry) in entries.enumerated() {
-                    guard let trackID = entry.id else { continue }
-                    try PlaylistEntryRecord(playlistID: id, position: position, trackID: trackID, entryID: entry.playlistItemID).insert(db)
-                }
-            }
+            try await writePlaylist(playlist, generation: generation)
         }
         return complete
+    }
+
+    private func writePlaylist(_ playlist: BaseItemDto, generation: Int) async throws {
+        guard let id = playlist.id else { return }
+        let entries = try await playlistEntries(id)
+        try await database.pool.write { db in
+            try PlaylistRecord(
+                id: id,
+                name: playlist.name ?? "Untitled Playlist",
+                imageTag: playlist.imageTags?["Primary"],
+                trackCount: entries.count,
+                durationMs: entries.compactMap { $0.runTimeTicks.map { $0 / 10_000 } }.reduce(0, +),
+                generation: generation
+            ).upsert(db)
+            try PlaylistEntryRecord.filter(Column("playlistID") == id).deleteAll(db)
+            for (position, entry) in entries.enumerated() {
+                guard let trackID = entry.id else { continue }
+                try PlaylistEntryRecord(playlistID: id, position: position, trackID: trackID, entryID: entry.playlistItemID).insert(db)
+            }
+        }
+    }
+
+    /// Collections (BoxSets) that hold albums. Empty ones are kept so new collections show up.
+    private func syncCollections(_ generation: Int, _ progress: (Progress) -> Void) async throws -> Bool {
+        var params = Paths.GetItemsParameters()
+        params.userID = session.userID
+        params.isRecursive = true
+        params.includeItemTypes = [.boxSet]
+        params.fields = [.childCount, .sortName]
+        params.sortBy = [.sortName]
+        let page = try await client.send(Paths.getItems(parameters: params)).value
+        let collections = page.items ?? []
+        for (index, collection) in collections.enumerated() {
+            progress(.init(phase: .collections, completed: index, total: collections.count))
+            try await writeCollection(collection, generation: generation)
+        }
+        return collections.count >= (page.totalRecordCount ?? 0)
+    }
+
+    private func writeCollection(_ collection: BaseItemDto, generation: Int) async throws {
+        guard let id = collection.id else { return }
+        var params = Paths.GetItemsParameters()
+        params.userID = session.userID
+        params.parentID = id
+        params.fields = [.sortName]
+        let children = try await client.send(Paths.getItems(parameters: params)).value.items ?? []
+        let albums = children.filter { $0.type == .musicAlbum }
+        // Skip movie/TV collections: keep only empty ones or ones that contain albums.
+        guard children.isEmpty || !albums.isEmpty else {
+            _ = try await database.pool.write { try CollectionRecord.deleteOne($0, key: id) }
+            return
+        }
+        let name = collection.name ?? "Untitled Collection"
+        try await database.pool.write { db in
+            try CollectionRecord(
+                id: id, name: name, sortName: SortKey.make(collection.sortName ?? name),
+                imageTag: collection.imageTags?["Primary"], albumCount: albums.count, generation: generation
+            ).upsert(db)
+            try CollectionAlbumRecord.filter(Column("collectionID") == id).deleteAll(db)
+            for (position, album) in albums.enumerated() {
+                guard let albumID = album.id else { continue }
+                try CollectionAlbumRecord(collectionID: id, albumID: albumID, position: position).insert(db)
+            }
+        }
+    }
+
+    // MARK: - Targeted refreshes (after edits)
+
+    private var currentGeneration: Int {
+        (try? database.syncState()?.generation) ?? 0
+    }
+
+    /// Re-reads one playlist from the server into the database.
+    public func refreshPlaylist(id: String) async throws {
+        let item = try await client.send(Paths.getItem(itemID: id, userID: session.userID)).value
+        try await writePlaylist(item, generation: currentGeneration)
+    }
+
+    /// Re-reads one collection from the server into the database.
+    public func refreshCollection(id: String) async throws {
+        let item = try await client.send(Paths.getItem(itemID: id, userID: session.userID)).value
+        try await writeCollection(item, generation: currentGeneration)
     }
 
     private func playlistEntries(_ playlistID: String) async throws -> [BaseItemDto] {

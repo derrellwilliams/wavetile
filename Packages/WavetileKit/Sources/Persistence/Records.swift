@@ -10,13 +10,15 @@ public struct ArtistRecord: Codable, Hashable, Sendable, Identifiable, Fetchable
     public var name: String
     public var sortName: String
     public var imageTag: String?
+    public var isFavorite: Bool
     public var generation: Int
 
-    public init(id: String, name: String, sortName: String, imageTag: String?, generation: Int) {
+    public init(id: String, name: String, sortName: String, imageTag: String?, isFavorite: Bool = false, generation: Int) {
         self.id = id
         self.name = name
         self.sortName = sortName
         self.imageTag = imageTag
+        self.isFavorite = isFavorite
         self.generation = generation
     }
 }
@@ -31,11 +33,12 @@ public struct AlbumRecord: Codable, Hashable, Sendable, Identifiable, FetchableR
     public var year: Int?
     public var imageTag: String?
     public var dateAdded: Date?
+    public var isFavorite: Bool
     public var generation: Int
 
     public init(
         id: String, title: String, sortTitle: String, artistName: String, artistID: String?,
-        year: Int?, imageTag: String?, dateAdded: Date?, generation: Int
+        year: Int?, imageTag: String?, dateAdded: Date?, isFavorite: Bool = false, generation: Int
     ) {
         self.id = id
         self.title = title
@@ -45,6 +48,7 @@ public struct AlbumRecord: Codable, Hashable, Sendable, Identifiable, FetchableR
         self.year = year
         self.imageTag = imageTag
         self.dateAdded = dateAdded
+        self.isFavorite = isFavorite
         self.generation = generation
     }
 }
@@ -156,4 +160,37 @@ public struct GenreSummary: Codable, Hashable, Sendable, Identifiable, Fetchable
     public var genre: String
     public var albumCount: Int
     public var id: String { genre }
+}
+
+/// A Jellyfin Collection (BoxSet) of albums: the album-based counterpart to playlists.
+public struct CollectionRecord: Codable, Hashable, Sendable, Identifiable, FetchableRecord, PersistableRecord {
+    public static let databaseTableName = "collection"
+    public var id: String
+    public var name: String
+    public var sortName: String
+    public var imageTag: String?
+    public var albumCount: Int
+    public var generation: Int
+
+    public init(id: String, name: String, sortName: String, imageTag: String?, albumCount: Int, generation: Int) {
+        self.id = id
+        self.name = name
+        self.sortName = sortName
+        self.imageTag = imageTag
+        self.albumCount = albumCount
+        self.generation = generation
+    }
+}
+
+public struct CollectionAlbumRecord: Codable, Hashable, Sendable, FetchableRecord, PersistableRecord {
+    public static let databaseTableName = "collectionAlbum"
+    public var collectionID: String
+    public var albumID: String
+    public var position: Int
+
+    public init(collectionID: String, albumID: String, position: Int) {
+        self.collectionID = collectionID
+        self.albumID = albumID
+        self.position = position
+    }
 }

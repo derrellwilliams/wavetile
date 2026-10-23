@@ -1,4 +1,5 @@
 import DesignSystem
+import Downloads
 import Foundation
 import JellyfinKit
 import Observation
@@ -19,6 +20,7 @@ public final class AppModel {
         public let session: ServerSession
         let library: LibraryStore
         let player: AudioPlayer
+        let downloads: DownloadsStore
     }
 
     public private(set) var phase: Phase = .launching
@@ -56,7 +58,11 @@ public final class AppModel {
         let database = (try? LibraryDatabase.open(serverID: session.serverID, userID: session.userID))
             ?? (try! LibraryDatabase.temporary())
         let library = LibraryStore(session: session, token: token, auth: auth, database: database)
-        return SignedIn(session: session, library: library, player: AudioPlayer(library: library.api))
+        let downloads = DownloadsStore(session: session, library: library)
+        let player = AudioPlayer(library: library.api)
+        player.localFile = { [weak downloads] trackID in downloads?.localFile(trackID: trackID) }
+        library.afterSync = { [weak downloads] in await downloads?.syncPlaylists() }
+        return SignedIn(session: session, library: library, player: player, downloads: downloads)
     }
 
     public func signOut() async {
@@ -65,11 +71,21 @@ public final class AppModel {
         }
         if case let .signedIn(signedIn) = phase {
             signedIn.player.stop()
+            // Downloaded music is tied to this account; remove it from the device.
+            signedIn.downloads.manager?.deleteEverything()
             // The cached library is private to this account; don't leave it on disk.
             LibraryDatabase.delete(serverID: signedIn.session.serverID, userID: signedIn.session.userID)
         }
         store.clear()
         phase = .signedOut
+    }
+}
+
+public extension AppModel {
+    /// Forwards the app delegate's background-transfer completion handler to the download manager.
+    static func handleBackgroundSessionEvents(identifier: String, completion: @escaping () -> Void) {
+        nonisolated(unsafe) let completion = completion
+        BackgroundSessionEvents.store(identifier) { completion() }
     }
 }
 
@@ -80,7 +96,7 @@ extension AppModel {
         if signedIn {
             let session = Fixtures.session
             let store = LibraryStore(session: session, token: "", auth: model.auth, database: try! LibraryDatabase.temporary())
-            model.phase = .signedIn(.init(session: session, library: store, player: AudioPlayer(library: store.api)))
+            model.phase = .signedIn(.init(session: session, library: store, player: AudioPlayer(library: store.api), downloads: DownloadsStore(session: session, library: store)))
         } else {
             model.phase = .signedOut
         }

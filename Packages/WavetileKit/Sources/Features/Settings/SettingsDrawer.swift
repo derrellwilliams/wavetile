@@ -1,4 +1,5 @@
 import DesignSystem
+import Downloads
 import JellyfinKit
 import PreviewSupport
 import SwiftUI
@@ -11,6 +12,8 @@ struct SettingsDrawer: View {
     let session: ServerSession
     @Binding var isOpen: Bool
     @State private var confirmSignOut = false
+    @State private var confirmRemoveDownloads = false
+    @Environment(DownloadsStore.self) private var downloads
 
     var body: some View {
         ScrollView {
@@ -39,6 +42,8 @@ struct SettingsDrawer: View {
                     }
                 }
 
+                downloadsSection
+
                 Button {
                     confirmSignOut = true
                 } label: {
@@ -59,6 +64,39 @@ struct SettingsDrawer: View {
         .foregroundStyle(theme.palette.textPrimary)
         .background(theme.palette.background.ignoresSafeArea())
         .enableInjection()
+    }
+
+    @ViewBuilder private var downloadsSection: some View {
+        @Bindable var downloads = downloads
+        SettingsSection(title: "Downloads") {
+            Menu {
+                Picker("Quality", selection: $downloads.quality) {
+                    Text("MP3 (256 kbps)").tag(DownloadManager.Quality.high)
+                    Text("Original (lossless when possible)").tag(DownloadManager.Quality.original)
+                }
+            } label: {
+                SettingsRow(.download, "Quality", value: downloads.quality == .original ? "Original" : "MP3")
+            }
+            Toggle(isOn: $downloads.allowCellular) {
+                HStack(spacing: theme.spacing.md) {
+                    Glyph.address.image.foregroundStyle(theme.palette.textSecondary)
+                    Text("Use Cellular Data").font(theme.typography.body)
+                }
+            }
+            .tint(theme.palette.accent)
+            .padding(.horizontal, theme.spacing.lg)
+            .padding(.vertical, theme.spacing.sm)
+            SettingsRow(.downloads, "Storage Used", value: ByteCountFormatter.string(fromByteCount: downloads.totalBytes, countStyle: .file))
+            Button {
+                confirmRemoveDownloads = true
+            } label: {
+                SettingsRow(.trash, "Remove All Downloads", value: "")
+            }
+            .disabled(downloads.totalBytes == 0)
+            .confirmationDialog("Remove all downloaded music?", isPresented: $confirmRemoveDownloads, titleVisibility: .visible) {
+                Button("Remove All", role: .destructive) { downloads.removeAll() }
+            }
+        }
     }
 
     private var profileHeader: some View {

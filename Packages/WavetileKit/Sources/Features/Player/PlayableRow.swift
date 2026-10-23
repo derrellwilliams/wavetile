@@ -33,26 +33,51 @@ extension QueuedTrack {
 /// offers Play Next / Add to Queue. `tracks` is built lazily on tap, so long lists stay cheap.
 struct PlayableRow<Label: View>: View {
     @Environment(AudioPlayer.self) private var player
+    @Environment(DownloadsStore.self) private var downloads
+    @Environment(Connectivity.self) private var connectivity
+    @Environment(LibraryActions.self) private var actions
+    @Environment(LibraryStore.self) private var store
+    let trackID: String
     let index: Int
     let tracks: () -> [QueuedTrack]
     @ViewBuilder let label: Label
 
     var body: some View {
         Button {
-            player.play(tracks(), startAt: index)
+            var queue = tracks()
+            var start = index
+            if !connectivity.isOnline {
+                // Offline: queue only what's on the device so playback doesn't hit dead tracks.
+                let tapped = queue[safe: index]?.queueID
+                queue = queue.filter { downloads.isDownloaded($0.trackID) }
+                start = queue.firstIndex { $0.queueID == tapped } ?? 0
+            }
+            player.play(queue, startAt: start)
         } label: {
             label.contentShape(.rect)
         }
         .buttonStyle(.plain)
+        // Offline, only downloaded songs can play; dim the rest.
+        .disabled(!isAvailable)
+        .opacity(isAvailable ? 1 : 0.35)
         .contextMenu {
             Button("Play Next", glyph: .playNext) {
                 if let track = tracks()[safe: index] { player.playNext([track.requeued()]) }
             }
-            Button("Add to Queue", glyph: .addToQueue) {
+            Button("Add to Queue", glyph: .queue) {
                 if let track = tracks()[safe: index] { player.addToQueue([track.requeued()]) }
+            }
+            Divider()
+            Button("Add to Playlist", glyph: .addToQueue) { actions.addToPlaylist([trackID]) }
+            Button("Favorite", glyph: .favorite) {
+                Task { try? await store.editor.setFavorite(itemID: trackID, true) }
             }
         }
         .sensoryFeedback(.selection, trigger: player.current?.trackID)
+    }
+
+    private var isAvailable: Bool {
+        connectivity.isOnline || downloads.isDownloaded(trackID)
     }
 }
 

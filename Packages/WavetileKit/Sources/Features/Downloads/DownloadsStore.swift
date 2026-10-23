@@ -1,0 +1,119 @@
+import DesignSystem
+import Downloads
+import Foundation
+import JellyfinKit
+import Network
+import Observation
+import Persistence
+
+/// Online/offline state. Screens dim music that isn't downloaded while offline.
+@Observable
+final class Connectivity {
+    private(set) var isOnline = true
+    @ObservationIgnored private let monitor = NWPathMonitor()
+
+    init() {
+        monitor.pathUpdateHandler = { [weak self] path in
+            let online = path.status == .satisfied
+            Task { @MainActor in self?.isOnline = online }
+        }
+        monitor.start(queue: DispatchQueue(label: "com.derrellwilliams.wavetile.connectivity"))
+    }
+
+    deinit { monitor.cancel() }
+}
+
+/// UI-facing downloads: settings, live status, and actions.
+@Observable
+final class DownloadsStore {
+    let manager: DownloadManager?
+    private let database: LibraryDatabase
+    private let library: LibraryStore
+
+    /// Fully downloaded track IDs (row badges, offline availability).
+    private(set) var downloadedTrackIDs: Set<String> = []
+    private(set) var totalBytes: Int64 = 0
+
+    var quality: DownloadManager.Quality {
+        didSet { UserDefaults.standard.set(quality.rawValue, forKey: "downloadQuality") }
+    }
+
+    var allowCellular: Bool {
+        didSet { UserDefaults.standard.set(allowCellular, forKey: "downloadOverCellular") }
+    }
+
+    init(session: ServerSession, library: LibraryStore) {
+        self.library = library
+        self.database = library.database
+        self.manager = try? DownloadManager(serverID: session.serverID, userID: session.userID, database: library.database, library: library.api)
+        self.quality = UserDefaults.standard.string(forKey: "downloadQuality").flatMap(DownloadManager.Quality.init) ?? .high
+        self.allowCellular = UserDefaults.standard.object(forKey: "downloadOverCellular") as? Bool ?? false
+    }
+
+    /// Long-running: keeps `downloadedTrackIDs` and `totalBytes` live. Run from a view `.task`.
+    func observe() async {
+        async let ids: Void = observeTrackIDs()
+        async let bytes: Void = observeBytes()
+        async let resume: Void = resumePending()
+        _ = await (ids, bytes, resume)
+    }
+
+    private func observeTrackIDs() async {
+        do {
+            for try await ids in library.observe(database.downloadedTrackIDs()) { downloadedTrackIDs = ids }
+        } catch {}
+    }
+
+    private func observeBytes() async {
+        do {
+            for try await bytes in library.observe(database.totalDownloadedBytes()) { totalBytes = bytes }
+        } catch {}
+    }
+
+    private func resumePending() async {
+        await manager?.resumePending(quality: quality, allowCellular: allowCellular)
+    }
+
+    func isDownloaded(_ trackID: String) -> Bool { downloadedTrackIDs.contains(trackID) }
+
+    func download(album: AlbumSummary, trackIDs: [String]) {
+        let record = DownloadCollectionRecord(id: album.id, kind: .album, name: album.title, subtitle: album.artist, imageTag: album.imageTag)
+        start(record, trackIDs: trackIDs)
+        prefetchArtwork(itemID: album.id, tag: album.imageTag)
+    }
+
+    func download(playlist: PlaylistRecord, trackIDs: [String], albumIDs: [String]) {
+        let record = DownloadCollectionRecord(id: playlist.id, kind: .playlist, name: playlist.name, subtitle: "Playlist", imageTag: playlist.imageTag)
+        start(record, trackIDs: trackIDs)
+        prefetchArtwork(itemID: playlist.id, tag: playlist.imageTag)
+        for albumID in Set(albumIDs) { prefetchArtwork(itemID: albumID, tag: nil) }
+    }
+
+    func remove(collectionID: String) {
+        Task { try? await manager?.remove(collectionID: collectionID) }
+    }
+
+    func removeAll() {
+        Task { try? await manager?.removeAll() }
+    }
+
+    /// After a library sync: pull new tracks into downloaded playlists.
+    func syncPlaylists() async {
+        await manager?.syncPlaylists(quality: quality, allowCellular: allowCellular)
+    }
+
+    func localFile(trackID: String) -> URL? {
+        manager?.localFile(trackID: trackID)
+    }
+
+    private func start(_ record: DownloadCollectionRecord, trackIDs: [String]) {
+        let quality = quality, cellular = allowCellular
+        Task { try? await manager?.download(record, trackIDs: trackIDs, quality: quality, allowCellular: cellular) }
+    }
+
+    /// Cache the artwork sizes the app renders so downloaded music looks right offline.
+    private func prefetchArtwork(itemID: String, tag: String?) {
+        let urls = [144, 480, 1320].compactMap { library.api.imageURL(itemID: itemID, tag: tag, maxPixelWidth: $0) }
+        ImageCaching.prefetch(urls)
+    }
+}

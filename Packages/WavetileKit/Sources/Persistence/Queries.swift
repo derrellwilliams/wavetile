@@ -156,3 +156,102 @@ public enum SortKey {
         return String(first).uppercased()
     }
 }
+
+// MARK: - Favorites & collections
+
+public extension LibraryDatabase {
+    func favoriteTracks() -> ValueObservation<ValueReducers.Fetch<[TrackRecord]>> {
+        ValueObservation.tracking { db in
+            try TrackRecord.filter(Column("isFavorite") == true).order(Column("sortTitle")).fetchAll(db)
+        }
+    }
+
+    func favoriteAlbums() -> ValueObservation<ValueReducers.Fetch<[AlbumRecord]>> {
+        ValueObservation.tracking { db in
+            try AlbumRecord.filter(Column("isFavorite") == true).order(Column("sortTitle")).fetchAll(db)
+        }
+    }
+
+    func favoriteArtists() -> ValueObservation<ValueReducers.Fetch<[ArtistRecord]>> {
+        ValueObservation.tracking { db in
+            try ArtistRecord.filter(Column("isFavorite") == true).order(Column("sortName")).fetchAll(db)
+        }
+    }
+
+    /// Live favorite flag for one item (album, artist, or track), for heart buttons.
+    func isFavorite(itemID: String) -> ValueObservation<ValueReducers.Fetch<Bool>> {
+        ValueObservation.tracking { db in
+            try Bool.fetchOne(db, sql: """
+                SELECT isFavorite FROM album WHERE id = :id
+                UNION ALL SELECT isFavorite FROM artist WHERE id = :id
+                UNION ALL SELECT isFavorite FROM track WHERE id = :id
+                LIMIT 1
+                """, arguments: ["id": itemID]) ?? false
+        }
+    }
+
+    func setFavorite(itemID: String, _ isFavorite: Bool) async throws {
+        try await pool.write { db in
+            for table in ["album", "artist", "track"] {
+                try db.execute(sql: "UPDATE \(table) SET isFavorite = ? WHERE id = ?", arguments: [isFavorite, itemID])
+            }
+        }
+    }
+
+    func collections() -> ValueObservation<ValueReducers.Fetch<[CollectionRecord]>> {
+        ValueObservation.tracking { db in
+            try CollectionRecord.order(Column("sortName")).fetchAll(db)
+        }
+    }
+
+    func albums(collectionID: String) -> ValueObservation<ValueReducers.Fetch<[AlbumRecord]>> {
+        ValueObservation.tracking { db in
+            try AlbumRecord.fetchAll(db, sql: """
+                SELECT album.* FROM collectionAlbum
+                JOIN album ON album.id = collectionAlbum.albumID
+                WHERE collectionAlbum.collectionID = ?
+                ORDER BY collectionAlbum.position
+                """, arguments: [collectionID])
+        }
+    }
+
+    /// First few album covers, for collection mosaics.
+    func collectionCovers(collectionID: String, limit: Int = 4) throws -> [AlbumRecord] {
+        try pool.read { db in
+            try AlbumRecord.fetchAll(db, sql: """
+                SELECT album.* FROM collectionAlbum JOIN album ON album.id = collectionAlbum.albumID
+                WHERE collectionAlbum.collectionID = ? ORDER BY collectionAlbum.position LIMIT ?
+                """, arguments: [collectionID, limit])
+        }
+    }
+
+    func playlistEntries(playlistID: String) throws -> [PlaylistEntryRecord] {
+        try pool.read { try PlaylistEntryRecord.filter(Column("playlistID") == playlistID).order(Column("position")).fetchAll($0) }
+    }
+
+    func playlist(id: String) throws -> PlaylistRecord? {
+        try pool.read { try PlaylistRecord.fetchOne($0, key: id) }
+    }
+}
+
+/// A playlist row: the entry (position, Jellyfin entry ID for edits) and its track.
+public struct PlaylistItem: Sendable, Equatable, Identifiable {
+    public let entry: PlaylistEntryRecord
+    public let track: TrackRecord
+    public var id: String { entry.entryID ?? "\(entry.position)-\(entry.trackID)" }
+}
+
+public extension LibraryDatabase {
+    func playlistItems(playlistID: String) -> ValueObservation<ValueReducers.Fetch<[PlaylistItem]>> {
+        ValueObservation.tracking { db in
+            let entries = try PlaylistEntryRecord.filter(Column("playlistID") == playlistID).order(Column("position")).fetchAll(db)
+            let tracks = try TrackRecord.fetchAll(db, keys: Set(entries.map(\.trackID)))
+            let byID = Dictionary(uniqueKeysWithValues: tracks.map { ($0.id, $0) })
+            return entries.compactMap { entry in byID[entry.trackID].map { PlaylistItem(entry: entry, track: $0) } }
+        }
+    }
+
+    func playlistObservation(id: String) -> ValueObservation<ValueReducers.Fetch<PlaylistRecord?>> {
+        ValueObservation.tracking { try PlaylistRecord.fetchOne($0, key: id) }
+    }
+}

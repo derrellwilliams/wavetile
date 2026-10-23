@@ -12,6 +12,7 @@ struct SearchView: View {
     @Environment(LibraryStore.self) private var store
     @Namespace private var zoom
     @Environment(AudioPlayer.self) private var player
+    @Environment(DownloadsStore.self) private var downloads
     @Binding var text: String
     @State private var results = LibraryDatabase.SearchResults()
 
@@ -50,13 +51,14 @@ struct SearchView: View {
                 if !results.tracks.isEmpty {
                     Section("Songs") {
                         ForEach(Array(results.tracks.enumerated()), id: \.element.id) { index, track in
-                            PlayableRow(index: index, tracks: { results.tracks.map(QueuedTrack.init) }) {
+                            PlayableRow(trackID: track.id, index: index, tracks: { results.tracks.map(QueuedTrack.init) }) {
                                 TrackRow(
                                     title: track.title,
                                     subtitle: "\(track.artistName) · \(track.albumTitle)",
                                     duration: track.durationMs.map { .milliseconds($0) },
                                     leading: .artwork(store.artwork(itemID: track.albumID, maxPixelWidth: 144)),
-                                    isPlaying: player.current?.trackID == track.id
+                                    isPlaying: player.current?.trackID == track.id,
+                                    isDownloaded: downloads.isDownloaded(track.id)
                                 )
                             }
                             .listRowBackground(Color.clear)
