@@ -1,22 +1,29 @@
 import SwiftUI
 
 /// Named animations. Tune feel here instead of sprinkling `.spring(...)` through views.
+///
+/// Follows Apple's fluid-interface guidance (WWDC18 "Designing Fluid Interfaces"):
+/// - UI that just changes state uses critically damped springs (damping 1.0): no overshoot.
+/// - Bounce is reserved for motion that follows a gesture with momentum (`momentum(initialVelocity:)`).
 public struct Motion: Sendable, Equatable {
-    /// Taps, toggles, small state changes.
+    /// Taps, toggles, small state changes. Critically damped.
     public var snappy: Animation
-    /// Layout changes, expanding content.
+    /// Layout changes, expanding content. Critically damped.
     public var smooth: Animation
-    /// Celebratory moments (favorite, track change artwork).
+    /// Kept for deliberate flourishes only; prefer `snappy`/`smooth` unless motion follows a flick.
     public var bouncy: Animation
+    /// Spring for settling after a drag/flick (drawers, sheets). Apple ships damping 0.8, response 0.3.
+    public var momentumSpring: Spring
     /// Now Playing background color drift.
     public var ambient: Animation
     /// Scale applied to pressed tiles and buttons.
     public var pressedScale: CGFloat
 
     public static let standard = Motion(
-        snappy: .snappy(duration: 0.25),
-        smooth: .smooth(duration: 0.4),
+        snappy: .spring(response: 0.3, dampingFraction: 1),
+        smooth: .spring(response: 0.4, dampingFraction: 1),
         bouncy: .bouncy(duration: 0.5, extraBounce: 0.1),
+        momentumSpring: Spring(response: 0.3, dampingRatio: 0.8),
         ambient: .easeInOut(duration: 8).repeatForever(autoreverses: true),
         pressedScale: 0.96
     )
@@ -25,12 +32,25 @@ public struct Motion: Sendable, Equatable {
         snappy: .spring(response: 0.3, dampingFraction: 0.65),
         smooth: .spring(response: 0.5, dampingFraction: 0.8),
         bouncy: .bouncy(duration: 0.6, extraBounce: 0.25),
+        momentumSpring: Spring(response: 0.35, dampingRatio: 0.7),
         ambient: .easeInOut(duration: 6).repeatForever(autoreverses: true),
         pressedScale: 0.92
     )
 }
 
 public extension Motion {
+    /// Settle after a gesture, continuing at the finger's speed so there's no seam between
+    /// dragging and animating. `initialVelocity` is relative: release velocity ÷ distance remaining.
+    func momentum(initialVelocity: Double) -> Animation {
+        .interpolatingSpring(momentumSpring, initialVelocity: initialVelocity.isFinite ? initialVelocity : 0)
+    }
+
+    /// Progressive resistance past a boundary (Apple's rubber-band curve): the further you pull,
+    /// the less the content follows, instead of a hard stop.
+    static func rubberBand(_ overshoot: CGFloat, dimension: CGFloat, constant: CGFloat = 0.55) -> CGFloat {
+        (overshoot * dimension * constant) / (dimension + constant * abs(overshoot))
+    }
+
     /// Returns nil when Reduce Motion is on, so `withAnimation(theme.motion.resolve(...))` degrades to no animation.
     func resolve(_ animation: Animation, reduceMotion: Bool) -> Animation? {
         reduceMotion ? nil : animation

@@ -51,6 +51,9 @@ public struct Theme: Sendable, Identifiable, Hashable {
         public var nowPlayingTitle: Font
         public var nowPlayingSubtitle: Font
         public var code: Font
+        /// Letter-spacing for large display titles: big type reads loose, so it's tightened.
+        /// (Body text stays at 0; system fonts do this automatically, custom faces don't.)
+        public var displayTracking: CGFloat = -0.5
     }
 
     public struct Spacing: Sendable, Equatable {

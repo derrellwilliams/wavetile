@@ -52,8 +52,9 @@ public enum BrandFont {
     /// Navigation bar titles can't be styled from SwiftUI, so use the appearance proxy.
     public static func applyNavigationBarAppearance(textColor: UIColor) {
         let bar = UINavigationBar.appearance()
-        bar.largeTitleTextAttributes = [.font: uiFont(.largeTitle, weight: .bold, family: displayFamily), .foregroundColor: textColor]
-        bar.titleTextAttributes = [.font: uiFont(.headline, weight: .bold, family: displayFamily), .foregroundColor: textColor]
+        // Negative kerning on large titles (size-specific tracking); a lighter touch on inline titles.
+        bar.largeTitleTextAttributes = [.font: uiFont(.largeTitle, weight: .bold, family: displayFamily), .foregroundColor: textColor, .kern: -0.6]
+        bar.titleTextAttributes = [.font: uiFont(.headline, weight: .bold, family: displayFamily), .foregroundColor: textColor, .kern: -0.2]
     }
 
     /// Apple's default point sizes at the standard ("Large") content size category.

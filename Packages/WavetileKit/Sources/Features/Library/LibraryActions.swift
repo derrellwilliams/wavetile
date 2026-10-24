@@ -79,7 +79,7 @@ struct FavoriteButton: View {
         .task(id: itemID) {
             do {
                 for try await value in store.observe(store.database.isFavorite(itemID: itemID)) {
-                    withAnimation(theme.motion.bouncy) { isFavorite = value }
+                    withAnimation(theme.motion.snappy) { isFavorite = value }
                 }
             } catch {}
         }

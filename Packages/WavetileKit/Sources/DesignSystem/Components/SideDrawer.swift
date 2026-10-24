@@ -19,8 +19,9 @@ public struct SideDrawer<Content: View, Drawer: View>: View {
     private let content: Content
     private let drawer: Drawer
 
-    /// Live finger translation while dragging.
-    @GestureState(resetTransaction: Transaction(animation: .smooth)) private var dragOffset: CGFloat = 0
+    /// Live finger translation while dragging. Plain state (not @GestureState) so the release can
+    /// reset it in the same animation as the open/close change: one spring from the on-screen value.
+    @State private var dragOffset: CGFloat = 0
 
     public init(
         isOpen: Binding<Bool>,
@@ -39,8 +40,7 @@ public struct SideDrawer<Content: View, Drawer: View>: View {
     public var body: some View {
         GeometryReader { proxy in
             let width = drawerWidth(in: proxy.size.width)
-            let resting: CGFloat = isOpen ? width : 0
-            let revealed = min(width, max(0, resting + direction * dragOffset))
+            let revealed = revealedAmount(dragOffset, width: width)
             let offset = direction * revealed
             let progress = revealed / width
 
@@ -87,6 +87,14 @@ public struct SideDrawer<Content: View, Drawer: View>: View {
         .sensoryFeedback(.impact(weight: .light), trigger: isOpen)
     }
 
+    /// How far the drawer is revealed for a given drag, rubber-banding past fully open/closed.
+    private func revealedAmount(_ drag: CGFloat, width: CGFloat) -> CGFloat {
+        let raw = (isOpen ? width : 0) + direction * drag
+        if raw > width { return width + Motion.rubberBand(raw - width, dimension: width) }
+        if raw < 0 { return -Motion.rubberBand(-raw, dimension: width) }
+        return raw
+    }
+
     /// +1 when content moves right to reveal a leading drawer, -1 for trailing.
     private var direction: CGFloat { edge == .leading ? 1 : -1 }
 
@@ -97,20 +105,36 @@ public struct SideDrawer<Content: View, Drawer: View>: View {
 
     private func dragGesture(width: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 10)
-            .updating($dragOffset) { value, state, _ in
-                state = value.translation.width
+            .onChanged { value in
+                // 1:1 tracking: no animation while the finger is down.
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) { dragOffset = value.translation.width }
             }
             .onEnded { value in
-                // Decide by projected end position so a quick flick feels natural.
+                // Momentum projection: choose open/closed from where the flick is *going*.
                 let resting: CGFloat = isOpen ? width : 0
                 let projected = resting + direction * value.predictedEndTranslation.width
-                setOpen(projected > width / 2)
+                let open = projected > width / 2
+
+                // Velocity handoff: the spring starts at the finger's speed (relative to distance left).
+                let current = revealedAmount(dragOffset, width: width)
+                let remaining = (open ? width : 0) - current
+                let velocity = direction * value.velocity.width
+                let relative = abs(remaining) > 1 ? velocity / remaining : 0
+
+                withAnimation(theme.motion.resolve(theme.motion.momentum(initialVelocity: relative), reduceMotion: reduceMotion)) {
+                    isOpen = open
+                    dragOffset = 0
+                }
             }
     }
 
+    /// Taps and the button: no gesture momentum, so a critically damped spring (no overshoot).
     private func setOpen(_ open: Bool) {
         withAnimation(theme.motion.resolve(theme.motion.smooth, reduceMotion: reduceMotion)) {
             isOpen = open
+            dragOffset = 0
         }
     }
 }

@@ -24,6 +24,7 @@ struct SignInFlow: View {
                             .pulsing()
                         Text("Connect to Jellyfin")
                             .font(theme.typography.largeTitle)
+                            .tracking(theme.typography.displayTracking)
                         Text("Enter the address you use to reach your server.")
                             .foregroundStyle(theme.palette.textSecondary)
                     }

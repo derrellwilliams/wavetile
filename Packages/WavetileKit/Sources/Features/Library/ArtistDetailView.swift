@@ -25,6 +25,7 @@ struct ArtistDetailView: View {
                     ArtworkHero(artwork: artwork)
                     Text(name)
                         .font(theme.typography.largeTitle)
+                        .tracking(theme.typography.displayTracking)
                         .foregroundStyle(theme.palette.textPrimary)
                         .multilineTextAlignment(.center)
                         .lineLimit(2)

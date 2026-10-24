@@ -61,6 +61,7 @@ struct AlbumDetailView: View {
         VStack(spacing: theme.spacing.xs) {
             Text(model.album.title)
                 .font(theme.typography.title)
+                .tracking(theme.typography.displayTracking)
                 .foregroundStyle(theme.palette.textPrimary)
                 .multilineTextAlignment(.center)
             Text(model.album.artist)

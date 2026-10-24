@@ -129,6 +129,7 @@ struct PlaylistDetailView: View {
                     VStack(spacing: theme.spacing.xs) {
                         Text(playlist.name)
                             .font(theme.typography.title)
+                            .tracking(theme.typography.displayTracking)
                             .foregroundStyle(theme.palette.textPrimary)
                             .multilineTextAlignment(.center)
                         Text("\(playlist.trackCount) songs · \(Duration.milliseconds(playlist.durationMs).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated)))")

@@ -108,7 +108,8 @@ struct NowPlayingView: View {
             .shadow(color: .black.opacity(player.isPlaying ? 0.5 : 0.2), radius: player.isPlaying ? 30 : 12, y: 12)
             // Apple Music–style "breathing": artwork recedes when paused.
             .scaleEffect(player.isPlaying || reduceMotion ? 1 : 0.86)
-            .animation(theme.motion.bouncy, value: player.isPlaying)
+            // State change, not a flick: critically damped, no overshoot.
+            .animation(theme.motion.smooth, value: player.isPlaying)
             .id(player.current?.albumID)
             .transition(.opacity)
     }
