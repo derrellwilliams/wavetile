@@ -92,6 +92,8 @@ struct AlbumLink: View {
     let album: AlbumSummary
     /// Disambiguates the same album appearing in several places on one screen.
     var context: String = ""
+    /// Adds "Remove from Recently Played" to the long-press menu (Home's Recently Played shelf).
+    var onRemoveFromRecents: (() -> Void)?
 
     var body: some View {
         let route = AlbumRoute(album: album, sourceID: "\(context)-\(album.id)")
@@ -108,6 +110,10 @@ struct AlbumLink: View {
             Button("Add to Collection", glyph: .collection) { actions.addToCollection([album.id]) }
             Button("Favorite", glyph: .favorite) {
                 Task { try? await store.editor.setFavorite(itemID: album.id, true) }
+            }
+            if let onRemoveFromRecents {
+                Divider()
+                Button("Remove from Recently Played", glyph: .close, action: onRemoveFromRecents)
             }
         }
     }

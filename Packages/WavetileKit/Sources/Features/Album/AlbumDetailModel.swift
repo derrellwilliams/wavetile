@@ -18,6 +18,8 @@ final class AlbumDetailModel {
     private(set) var tracks: [TrackSummary] = []
     private(set) var isLoading = false
     private(set) var errorMessage: String?
+    /// The album artist, from the synced library; nil if the album isn't synced yet.
+    private(set) var artistID: String?
     private let store: LibraryStore?
 
     init(album: AlbumSummary, store: LibraryStore?) {
@@ -27,6 +29,7 @@ final class AlbumDetailModel {
         if let store, let local = try? store.database.tracks(albumID: album.id), !local.isEmpty {
             tracks = local.map(\.summary)
         }
+        artistID = (try? store?.database.album(id: album.id))?.artistID
     }
 
     /// Preview initializer with fixed tracks and no network.

@@ -1,4 +1,5 @@
 import DesignSystem
+import JellyfinKit
 import Library
 import Persistence
 import Playback
@@ -13,11 +14,16 @@ struct SearchView: View {
     @Namespace private var zoom
     @Environment(AudioPlayer.self) private var player
     @Environment(DownloadsStore.self) private var downloads
+    @Environment(Connectivity.self) private var connectivity
+    @Environment(\.openNowPlaying) private var openNowPlaying
     @Binding var text: String
     @State private var results = LibraryDatabase.SearchResults()
+    @State private var path: [LibraryRoute] = []
+    /// The song whose ⋯ actions sheet is showing.
+    @State private var actionsTrack: TrackRecord?
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             List {
                 if !results.artists.isEmpty {
                     Section("Artists") {
@@ -51,15 +57,24 @@ struct SearchView: View {
                 if !results.tracks.isEmpty {
                     Section("Songs") {
                         ForEach(Array(results.tracks.enumerated()), id: \.element.id) { index, track in
-                            PlayableRow(trackID: track.id, index: index, tracks: { results.tracks.map(QueuedTrack.init) }) {
-                                TrackRow(
-                                    title: track.title,
-                                    subtitle: "\(track.artistName) · \(track.albumTitle)",
-                                    duration: track.durationMs.map { .milliseconds($0) },
-                                    leading: .artwork(store.artwork(itemID: track.albumID, maxPixelWidth: 144)),
-                                    isPlaying: player.current?.trackID == track.id,
-                                    isDownloaded: downloads.isDownloaded(track.id)
-                                )
+                            HStack(spacing: theme.spacing.xs) {
+                                PlayableRow(
+                                    trackID: track.id, index: index,
+                                    tracks: { results.tracks.map(QueuedTrack.init) },
+                                    onTap: { play(track) }
+                                ) {
+                                    TrackRow(
+                                        title: track.title,
+                                        subtitle: "\(track.artistName) · \(track.albumTitle)",
+                                        duration: track.durationMs.map { .milliseconds($0) },
+                                        leading: .artwork(store.artwork(itemID: track.albumID, maxPixelWidth: 144)),
+                                        isPlaying: player.current?.trackID == track.id,
+                                        isDownloaded: downloads.isDownloaded(track.id)
+                                    )
+                                }
+                                GlyphButton("More for \(track.title)", glyph: .more, size: 20) { actionsTrack = track }
+                                    .buttonStyle(.plain)
+                                    .foregroundStyle(theme.palette.accent)
                             }
                             .listRowBackground(Color.clear)
                         }
@@ -70,9 +85,18 @@ struct SearchView: View {
             .scrollDismissesKeyboard(.immediately)
             .overlay { emptyState }
             .themedBackground()
-            .reportsTabRoot()
             .navigationTitle("Search")
+            .tabRootChrome()
             .libraryDestinations(zoom: zoom)
+            .sheet(item: $actionsTrack) { track in
+                SongActionsSheet(
+                    track: track,
+                    artwork: store.artwork(itemID: track.albumID, maxPixelWidth: 144),
+                    onPlay: { play(track) },
+                    onAlbum: albumRoute(for: track).map { route in { path.append(route) } },
+                    onArtist: artistRoute(for: track).map { route in { path.append(route) } }
+                )
+            }
         }
         // Scoped to this tab's stack so the field doesn't leak into other tabs' navigation bars.
         .searchable(text: $text, prompt: "Artists, albums, songs")
@@ -83,6 +107,37 @@ struct SearchView: View {
             results = (try? store.database.search(text)) ?? .init()
         }
         .enableInjection()
+    }
+
+    /// Plays the song within its album (so playback continues through the record, not the
+    /// search results) and opens Now Playing.
+    private func play(_ track: TrackRecord) {
+        var queue = [QueuedTrack(track)]
+        if let albumID = track.albumID, let albumTracks = try? store.database.tracks(albumID: albumID), !albumTracks.isEmpty {
+            queue = albumTracks.map(QueuedTrack.init)
+        }
+        // Offline, queue only what's on the device (same rule as tapping any row).
+        if !connectivity.isOnline { queue = queue.filter { downloads.isDownloaded($0.trackID) } }
+        guard let start = queue.firstIndex(where: { $0.trackID == track.id }) else { return }
+        player.play(queue, startAt: start)
+        openNowPlaying()
+    }
+
+    private func albumRecord(for track: TrackRecord) -> AlbumRecord? {
+        track.albumID.flatMap { try? store.database.album(id: $0) }
+    }
+
+    private func albumRoute(for track: TrackRecord) -> LibraryRoute? {
+        guard let albumID = track.albumID else { return nil }
+        let album = albumRecord(for: track)?.summary
+            ?? AlbumSummary(id: albumID, title: track.albumTitle, artist: track.albumArtistName)
+        return .album(AlbumRoute(album: album, sourceID: "search-track-\(track.id)"))
+    }
+
+    /// The album artist: tracks don't store their own artist ID.
+    private func artistRoute(for track: TrackRecord) -> LibraryRoute? {
+        guard let artistID = albumRecord(for: track)?.artistID else { return nil }
+        return .artist(id: artistID, name: track.albumArtistName)
     }
 
     @ViewBuilder private var emptyState: some View {

@@ -9,7 +9,7 @@ set -euo pipefail
 
 WEIGHT="${WEIGHT:-bold}"
 ICONS=(
-  house stack arrow-circle-down magnifying-glass user-circle
+  house stack box-arrow-down magnifying-glass user-circle
   playlist microphone-stage vinyl-record music-note guitar
   waveform warning lock-open lock copy check
   play pause skip-forward skip-back

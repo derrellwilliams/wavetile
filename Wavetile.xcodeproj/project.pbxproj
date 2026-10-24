@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		197535260D47403824DD5ACF /* HomeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EB333D4B5F2B7A38F00ECED /* HomeTests.swift */; };
 		293B76453F4541068AF94637 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 600A6831CAFBA608604EC65C /* SwiftUI.framework */; };
 		29FA4F497E1E129557617FC8 /* NowPlayingWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51107A7FCB5C0404CF98041F /* NowPlayingWidget.swift */; };
 		7177EF3BFB2405CBE4A0D6A8 /* WavetileWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = BE64D9F3EAE7A406F7322312 /* WavetileWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -17,6 +18,7 @@
 		B6C7A4EF5A040F73222B5B28 /* WavetileApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE62EBD766A57ECC0F9E43CD /* WavetileApp.swift */; };
 		BF1F96350A129326F70095B0 /* WidgetShared in Frameworks */ = {isa = PBXBuildFile; productRef = 0C66071B4354454BDCFC6F65 /* WidgetShared */; };
 		BF226A6E41B4B60AE3190BD9 /* WavetileWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3808158EAA3BE89F777F6196 /* WavetileWidgets.swift */; };
+		BFE7CD2369681FAAE8091B79 /* SearchTypingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B3DBC04AB9BCCD7E614F3F9 /* SearchTypingTests.swift */; };
 		D5ADA51017B8CB7FBAD10D5A /* PlaybackIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6B16C4CDE18FD559173CA08 /* PlaybackIntents.swift */; };
 		DACC04010B0BDCC0B58A22A6 /* DownloadLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2BEB7FC68820624FDFEB8CE /* DownloadLiveActivity.swift */; };
 		DB8A50C54CC4C62786185428 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8024A92BB845E32D58BE675C /* WidgetKit.framework */; };
@@ -62,9 +64,11 @@
 		3808158EAA3BE89F777F6196 /* WavetileWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WavetileWidgets.swift; sourceTree = "<group>"; };
 		3D755AFA0A1F31315F004D72 /* WavetileUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = WavetileUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		51107A7FCB5C0404CF98041F /* NowPlayingWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingWidget.swift; sourceTree = "<group>"; };
+		5EB333D4B5F2B7A38F00ECED /* HomeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeTests.swift; sourceTree = "<group>"; };
 		600A6831CAFBA608604EC65C /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		8024A92BB845E32D58BE675C /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		8BC9880BE0B4A0A353E499A1 /* RecentlyPlayedWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentlyPlayedWidget.swift; sourceTree = "<group>"; };
+		9B3DBC04AB9BCCD7E614F3F9 /* SearchTypingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchTypingTests.swift; sourceTree = "<group>"; };
 		9DD2A2844C81BA65529BD051 /* WavetileKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = WavetileKit; path = Packages/WavetileKit; sourceTree = SOURCE_ROOT; };
 		A618CF1452D243D448B37A64 /* WavetileWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WavetileWidgets.entitlements; sourceTree = "<group>"; };
 		ACF0F1CC5471BD62BFDE3E4A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -118,6 +122,8 @@
 			isa = PBXGroup;
 			children = (
 				C23EB66484AE2A1A9B71AA29 /* AccessibilityAuditTests.swift */,
+				5EB333D4B5F2B7A38F00ECED /* HomeTests.swift */,
+				9B3DBC04AB9BCCD7E614F3F9 /* SearchTypingTests.swift */,
 			);
 			path = UITests;
 			sourceTree = "<group>";
@@ -328,6 +334,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				EEDB361FA4C75D9B7969F9A0 /* AccessibilityAuditTests.swift in Sources */,
+				197535260D47403824DD5ACF /* HomeTests.swift in Sources */,
+				BFE7CD2369681FAAE8091B79 /* SearchTypingTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -7,8 +7,6 @@ struct HomeView: View {
     @ObserveInjection var inject
     @Environment(\.theme) private var theme
     @State var model: HomeModel
-    let userName: String
-    @Binding var showSettings: Bool
     @Namespace private var zoom
     @Binding var path: [LibraryRoute]
     @State private var didRefresh = false
@@ -19,7 +17,13 @@ struct HomeView: View {
                 LazyVStack(alignment: .leading, spacing: theme.spacing.xxl) {
                     ForEach(model.shelves) { shelf in
                         ShelfSection(shelf.title, items: shelf.albums) { album in
-                            AlbumLink(album: album, context: shelf.kind.rawValue)
+                            AlbumLink(
+                                album: album,
+                                context: shelf.kind.rawValue,
+                                onRemoveFromRecents: shelf.kind == .recentlyPlayed
+                                    ? { withAnimation(theme.motion.smooth) { model.removeFromRecentlyPlayed(album.id) } }
+                                    : nil
+                            )
                         }
                     }
                 }
@@ -27,26 +31,17 @@ struct HomeView: View {
             }
             .overlay { overlay }
             .themedBackground()
-            .reportsTabRoot()
             .navigationTitle("Home")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text("Wavetile")
                         .font(theme.typography.wordmark)
-                        .foregroundStyle(theme.palette.textPrimary)
+                        .foregroundStyle(theme.palette.accent)
                         .accessibilityAddTraits(.isHeader)
                 }
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        showSettings = true
-                    } label: {
-                        Avatar(size: 34)
-                    }
-                    .accessibilityLabel("Profile and Settings")
-                }
-                .sharedBackgroundVisibility(.hidden)
             }
+            .tabRootChrome()
             .libraryDestinations(zoom: zoom)
             .refreshable { await model.load() }
             .task {
@@ -82,7 +77,7 @@ struct HomeView: View {
             .init(kind: .recentlyPlayed, albums: Array(Fixtures.albums.prefix(6))),
             .init(kind: .mostPlayed, albums: Fixtures.albums.reversed()),
             .init(kind: .recentlyAdded, albums: Array(Fixtures.albums.suffix(5))),
-        ]), userName: "Derrell", showSettings: .constant(false), path: .constant([]))
+        ]), path: .constant([]))
         .environment(signedIn.library)
     }
 }

@@ -128,18 +128,13 @@ struct PlaylistDetailView: View {
                     ArtworkHero(artwork: artwork)
                     VStack(spacing: theme.spacing.xs) {
                         Text(playlist.name)
-                            .font(theme.typography.title)
+                            .font(theme.typography.largeTitle)
                             .tracking(theme.typography.displayTracking)
                             .foregroundStyle(theme.palette.textPrimary)
                             .multilineTextAlignment(.center)
                         Text("\(playlist.trackCount) songs · \(Duration.milliseconds(playlist.durationMs).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated)))")
                             .font(theme.typography.caption)
                             .foregroundStyle(theme.palette.textSecondary)
-                        DownloadButton(collectionID: playlist.id) {
-                            downloads.download(playlist: playlist, trackIDs: tracks.map(\.id), albumIDs: tracks.compactMap(\.albumID))
-                        }
-                        .padding(.top, theme.spacing.sm)
-                        .disabled(items.isEmpty)
                     }
                     .padding(.horizontal, theme.spacing.screenInset)
                 }
@@ -172,6 +167,12 @@ struct PlaylistDetailView: View {
         .themedBackground()
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                DownloadButton(collectionID: playlist.id) {
+                    downloads.download(playlist: playlist, trackIDs: tracks.map(\.id), albumIDs: tracks.compactMap(\.albumID))
+                }
+                .disabled(items.isEmpty)
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button("Rename", glyph: .edit) {

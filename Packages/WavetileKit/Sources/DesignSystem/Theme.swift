@@ -90,18 +90,18 @@ public struct Theme: Sendable, Identifiable, Hashable {
 // MARK: - Built-in themes
 
 public extension Theme {
-    /// Default brand: #1A1A1A canvas, white type and controls (no color accent),
+    /// Default brand: #1A1A1A canvas, light tan (#ECE4D2) type, logo, icons and controls,
     /// Stack Sans Notch for the logo and titles, Familjen Grotesk for text.
     static let wavetile = Theme(
         id: "wavetile",
         name: "Wavetile",
         palette: .init(
-            accent: .white,
+            accent: Color(hex: 0xECE4D2),
             onAccent: .black,
             background: Color(hex: 0x1A1A1A),
             surface: Color(hex: 0x262626),
-            textPrimary: .white,
-            textSecondary: .white.opacity(0.6),
+            textPrimary: Color(hex: 0xECE4D2),
+            textSecondary: Color(hex: 0xECE4D2).opacity(0.6),
             separator: .white.opacity(0.12),
             artworkPlaceholder: [Color(hex: 0x2E2E2E), Color(hex: 0x222222)]
         ),

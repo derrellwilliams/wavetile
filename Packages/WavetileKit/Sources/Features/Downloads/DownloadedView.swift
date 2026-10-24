@@ -3,7 +3,7 @@ import JellyfinKit
 import Persistence
 import SwiftUI
 
-/// Everything on the device: downloaded albums and playlists, progress, and storage used.
+/// Everything on the device: downloaded albums and playlists, with progress. (Storage used is in Settings.)
 struct DownloadedView: View {
     @ObserveInjection var inject
     @Environment(\.theme) private var theme
@@ -12,6 +12,7 @@ struct DownloadedView: View {
     @Environment(Connectivity.self) private var connectivity
     @Namespace private var zoom
     @State private var collections: [DownloadedCollection] = []
+    @State private var confirmRemoveAll = false
 
     var body: some View {
         NavigationStack {
@@ -20,11 +21,6 @@ struct DownloadedView: View {
                     if !connectivity.isOnline {
                         Label("You're offline. Downloaded music still plays.", glyph: .offline)
                             .font(theme.typography.itemSubtitle)
-                            .foregroundStyle(theme.palette.textSecondary)
-                    }
-                    if !collections.isEmpty {
-                        Text("\(collections.count) download\(collections.count == 1 ? "" : "s") · \(ByteCountFormatter.string(fromByteCount: downloads.totalBytes, countStyle: .file))")
-                            .font(theme.typography.caption)
                             .foregroundStyle(theme.palette.textSecondary)
                     }
                     LazyVGrid(
@@ -50,8 +46,23 @@ struct DownloadedView: View {
                 }
             }
             .themedBackground()
-            .reportsTabRoot()
             .navigationTitle("Downloaded")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button("Remove All Downloads", glyph: .trash, role: .destructive) { confirmRemoveAll = true }
+                    } label: {
+                        Label("More", glyph: .more)
+                    }
+                    .disabled(collections.isEmpty)
+                }
+            }
+            .confirmationDialog("Remove all downloaded music?", isPresented: $confirmRemoveAll, titleVisibility: .visible) {
+                Button("Remove All", role: .destructive) { downloads.removeAll() }
+            } message: {
+                Text("You can download it again anytime.")
+            }
+            .tabRootChrome()
             .libraryDestinations(zoom: zoom)
             .task {
                 do {

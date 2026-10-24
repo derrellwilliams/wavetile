@@ -50,7 +50,7 @@ struct NowPlayingView: View {
                         .foregroundStyle(theme.palette.textPrimary)
                     Text(player.current?.artist ?? "")
                         .font(theme.typography.nowPlayingSubtitle)
-                        .foregroundStyle(theme.palette.accent)
+                        .foregroundStyle(theme.palette.textPrimary)
                     if let error = player.errorMessage {
                         Label(error, glyph: .warning)
                             .font(theme.typography.caption)
@@ -99,7 +99,7 @@ struct NowPlayingView: View {
         }
         .labelStyle(.iconOnly)
         .buttonStyle(.plain)
-        .foregroundStyle(theme.palette.textPrimary)
+        .foregroundStyle(theme.palette.accent)
         .padding(.top, theme.spacing.lg)
     }
 
@@ -131,7 +131,7 @@ struct NowPlayingView: View {
             Spacer()
         }
         .buttonStyle(.pressable)
-        .foregroundStyle(theme.palette.textPrimary)
+        .foregroundStyle(theme.palette.accent)
         .sensoryFeedback(.impact(weight: .medium), trigger: player.isPlaying)
     }
 
@@ -218,7 +218,7 @@ struct AirPlayButton: View {
     var body: some View {
         ZStack {
             Glyph.airplay.image
-                .foregroundStyle(theme.palette.textSecondary)
+                .foregroundStyle(theme.palette.accent)
             RoutePicker()
         }
         .accessibilityElement(children: .contain)

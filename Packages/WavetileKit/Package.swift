@@ -29,6 +29,8 @@ let package = Package(
         .package(url: "https://github.com/kean/Nuke.git", from: "13.2.0"),
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.11.1"),
         .package(url: "https://github.com/krzysztofzablocki/Inject.git", from: "1.6.0"),
+        // Exact pin: Rive ships a prebuilt binary, so upgrades should be deliberate.
+        .package(url: "https://github.com/rive-app/rive-ios.git", exact: "6.28.1"),
     ],
     targets: [
         .target(
@@ -77,7 +79,11 @@ let package = Package(
         ),
         .target(
             name: "Features",
-            dependencies: ["JellyfinKit", "Library", "Persistence", "Playback", "Downloads", "DesignSystem", "PreviewSupport", "WidgetShared"],
+            dependencies: [
+                "JellyfinKit", "Library", "Persistence", "Playback", "Downloads", "DesignSystem", "PreviewSupport", "WidgetShared",
+                // Kept out of DesignSystem so the widget extension doesn't link it.
+                .product(name: "RiveRuntime", package: "rive-ios"),
+            ],
             swiftSettings: uiSettings
         ),
         .testTarget(

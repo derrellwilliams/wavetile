@@ -58,7 +58,7 @@ struct SettingsRow: View {
     private var titleLabel: some View {
         HStack(spacing: theme.spacing.md) {
             glyph.image
-                .foregroundStyle(theme.palette.textSecondary)
+                .foregroundStyle(theme.palette.accent)
             Text(title)
                 .font(theme.typography.body)
                 .foregroundStyle(theme.palette.textPrimary)
@@ -75,19 +75,17 @@ struct SettingsRow: View {
     }
 }
 
-/// Profile avatar: black circle with a person glyph.
+/// Profile avatar: the Phosphor `user-circle` glyph in the text color.
 struct Avatar: View {
+    @Environment(\.theme) private var theme
     var size: CGFloat = 52
 
     var body: some View {
-        Glyph.user.image
+        Glyph.profile.image
             .resizable()
             .scaledToFit()
-            // Scales with the circle so the glyph never crowds the edge.
-            .frame(width: size * 0.5, height: size * 0.5)
-            .foregroundStyle(.white)
             .frame(width: size, height: size)
-            .background(.black, in: .circle)
+            .foregroundStyle(theme.palette.accent)
             .accessibilityHidden(true)
     }
 }

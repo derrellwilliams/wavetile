@@ -3,6 +3,7 @@ import SwiftUI
 
 struct PasswordSignInView: View {
     @ObserveInjection var inject
+    @Environment(\.theme) private var theme
     @Bindable var model: SignInModel
     @State private var username = ""
     @State private var password = ""
@@ -27,7 +28,7 @@ struct PasswordSignInView: View {
                     .onSubmit(submit)
             } footer: {
                 if let error = model.errorMessage {
-                    Label(error, glyph: .warning).foregroundStyle(.white)
+                    Label(error, glyph: .warning).foregroundStyle(theme.palette.textPrimary)
                 }
             }
 

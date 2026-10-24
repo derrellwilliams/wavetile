@@ -15,10 +15,11 @@ public struct AlbumTile: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: theme.spacing.xs) {
+        // Title and artist sit tight together; the artwork keeps its 6pt gap above them.
+        VStack(alignment: .leading, spacing: 0) {
             ArtworkView(artwork)
                 .shadow(color: .black.opacity(theme.artwork.shadowOpacity), radius: theme.artwork.shadowRadius, y: 4)
-                .padding(.bottom, theme.spacing.xxs)
+                .padding(.bottom, theme.spacing.xs + theme.spacing.xxs)
             Text(title)
                 .font(theme.typography.itemTitle)
                 .foregroundStyle(theme.palette.textPrimary)

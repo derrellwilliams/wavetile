@@ -32,6 +32,12 @@ struct AlbumDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
+                DownloadButton(collectionID: model.album.id) {
+                    downloads.download(album: model.album, trackIDs: model.tracks.map(\.id))
+                }
+                .disabled(model.tracks.isEmpty)
+            }
+            ToolbarItem(placement: .topBarTrailing) {
                 FavoriteButton(itemID: model.album.id)
             }
             ToolbarItem(placement: .topBarTrailing) {
@@ -60,23 +66,34 @@ struct AlbumDetailView: View {
     private var header: some View {
         VStack(spacing: theme.spacing.xs) {
             Text(model.album.title)
-                .font(theme.typography.title)
+                .font(theme.typography.largeTitle)
                 .tracking(theme.typography.displayTracking)
                 .foregroundStyle(theme.palette.textPrimary)
                 .multilineTextAlignment(.center)
-            Text(model.album.artist)
-                .font(theme.typography.sectionHeader)
-                .foregroundStyle(theme.palette.accent)
+                .accessibilityAddTraits(.isHeader)
+            artistName
             Text(metadata)
-                .font(theme.typography.caption)
+                // One point up from caption (12pt), still scaling with Dynamic Type.
+                .font(BrandFont.font(.footnote))
                 .foregroundStyle(theme.palette.textSecondary)
-            DownloadButton(collectionID: model.album.id) {
-                downloads.download(album: model.album, trackIDs: model.tracks.map(\.id))
-            }
-            .padding(.top, theme.spacing.sm)
-            .disabled(model.tracks.isEmpty)
         }
         .padding(.horizontal, theme.spacing.screenInset)
+    }
+
+    /// Taps through to the artist when the album's artist is known locally.
+    @ViewBuilder private var artistName: some View {
+        // Stack Sans Notch, matching the title on the artist page it opens.
+        let label = Text(model.album.artist)
+            .font(BrandFont.display(.title3))
+            .tracking(theme.typography.displayTracking)
+            .foregroundStyle(theme.palette.textPrimary)
+        if let artistID = model.artistID {
+            NavigationLink(value: LibraryRoute.artist(id: artistID, name: model.album.artist)) { label }
+                .buttonStyle(.plain)
+                .accessibilityHint("Shows the artist")
+        } else {
+            label
+        }
     }
 
     private func queue() -> [QueuedTrack] {

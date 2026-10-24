@@ -54,6 +54,7 @@ public struct MiniPlayerBar: View {
         }
         .labelStyle(.iconOnly)
         .buttonStyle(.plain)
+        .tint(theme.palette.accent)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Now playing: \(title), \(subtitle)")
         .padding(.horizontal, theme.spacing.md)

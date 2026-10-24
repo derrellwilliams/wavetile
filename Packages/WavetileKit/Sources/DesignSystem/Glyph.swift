@@ -9,7 +9,7 @@ import SwiftUI
 public enum Glyph: String, CaseIterable, Sendable {
     case home = "house"
     case library = "stack"
-    case downloads = "arrow-circle-down"
+    case downloads = "box-arrow-down"
     case search = "magnifying-glass"
     case profile = "user-circle"
     case playlist
@@ -66,6 +66,14 @@ public enum Glyph: String, CaseIterable, Sendable {
     public func image(label: String) -> Image {
         Image(rawValue, bundle: .module, label: Text(label))
     }
+
+    /// The glyph with its color baked in, for places that recolor template images on their own
+    /// (the glass tab bar forces its item colors and ignores `.tint` and appearance proxies).
+    /// Decorative like `image`; pair it with a title.
+    public func image(color: Color) -> Image {
+        guard let base = UIImage(named: rawValue, in: .module, with: nil) else { return image }
+        return Image(uiImage: base.withTintColor(UIColor(color), renderingMode: .alwaysOriginal))
+    }
 }
 
 public extension Label where Title == Text, Icon == Image {
@@ -81,6 +89,23 @@ public extension Button where Label == SwiftUI.Label<Text, Image> {
     init(_ title: String, glyph: Glyph, role: ButtonRole? = nil, action: @escaping () -> Void) {
         self.init(role: role, action: action) { SwiftUI.Label(title, glyph: glyph) }
     }
+}
+
+/// White title with a tan (accent) icon, for text buttons like "New Playlist" and "Sign Out".
+public struct TintedIconLabelStyle: LabelStyle {
+    @Environment(\.theme) private var theme
+
+    public func makeBody(configuration: Configuration) -> some View {
+        SwiftUI.Label {
+            configuration.title.foregroundStyle(theme.palette.textPrimary)
+        } icon: {
+            configuration.icon.foregroundStyle(theme.palette.accent)
+        }
+    }
+}
+
+public extension LabelStyle where Self == TintedIconLabelStyle {
+    static var tintedIcon: TintedIconLabelStyle { .init() }
 }
 
 /// Icon-only button at an arbitrary size (Phosphor assets are 24pt templates).
@@ -130,7 +155,8 @@ public struct EmptyState<Actions: View>: View {
     public var body: some View {
         ContentUnavailableView {
             SwiftUI.Label {
-                Text(title).font(theme.typography.title)
+                // System copy, so the text face; Stack Sans Notch is for screen and content titles.
+                Text(title).font(BrandFont.font(.title2, weight: .bold))
             } icon: {
                 glyph.image
                     .resizable()

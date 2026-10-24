@@ -61,8 +61,8 @@ struct LibraryView: View {
             }
             .themedBackground()
             .refreshable { await store.syncNow() }
-            .reportsTabRoot()
             .navigationTitle("Library")
+            .tabRootChrome()
             .libraryDestinations(zoom: zoom)
             .task {
                 do {

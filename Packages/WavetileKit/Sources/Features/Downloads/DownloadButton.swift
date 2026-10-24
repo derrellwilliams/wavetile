@@ -3,6 +3,7 @@ import Persistence
 import SwiftUI
 
 /// Download control for an album or playlist: download → progress ring → downloaded (menu to remove).
+/// Icon-only, for the navigation bar (which supplies the glass); the label is read by VoiceOver.
 struct DownloadButton: View {
     @Environment(\.theme) private var theme
     @Environment(LibraryStore.self) private var library
@@ -27,7 +28,6 @@ struct DownloadButton: View {
                 Button(action: onDownload) { label }
             }
         }
-        .buttonStyle(.glass)
         .confirmationDialog("Remove this download?", isPresented: $confirmRemove, titleVisibility: .visible) {
             Button("Remove Download", role: .destructive) { downloads.remove(collectionID: collectionID) }
         } message: {
@@ -43,28 +43,30 @@ struct DownloadButton: View {
         }
     }
 
-    @ViewBuilder private var label: some View {
-        HStack(spacing: theme.spacing.sm) {
-            if status.isDownloaded {
-                Glyph.downloaded.image.foregroundStyle(theme.palette.accent)
-                Text("Downloaded")
-            } else if status.isInProgress {
-                ProgressRing(progress: status.progress)
-                    .frame(width: 20, height: 20)
-                Text("Downloading \(status.done)/\(status.total)")
-                    .monospacedDigit()
-            } else if status.failed > 0 {
-                Glyph.warning.image
-                Text("\(status.failed) Failed")
-            } else {
-                Glyph.download.image
-                Text("Download")
-            }
+    private var label: some View {
+        Label { Text(title) } icon: { icon }
+            .labelStyle(.iconOnly)
+            .contentTransition(.opacity)
+    }
+
+    private var title: String {
+        if status.isDownloaded { "Downloaded" }
+        else if status.isInProgress { "Downloading \(status.done) of \(status.total)" }
+        else if status.failed > 0 { "\(status.failed) Failed" }
+        else { "Download" }
+    }
+
+    @ViewBuilder private var icon: some View {
+        if status.isDownloaded {
+            Glyph.downloaded.image
+        } else if status.isInProgress {
+            ProgressRing(progress: status.progress)
+                .frame(width: 20, height: 20)
+        } else if status.failed > 0 {
+            Glyph.warning.image
+        } else {
+            Glyph.download.image
         }
-        .font(theme.typography.itemTitle)
-        .foregroundStyle(theme.palette.textPrimary)
-        .contentTransition(.opacity)
-        .accessibilityElement(children: .combine)
     }
 }
 

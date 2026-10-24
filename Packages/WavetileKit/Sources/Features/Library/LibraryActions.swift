@@ -73,7 +73,7 @@ struct FavoriteButton: View {
                 }
             }
         }
-        .foregroundStyle(isFavorite ? theme.palette.accent : theme.palette.textPrimary)
+        .foregroundStyle(theme.palette.accent)
         .contentTransition(.symbolEffect(.replace))
         .sensoryFeedback(.impact(weight: .light), trigger: isFavorite)
         .task(id: itemID) {
@@ -103,7 +103,7 @@ struct AddToPlaylistSheet: View {
                 Button { showNew = true } label: {
                     Label("New Playlist", glyph: .add)
                         .font(theme.typography.body.weight(.semibold))
-                        .foregroundStyle(theme.palette.accent)
+                        .labelStyle(.tintedIcon)
                 }
                 .listRowBackground(Color.clear)
                 ForEach(playlists) { playlist in
@@ -174,7 +174,7 @@ struct AddToCollectionSheet: View {
                 Button { showNew = true } label: {
                     Label("New Collection", glyph: .add)
                         .font(theme.typography.body.weight(.semibold))
-                        .foregroundStyle(theme.palette.accent)
+                        .labelStyle(.tintedIcon)
                 }
                 .listRowBackground(Color.clear)
                 ForEach(collections) { collection in

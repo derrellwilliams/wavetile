@@ -4,7 +4,7 @@ import JellyfinKit
 import PreviewSupport
 import SwiftUI
 
-/// Profile and settings, revealed under the main UI by `SideDrawer` (opened from the Home avatar).
+/// Profile and settings, revealed under the main UI by `SideDrawer` (opened from the top-right avatar on each tab).
 struct SettingsDrawer: View {
     @ObserveInjection var inject
     @Environment(\.theme) private var theme
@@ -50,7 +50,7 @@ struct SettingsDrawer: View {
                 } label: {
                     Label("Sign Out", glyph: .signOut)
                         .font(theme.typography.body.weight(.semibold))
-                        .foregroundStyle(theme.palette.accent)
+                        .labelStyle(.tintedIcon)
                 }
                 .confirmationDialog("Sign out of \(session.serverName)?", isPresented: $confirmSignOut, titleVisibility: .visible) {
                     Button("Sign Out", role: .destructive) {

@@ -30,19 +30,47 @@ final class HomeModel {
     @ObservationIgnored var onRecentlyPlayed: (([AlbumSummary]) -> Void)?
     private let library: LibraryClient?
     private let database: LibraryDatabase?
+    /// Albums the user removed from Recently Played. Local only: Jellyfin's play history and
+    /// counts are untouched, and playing the album again brings it back.
+    private var hiddenRecents: Set<String> {
+        didSet { UserDefaults.standard.set(Array(hiddenRecents), forKey: hiddenRecentsKey) }
+    }
+    @ObservationIgnored private let hiddenRecentsKey: String
 
     /// Shelves are computed from the local database synchronously, so Home is populated on the
     /// first frame (and offline); `load()` then refreshes them from the server.
-    init(library: LibraryClient, database: LibraryDatabase? = nil) {
+    init(library: LibraryClient, database: LibraryDatabase? = nil, userID: String = "") {
         self.library = library
         self.database = database
+        hiddenRecentsKey = "hiddenRecentlyPlayed.\(userID)"
+        hiddenRecents = Set(UserDefaults.standard.stringArray(forKey: hiddenRecentsKey) ?? [])
         loadLocal()
+    }
+
+    func removeFromRecentlyPlayed(_ albumID: String) {
+        hiddenRecents.insert(albumID)
+        applyHiddenRecents()
+        onRecentlyPlayed?(shelves.first { $0.kind == .recentlyPlayed }?.albums ?? [])
+    }
+
+    /// Playing an album again un-hides it; the next load shows it at the front.
+    func albumStartedPlaying(_ albumID: String?) {
+        guard let albumID, hiddenRecents.contains(albumID) else { return }
+        hiddenRecents.remove(albumID)
+    }
+
+    private func applyHiddenRecents() {
+        guard let index = shelves.firstIndex(where: { $0.kind == .recentlyPlayed }) else { return }
+        shelves[index].albums.removeAll { hiddenRecents.contains($0.id) }
+        if shelves[index].albums.isEmpty { shelves.remove(at: index) }
     }
 
     /// Preview initializer with fixed content and no network.
     init(previewShelves: [Shelf]) {
         self.library = nil
         self.database = nil
+        self.hiddenRecentsKey = ""
+        self.hiddenRecents = []
         self.shelves = previewShelves
     }
 
@@ -56,6 +84,7 @@ final class HomeModel {
         shelves = local.compactMap { kind, albums in
             albums.isEmpty ? nil : Shelf(kind: kind, albums: albums.map(\.summary))
         }
+        applyHiddenRecents()
     }
 
     func load() async {
@@ -79,6 +108,7 @@ final class HomeModel {
             }
             return previous[kind]
         }
+        applyHiddenRecents()
         if let recent = shelves.first(where: { $0.kind == .recentlyPlayed }) { onRecentlyPlayed?(recent.albums) }
         let allFailed = results.allSatisfy { (try? $0.1.get()) == nil }
         errorMessage = if !shelves.isEmpty {

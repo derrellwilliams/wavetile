@@ -9,6 +9,7 @@ public struct TrackRow: View {
 
     @Environment(\.theme) private var theme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.isAudioPlaying) private var isAudioPlaying
     private let title: String
     private let subtitle: String?
     private let duration: Duration?
@@ -34,7 +35,7 @@ public struct TrackRow: View {
             VStack(alignment: .leading, spacing: theme.spacing.xxs) {
                 Text(title)
                     .font(theme.typography.body)
-                    .foregroundStyle(isPlaying ? theme.palette.accent : theme.palette.textPrimary)
+                    .foregroundStyle(theme.palette.textPrimary)
                 if let subtitle {
                     Text(subtitle)
                         .font(theme.typography.itemSubtitle)
@@ -76,8 +77,7 @@ public struct TrackRow: View {
         case let .number(number):
             Group {
                 if isPlaying {
-                    Glyph.waveform.image
-                        .pulsing(isPlaying)
+                    WaveformIndicator(isAnimating: isAudioPlaying)
                         .foregroundStyle(theme.palette.accent)
                 } else {
                     Text(number.map(String.init) ?? "")
@@ -97,6 +97,7 @@ public struct TrackRow: View {
     List {
         TrackRow(title: "15 Step", duration: .seconds(237), leading: .number(1))
         TrackRow(title: "Bodysnatchers", duration: .seconds(242), leading: .number(2), isPlaying: true)
+            .environment(\.isAudioPlaying, true)
         TrackRow(title: "Nude", subtitle: "Radiohead", duration: .seconds(255), leading: .artwork(.placeholder(seed: 2)))
     }
     .listStyle(.plain)
