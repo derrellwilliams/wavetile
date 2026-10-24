@@ -26,7 +26,7 @@ struct MainTabView: View {
     init(app: AppModel, signedIn: AppModel.SignedIn) {
         self.app = app
         self.signedIn = signedIn
-        let home = HomeModel(library: signedIn.library.api)
+        let home = HomeModel(library: signedIn.library.api, database: signedIn.library.database)
         let widgets = WidgetBridge(player: signedIn.player, library: signedIn.library)
         home.onRecentlyPlayed = { [weak widgets] albums in widgets?.recentsChanged(albums) }
         _home = State(initialValue: home)

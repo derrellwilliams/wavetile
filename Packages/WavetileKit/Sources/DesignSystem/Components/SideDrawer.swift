@@ -12,6 +12,7 @@ import SwiftUI
 public struct SideDrawer<Content: View, Drawer: View>: View {
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Binding private var isOpen: Bool
     private let edge: HorizontalEdge
     private let edgeSwipeEnabled: Bool
@@ -89,8 +90,9 @@ public struct SideDrawer<Content: View, Drawer: View>: View {
     /// +1 when content moves right to reveal a leading drawer, -1 for trailing.
     private var direction: CGFloat { edge == .leading ? 1 : -1 }
 
+    /// Wider at accessibility text sizes so long words in the drawer don't break.
     private func drawerWidth(in total: CGFloat) -> CGFloat {
-        min(340, total * 0.84)
+        dynamicTypeSize.isAccessibilitySize ? total * 0.92 : min(340, total * 0.84)
     }
 
     private func dragGesture(width: CGFloat) -> some Gesture {

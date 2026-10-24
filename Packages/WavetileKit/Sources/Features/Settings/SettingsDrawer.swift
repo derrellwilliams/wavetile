@@ -8,6 +8,7 @@ import SwiftUI
 struct SettingsDrawer: View {
     @ObserveInjection var inject
     @Environment(\.theme) private var theme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Bindable var app: AppModel
     let session: ServerSession
     @Binding var isOpen: Bool
@@ -57,7 +58,7 @@ struct SettingsDrawer: View {
                     }
                 }
             }
-            .padding(.horizontal, theme.spacing.xl)
+            .padding(.horizontal, dynamicTypeSize.isAccessibilitySize ? theme.spacing.md : theme.spacing.xl)
             .padding(.vertical, theme.spacing.lg)
         }
         .scrollIndicators(.hidden)
@@ -110,7 +111,7 @@ struct SettingsDrawer: View {
                     .font(theme.typography.itemSubtitle)
                     .foregroundStyle(theme.palette.textSecondary)
             }
-            .lineLimit(1)
+            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
         }
         .padding(.top, theme.spacing.lg)
     }

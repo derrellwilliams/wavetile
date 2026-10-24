@@ -1,7 +1,9 @@
 import DesignSystem
 import Foundation
 import JellyfinKit
+import Library
 import Observation
+import Persistence
 import PreviewSupport
 
 @Observable
@@ -27,15 +29,33 @@ final class HomeModel {
     /// Called with the Recently Played albums after each load (feeds the widget).
     @ObservationIgnored var onRecentlyPlayed: (([AlbumSummary]) -> Void)?
     private let library: LibraryClient?
+    private let database: LibraryDatabase?
 
-    init(library: LibraryClient) {
+    /// Shelves are computed from the local database synchronously, so Home is populated on the
+    /// first frame (and offline); `load()` then refreshes them from the server.
+    init(library: LibraryClient, database: LibraryDatabase? = nil) {
         self.library = library
+        self.database = database
+        loadLocal()
     }
 
     /// Preview initializer with fixed content and no network.
     init(previewShelves: [Shelf]) {
         self.library = nil
+        self.database = nil
         self.shelves = previewShelves
+    }
+
+    private func loadLocal() {
+        guard let database else { return }
+        let local: [(Shelf.Kind, [AlbumRecord])] = [
+            (.recentlyPlayed, (try? database.recentlyPlayedAlbums()) ?? []),
+            (.mostPlayed, (try? database.mostPlayedAlbums()) ?? []),
+            (.recentlyAdded, (try? database.recentlyAddedAlbums()) ?? []),
+        ]
+        shelves = local.compactMap { kind, albums in
+            albums.isEmpty ? nil : Shelf(kind: kind, albums: albums.map(\.summary))
+        }
     }
 
     func load() async {
@@ -51,15 +71,23 @@ final class HomeModel {
             (.mostPlayed, await most),
             (.recentlyAdded, await added),
         ]
+        // Server results win; a shelf that failed keeps its local version.
+        let previous = Dictionary(uniqueKeysWithValues: shelves.map { ($0.kind, $0) })
         shelves = results.compactMap { kind, result in
-            guard let albums = try? result.get(), !albums.isEmpty else { return nil }
-            return Shelf(kind: kind, albums: albums)
+            if let albums = try? result.get() {
+                return albums.isEmpty ? nil : Shelf(kind: kind, albums: albums)
+            }
+            return previous[kind]
         }
         if let recent = shelves.first(where: { $0.kind == .recentlyPlayed }) { onRecentlyPlayed?(recent.albums) }
         let allFailed = results.allSatisfy { (try? $0.1.get()) == nil }
-        errorMessage = allFailed
-            ? "Couldn't reach your server. Your downloads are in the Downloaded tab."
-            : (shelves.isEmpty ? "Your music library is empty." : nil)
+        errorMessage = if !shelves.isEmpty {
+            nil
+        } else if allFailed {
+            "Couldn't reach your server. Your downloads are in the Downloaded tab."
+        } else {
+            "Your music library is empty."
+        }
     }
 }
 

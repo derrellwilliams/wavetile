@@ -56,15 +56,23 @@ public enum Glyph: String, CaseIterable, Sendable {
     case user
 
     /// 24pt template image; tints with `foregroundStyle`. Add `.resizable()` for other sizes.
+    /// Decorative: VoiceOver skips it (otherwise it reads asset names like "magnifying-glass").
+    /// Meaning comes from the surrounding `Label`, button title, or an explicit accessibility label.
     public var image: Image {
-        Image(rawValue, bundle: .module)
+        Image(decorative: rawValue, bundle: .module)
+    }
+
+    /// The glyph with an accessibility label, for icon-only controls.
+    public func image(label: String) -> Image {
+        Image(rawValue, bundle: .module, label: Text(label))
     }
 }
 
 public extension Label where Title == Text, Icon == Image {
     /// `Label("Library", glyph: .library)`: the Phosphor equivalent of `Label(_:systemImage:)`.
     init(_ title: String, glyph: Glyph) {
-        self.init { Text(title) } icon: { glyph.image }
+        // Labeled icon so `.labelStyle(.iconOnly)` buttons still have a VoiceOver name.
+        self.init { Text(title) } icon: { glyph.image(label: title) }
     }
 }
 

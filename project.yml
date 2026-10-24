@@ -103,6 +103,21 @@ targets:
       properties:
         com.apple.security.application-groups: [group.com.derrellwilliams.wavetile]
 
+  WavetileUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - UITests
+    dependencies:
+      - target: Wavetile
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.derrellwilliams.wavetile.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        # XCTestCase overrides are nonisolated; tests opt into @MainActor individually.
+        SWIFT_DEFAULT_ACTOR_ISOLATION: nonisolated
+        TEST_TARGET_NAME: Wavetile
+
 schemes:
   Wavetile:
     build:
@@ -112,6 +127,6 @@ schemes:
       config: Debug
       testPlans: []
       targets:
-        - package: WavetileKit/JellyfinKitTests
+        - WavetileUITests
     run:
       config: Debug

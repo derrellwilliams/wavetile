@@ -166,6 +166,11 @@ public final class LibraryDatabase: Sendable {
                 t.primaryKey(["collectionID", "albumID"])
             }
         }
+        migrator.registerMigration("v4-play-indexes") { db in
+            // Home shelves group tracks by album and sort by play data.
+            try db.create(index: "track_lastPlayed", on: "track", columns: ["lastPlayed"])
+            try db.create(index: "track_playCount", on: "track", columns: ["playCount"])
+        }
         return migrator
     }
 }

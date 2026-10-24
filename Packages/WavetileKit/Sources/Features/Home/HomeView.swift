@@ -11,6 +11,7 @@ struct HomeView: View {
     @Binding var showSettings: Bool
     @Namespace private var zoom
     @Binding var path: [LibraryRoute]
+    @State private var didRefresh = false
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -48,9 +49,10 @@ struct HomeView: View {
             }
             .libraryDestinations(zoom: zoom)
             .refreshable { await model.load() }
-            // Root reappears after every pop, so only load the first time; pull to refresh after that.
             .task {
-                guard model.shelves.isEmpty else { return }
+                // Local shelves are already on screen; refresh from the server once per session.
+                guard !didRefresh else { return }
+                didRefresh = true
                 await model.load()
                 if DebugFlags.openFirstAlbum, let shelf = model.shelves.first,
                    let album = shelf.albums.dropFirst(DebugFlags.albumIndex).first {

@@ -255,3 +255,35 @@ public extension LibraryDatabase {
         ValueObservation.tracking { try PlaylistRecord.fetchOne($0, key: id) }
     }
 }
+
+// MARK: - Home shelves from local play data (instant first frame, works offline)
+
+public extension LibraryDatabase {
+    /// Albums ordered by their most recently played track.
+    func recentlyPlayedAlbums(limit: Int = 24) throws -> [AlbumRecord] {
+        try pool.read { db in
+            try AlbumRecord.fetchAll(db, sql: """
+                SELECT album.* FROM album
+                JOIN (SELECT albumID, MAX(lastPlayed) AS played FROM track
+                      WHERE lastPlayed IS NOT NULL GROUP BY albumID) t ON t.albumID = album.id
+                ORDER BY t.played DESC LIMIT ?
+                """, arguments: [limit])
+        }
+    }
+
+    /// Albums ranked by the summed play counts of their tracks.
+    func mostPlayedAlbums(limit: Int = 24) throws -> [AlbumRecord] {
+        try pool.read { db in
+            try AlbumRecord.fetchAll(db, sql: """
+                SELECT album.* FROM album
+                JOIN (SELECT albumID, SUM(playCount) AS plays FROM track
+                      WHERE playCount > 0 GROUP BY albumID) t ON t.albumID = album.id
+                ORDER BY t.plays DESC, album.sortTitle LIMIT ?
+                """, arguments: [limit])
+        }
+    }
+
+    func recentlyAddedAlbums(limit: Int = 24) throws -> [AlbumRecord] {
+        try pool.read { try AlbumRecord.order(Column("dateAdded").desc).limit(limit).fetchAll($0) }
+    }
+}

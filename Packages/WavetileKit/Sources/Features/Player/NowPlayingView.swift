@@ -9,19 +9,39 @@ struct NowPlayingView: View {
     @Environment(\.theme) private var theme
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(AudioPlayer.self) private var player
     @Environment(LibraryStore.self) private var store
     @State private var showQueue = false
 
     var body: some View {
+        // Fixed, full-screen layout when it fits; scrolls when large text makes it taller than
+        // the screen (instead of squeezing and clipping the text).
+        ViewThatFits(in: .vertical) {
+            content(scrolling: false)
+            ScrollView {
+                content(scrolling: true)
+            }
+            .scrollIndicators(.hidden)
+        }
+        .background(theme.palette.background.ignoresSafeArea())
+        .sheet(isPresented: $showQueue) {
+            QueueView()
+                .presentationDetents([.medium, .large])
+                .presentationBackground(theme.palette.background)
+        }
+        .enableInjection()
+    }
+
+    private func content(scrolling: Bool) -> some View {
         VStack(spacing: theme.spacing.xl) {
             header
 
-            Spacer(minLength: 0)
+            if !scrolling { Spacer(minLength: 0) }
 
             artwork
 
-            Spacer(minLength: 0)
+            if !scrolling { Spacer(minLength: 0) }
 
             HStack(alignment: .center, spacing: theme.spacing.md) {
                 VStack(alignment: .leading, spacing: theme.spacing.xs) {
@@ -37,7 +57,8 @@ struct NowPlayingView: View {
                             .foregroundStyle(theme.palette.textSecondary)
                     }
                 }
-                .lineLimit(1)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 if let trackID = player.current?.trackID {
                     FavoriteButton(itemID: trackID, size: 28)
@@ -54,13 +75,6 @@ struct NowPlayingView: View {
         }
         .padding(.horizontal, theme.spacing.xl)
         .padding(.bottom, theme.spacing.lg)
-        .background(theme.palette.background.ignoresSafeArea())
-        .sheet(isPresented: $showQueue) {
-            QueueView()
-                .presentationDetents([.medium, .large])
-                .presentationBackground(theme.palette.background)
-        }
-        .enableInjection()
     }
 
     private var header: some View {
@@ -75,7 +89,10 @@ struct NowPlayingView: View {
                 Text(player.current?.albumTitle ?? "")
                     .font(theme.typography.itemTitle)
                     .foregroundStyle(theme.palette.textPrimary)
-                    .lineLimit(1)
+                    // Two lines normally; unlimited at accessibility sizes.
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
             Button("Queue", glyph: .queue) { showQueue = true }

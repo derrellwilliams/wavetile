@@ -8,6 +8,7 @@ public struct TrackRow: View {
     }
 
     @Environment(\.theme) private var theme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private let title: String
     private let subtitle: String?
     private let duration: Duration?
@@ -39,17 +40,23 @@ public struct TrackRow: View {
                         .font(theme.typography.itemSubtitle)
                         .foregroundStyle(theme.palette.textSecondary)
                 }
+                // At accessibility sizes the duration moves under the title instead of squeezing it.
+                if isAccessibilitySize, let duration {
+                    Text(duration, format: .time(pattern: .minuteSecond))
+                        .font(theme.typography.itemSubtitle.monospacedDigit())
+                        .foregroundStyle(theme.palette.textSecondary)
+                }
             }
-            .lineLimit(1)
+            // One line normally; wrap at accessibility text sizes instead of truncating.
+            .lineLimit(isAccessibilitySize ? nil : 1)
             Spacer(minLength: theme.spacing.sm)
             if isDownloaded {
                 Glyph.downloads.image
                     .resizable()
                     .frame(width: 14, height: 14)
                     .foregroundStyle(theme.palette.textSecondary)
-                    .accessibilityLabel("Downloaded")
             }
-            if let duration {
+            if !isAccessibilitySize, let duration {
                 Text(duration, format: .time(pattern: .minuteSecond))
                     .font(theme.typography.itemSubtitle.monospacedDigit())
                     .foregroundStyle(theme.palette.textSecondary)
@@ -57,8 +64,12 @@ public struct TrackRow: View {
         }
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("trackRow")
+        .accessibilityValue([isPlaying ? "Now playing" : nil, isDownloaded ? "Downloaded" : nil].compactMap(\.self).joined(separator: ", "))
         .accessibilityAddTraits(isPlaying ? .isSelected : [])
     }
+
+    private var isAccessibilitySize: Bool { dynamicTypeSize.isAccessibilitySize }
 
     @ViewBuilder private var leadingView: some View {
         switch leading {

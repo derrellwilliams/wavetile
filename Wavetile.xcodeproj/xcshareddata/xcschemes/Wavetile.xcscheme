@@ -44,10 +44,10 @@
             parallelizable = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "JellyfinKitTests"
-               BuildableName = "JellyfinKitTests"
-               BlueprintName = "JellyfinKitTests"
-               ReferencedContainer = "container:Packages/WavetileKit">
+               BlueprintIdentifier = "32849DB9DCC1D372D0D41053"
+               BuildableName = "WavetileUITests.xctest"
+               BlueprintName = "WavetileUITests"
+               ReferencedContainer = "container:Wavetile.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>

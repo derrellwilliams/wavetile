@@ -44,13 +44,18 @@ public struct MiniPlayerBar: View {
             Spacer(minLength: 0)
             Button(isPlaying ? "Pause" : "Play", glyph: isPlaying ? .pause : .play, action: onPlayPause)
                 .contentTransition(.opacity)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(.rect)
             if placement != .inline {
                 Button("Next", glyph: .next, action: onNext)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(.rect)
             }
         }
         .labelStyle(.iconOnly)
-        .font(.title3)
         .buttonStyle(.plain)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Now playing: \(title), \(subtitle)")
         .padding(.horizontal, theme.spacing.md)
         .sensoryFeedback(.selection, trigger: isPlaying)
     }

@@ -23,6 +23,7 @@ struct SettingsSection<Rows: View>: View {
 
 struct SettingsRow: View {
     @Environment(\.theme) private var theme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let glyph: Glyph
     let title: String
     let value: String
@@ -34,22 +35,43 @@ struct SettingsRow: View {
     }
 
     var body: some View {
+        // Side by side when label and value both fit on one line; otherwise stacked (like iOS
+        // Settings) so neither has to break mid-word or truncate, at any text size.
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: theme.spacing.md) {
+                titleLabel
+                Spacer(minLength: theme.spacing.sm)
+                valueText.fixedSize()
+            }
+            VStack(alignment: .leading, spacing: theme.spacing.xxs) {
+                titleLabel
+                valueText
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, dynamicTypeSize.isAccessibilitySize ? theme.spacing.md : theme.spacing.lg)
+        .padding(.vertical, theme.spacing.md + 2)
+        .contentShape(.rect)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var titleLabel: some View {
         HStack(spacing: theme.spacing.md) {
             glyph.image
                 .foregroundStyle(theme.palette.textSecondary)
             Text(title)
                 .font(theme.typography.body)
                 .foregroundStyle(theme.palette.textPrimary)
-            Spacer(minLength: theme.spacing.sm)
+                .fixedSize()
+        }
+    }
+
+    @ViewBuilder private var valueText: some View {
+        if !value.isEmpty {
             Text(value)
                 .font(theme.typography.itemSubtitle)
                 .foregroundStyle(theme.palette.textSecondary)
-                .lineLimit(1)
         }
-        .padding(.horizontal, theme.spacing.lg)
-        .padding(.vertical, theme.spacing.md + 2)
-        .contentShape(.rect)
-        .accessibilityElement(children: .combine)
     }
 }
 

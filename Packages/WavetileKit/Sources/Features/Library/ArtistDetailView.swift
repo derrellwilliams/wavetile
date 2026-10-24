@@ -11,10 +11,11 @@ struct ArtistDetailView: View {
     let artistID: String
     let name: String
     @State private var albums: [AlbumRecord] = []
+    /// Resolved once; reading the database from `body` would run on every render.
+    @State private var imageTag: String??
 
     private var artwork: ArtworkSource {
-        let tag = try? store.database.artist(id: artistID)?.imageTag
-        return store.artwork(itemID: artistID, tag: tag, maxPixelWidth: 1320)
+        store.artwork(itemID: artistID, tag: imageTag ?? nil, maxPixelWidth: 1320)
     }
 
     var body: some View {
@@ -65,6 +66,7 @@ struct ArtistDetailView: View {
             }
         }
         .task {
+            if imageTag == nil { imageTag = .some(try? store.database.artist(id: artistID)?.imageTag) }
             do {
                 for try await value in store.observe(store.database.albums(artistID: artistID)) { albums = value }
             } catch {}

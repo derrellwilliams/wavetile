@@ -28,7 +28,13 @@ open Wavetile.xcodeproj
 - **Hot reload:** install [InjectionNext](https://github.com/johnno1962/InjectionNext), launch it, run the Debug build in the Simulator, then save any Swift file. Screens using `@ObserveInjection` + `.enableInjection()` re-render in place.
 
 ## Tests
+Unit and performance tests (queue logic, sync and downloads bookkeeping, search, and 50k-track query budgets):
 ```sh
 cd Packages/WavetileKit
 xcodebuild -scheme WavetileKit-Package -destination 'platform=iOS Simulator,name=iPhone 18 Pro' test
+```
+
+UI tests: an accessibility audit (`performAccessibilityAudit`) of Home, Library, an album, Now Playing and Settings, plus a launch-time metric. They need a signed-in session in the simulator:
+```sh
+xcodebuild -project Wavetile.xcodeproj -scheme Wavetile -destination 'platform=iOS Simulator,name=iPhone 18 Pro' test
 ```
