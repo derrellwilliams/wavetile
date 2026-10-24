@@ -10,7 +10,7 @@ struct HomeView: View {
     let userName: String
     @Binding var showSettings: Bool
     @Namespace private var zoom
-    @State private var path: [LibraryRoute] = []
+    @Binding var path: [LibraryRoute]
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -40,7 +40,7 @@ struct HomeView: View {
                     Button {
                         showSettings = true
                     } label: {
-                        Avatar(name: userName, size: 34)
+                        Avatar(size: 34)
                     }
                     .accessibilityLabel("Profile and Settings")
                 }
@@ -80,7 +80,7 @@ struct HomeView: View {
             .init(kind: .recentlyPlayed, albums: Array(Fixtures.albums.prefix(6))),
             .init(kind: .mostPlayed, albums: Fixtures.albums.reversed()),
             .init(kind: .recentlyAdded, albums: Array(Fixtures.albums.suffix(5))),
-        ]), userName: "Derrell", showSettings: .constant(false))
+        ]), userName: "Derrell", showSettings: .constant(false), path: .constant([]))
         .environment(signedIn.library)
     }
 }

@@ -74,12 +74,12 @@ struct SignInFlow: View {
     @ViewBuilder private var footer: some View {
         if let error = model.errorMessage {
             Label(error, glyph: .warning)
-                .foregroundStyle(.red)
+                .foregroundStyle(.white)
         } else {
             switch model.transportWarning {
             case .insecureRemote:
                 Label("HTTP over the internet sends your password and token unencrypted, and iOS will block it. Use HTTPS.", glyph: .lockOpen)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(.white)
             case .insecureLocal:
                 Label("Unencrypted connection. OK on your home network only.", glyph: .lockOpen)
             case nil:

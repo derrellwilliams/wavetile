@@ -24,6 +24,8 @@ final class HomeModel {
     private(set) var shelves: [Shelf] = []
     private(set) var isLoading = false
     private(set) var errorMessage: String?
+    /// Called with the Recently Played albums after each load (feeds the widget).
+    @ObservationIgnored var onRecentlyPlayed: (([AlbumSummary]) -> Void)?
     private let library: LibraryClient?
 
     init(library: LibraryClient) {
@@ -53,6 +55,7 @@ final class HomeModel {
             guard let albums = try? result.get(), !albums.isEmpty else { return nil }
             return Shelf(kind: kind, albums: albums)
         }
+        if let recent = shelves.first(where: { $0.kind == .recentlyPlayed }) { onRecentlyPlayed?(recent.albums) }
         let allFailed = results.allSatisfy { (try? $0.1.get()) == nil }
         errorMessage = allFailed
             ? "Couldn't reach your server. Your downloads are in the Downloaded tab."

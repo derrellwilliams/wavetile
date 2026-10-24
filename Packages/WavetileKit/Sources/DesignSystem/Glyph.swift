@@ -53,6 +53,7 @@ public enum Glyph: String, CaseIterable, Sendable {
     case collection = "squares-four"
     case add = "plus"
     case edit = "pencil-simple"
+    case user
 
     /// 24pt template image; tints with `foregroundStyle`. Add `.resizable()` for other sizes.
     public var image: Image {

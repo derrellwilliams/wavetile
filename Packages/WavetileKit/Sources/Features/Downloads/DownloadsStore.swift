@@ -1,3 +1,4 @@
+import ActivityKit
 import DesignSystem
 import Downloads
 import Foundation
@@ -5,6 +6,7 @@ import JellyfinKit
 import Network
 import Observation
 import Persistence
+import WidgetShared
 
 /// Online/offline state. Screens dim music that isn't downloaded while offline.
 @Observable
@@ -108,7 +110,35 @@ final class DownloadsStore {
 
     private func start(_ record: DownloadCollectionRecord, trackIDs: [String]) {
         let quality = quality, cellular = allowCellular
-        Task { try? await manager?.download(record, trackIDs: trackIDs, quality: quality, allowCellular: cellular) }
+        Task {
+            try? await manager?.download(record, trackIDs: trackIDs, quality: quality, allowCellular: cellular)
+            await trackWithLiveActivity(record)
+        }
+    }
+
+    /// Lock Screen / Dynamic Island progress for one collection's download.
+    private func trackWithLiveActivity(_ record: DownloadCollectionRecord) async {
+        guard ActivityAuthorizationInfo().areActivitiesEnabled,
+              let status = try? database.downloadStatusNow(collectionID: record.id),
+              status.isInProgress
+        else { return }
+        let attributes = DownloadActivityAttributes(collectionID: record.id, name: record.name, subtitle: record.subtitle)
+        let initial = DownloadActivityAttributes.ContentState(done: status.done, total: status.total, progress: status.progress)
+        guard let activity = try? Activity.request(attributes: attributes, content: .init(state: initial, staleDate: nil)) else { return }
+
+        do {
+            for try await status in library.observe(database.downloadStatus(collectionID: record.id)) {
+                let state = DownloadActivityAttributes.ContentState(done: status.done, total: status.total, progress: status.progress)
+                if !status.isRequested || !status.isInProgress {
+                    // Finished, failed, or removed: show the final state briefly, then dismiss.
+                    await activity.end(.init(state: state, staleDate: nil), dismissalPolicy: .after(.now + 60))
+                    return
+                }
+                await activity.update(.init(state: state, staleDate: nil))
+            }
+        } catch {
+            await activity.end(nil, dismissalPolicy: .immediate)
+        }
     }
 
     /// Cache the artwork sizes the app renders so downloaded music looks right offline.

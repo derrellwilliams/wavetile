@@ -22,7 +22,7 @@ struct QuickConnectView: View {
                 if let error = model.errorMessage {
                     VStack(spacing: theme.spacing.md) {
                         Label(error, glyph: .warning)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(.white)
                         Button("Try Again") { model.startQuickConnect() }
                             .buttonStyle(.glass)
                     }

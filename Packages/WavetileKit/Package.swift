@@ -20,6 +20,9 @@ let package = Package(
     platforms: [.iOS("26.1")],
     products: [
         .library(name: "WavetileKit", targets: ["Features"]),
+        // Lightweight products for the widget extension (no database, player, or network stack).
+        .library(name: "WidgetShared", targets: ["WidgetShared"]),
+        .library(name: "DesignSystem", targets: ["DesignSystem"]),
     ],
     dependencies: [
         .package(url: "https://github.com/jellyfin/jellyfin-sdk-swift.git", from: "3.3.0"),
@@ -31,6 +34,10 @@ let package = Package(
         .target(
             name: "JellyfinKit",
             dependencies: [.product(name: "JellyfinAPI", package: "jellyfin-sdk-swift")],
+            swiftSettings: serviceSettings
+        ),
+        .target(
+            name: "WidgetShared",
             swiftSettings: serviceSettings
         ),
         .target(
@@ -70,7 +77,7 @@ let package = Package(
         ),
         .target(
             name: "Features",
-            dependencies: ["JellyfinKit", "Library", "Persistence", "Playback", "Downloads", "DesignSystem", "PreviewSupport"],
+            dependencies: ["JellyfinKit", "Library", "Persistence", "Playback", "Downloads", "DesignSystem", "PreviewSupport", "WidgetShared"],
             swiftSettings: uiSettings
         ),
         .testTarget(

@@ -17,7 +17,7 @@ ICONS=(
   shuffle sort-ascending caret-right
   repeat repeat-once queue caret-down speaker-hifi dots-three list-plus arrow-bend-down-right
   check-circle cloud-slash trash download-simple
-  heart heart:fill squares-four plus pencil-simple
+  heart heart:fill squares-four plus pencil-simple user
 )
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

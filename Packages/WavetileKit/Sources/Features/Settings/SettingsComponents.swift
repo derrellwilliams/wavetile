@@ -53,19 +53,19 @@ struct SettingsRow: View {
     }
 }
 
-/// Initial-in-a-circle avatar until we load the Jellyfin profile image.
+/// Profile avatar: black circle with a person glyph.
 struct Avatar: View {
-    @Environment(\.theme) private var theme
-    let name: String
     var size: CGFloat = 52
 
     var body: some View {
-        Text(String(name.prefix(1)).uppercased())
-            // Scales with the circle so the initial never crowds the edge.
-            .font(BrandFont.font(fixedSize: size * 0.48, weight: .bold))
+        Glyph.user.image
+            .resizable()
+            .scaledToFit()
+            // Scales with the circle so the glyph never crowds the edge.
+            .frame(width: size * 0.5, height: size * 0.5)
             .foregroundStyle(.white)
             .frame(width: size, height: size)
-            .background(theme.palette.accent, in: .circle)
+            .background(.black, in: .circle)
             .accessibilityHidden(true)
     }
 }

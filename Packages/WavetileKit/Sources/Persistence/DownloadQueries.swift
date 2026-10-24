@@ -152,7 +152,7 @@ public extension LibraryDatabase {
         }
     }
 
-    private static func status(_ db: Database, collectionID: String) throws -> DownloadStatus {
+    fileprivate static func status(_ db: Database, collectionID: String) throws -> DownloadStatus {
         let row = try Row.fetchOne(db, sql: """
             SELECT COUNT(*) AS total,
                    SUM(t.state = 'done') AS done,
@@ -169,5 +169,12 @@ public extension LibraryDatabase {
             failed: row?["failed"] ?? 0,
             progress: (row?["progressSum"] ?? 0.0) / Double(total)
         )
+    }
+}
+
+public extension LibraryDatabase {
+    /// One-shot status (inside an existing read).
+    func downloadStatusNow(collectionID: String) throws -> DownloadStatus {
+        try pool.read { try Self.status($0, collectionID: collectionID) }
     }
 }

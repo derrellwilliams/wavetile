@@ -2,11 +2,13 @@ import CoreText
 import SwiftUI
 import UIKit
 
-/// The brand typeface, bundled in `Resources/Fonts` (SIL OFL 1.1, see OFL.txt).
+/// Brand typefaces, bundled in `Resources/Fonts` (SIL OFL 1.1, see the OFL files).
 ///
-/// To change the app font: drop new .ttf/.otf files in `Resources/Fonts` and update `family`.
+/// `family` is the text face; `displayFamily` is for the logo and view titles.
+/// To change a font: drop new .ttf/.otf files in `Resources/Fonts` and update the family name.
 public enum BrandFont {
     public static let family = "Familjen Grotesk"
+    public static let displayFamily = "Stack Sans Notch"
 
     /// Registers bundled fonts with the process. Packages can't use `UIAppFonts`, so this
     /// runs once at launch (`RootView` calls it); repeated calls are no-ops.
@@ -23,17 +25,22 @@ public enum BrandFont {
     }()
 
     /// Brand font that scales with Dynamic Type relative to `style`.
-    public static func font(_ style: Font.TextStyle, weight: Font.Weight = .regular) -> Font {
+    public static func font(_ style: Font.TextStyle, weight: Font.Weight = .regular, family: String = family) -> Font {
         .custom(family, size: defaultSize(style), relativeTo: style).weight(weight)
     }
 
-    /// Fixed-size brand font for graphics that must fit a shape (avatars, badges), not body text.
-    public static func font(fixedSize size: CGFloat, weight: Font.Weight = .regular) -> Font {
+    /// Display face (titles) at a Dynamic Type style.
+    public static func display(_ style: Font.TextStyle, weight: Font.Weight = .bold) -> Font {
+        font(style, weight: weight, family: displayFamily)
+    }
+
+    /// Fixed-size brand font for graphics that must fit a shape (logo, avatars, badges), not body text.
+    public static func font(fixedSize size: CGFloat, weight: Font.Weight = .regular, family: String = family) -> Font {
         .custom(family, fixedSize: size).weight(weight)
     }
 
     /// UIKit equivalent for appearance proxies (navigation bar titles).
-    public static func uiFont(_ style: UIFont.TextStyle, weight: UIFont.Weight) -> UIFont {
+    public static func uiFont(_ style: UIFont.TextStyle, weight: UIFont.Weight, family: String = family) -> UIFont {
         let descriptor = UIFontDescriptor(fontAttributes: [
             .family: family,
             .traits: [UIFontDescriptor.TraitKey.weight: weight],
@@ -45,8 +52,8 @@ public enum BrandFont {
     /// Navigation bar titles can't be styled from SwiftUI, so use the appearance proxy.
     public static func applyNavigationBarAppearance(textColor: UIColor) {
         let bar = UINavigationBar.appearance()
-        bar.largeTitleTextAttributes = [.font: uiFont(.largeTitle, weight: .bold), .foregroundColor: textColor]
-        bar.titleTextAttributes = [.font: uiFont(.headline, weight: .semibold), .foregroundColor: textColor]
+        bar.largeTitleTextAttributes = [.font: uiFont(.largeTitle, weight: .bold, family: displayFamily), .foregroundColor: textColor]
+        bar.titleTextAttributes = [.font: uiFont(.headline, weight: .bold, family: displayFamily), .foregroundColor: textColor]
     }
 
     /// Apple's default point sizes at the standard ("Large") content size category.

@@ -30,5 +30,5 @@ open Wavetile.xcodeproj
 ## Tests
 ```sh
 cd Packages/WavetileKit
-xcodebuild -scheme WavetileKit -destination 'platform=iOS Simulator,name=iPhone 18 Pro' test
+xcodebuild -scheme WavetileKit-Package -destination 'platform=iOS Simulator,name=iPhone 18 Pro' test
 ```

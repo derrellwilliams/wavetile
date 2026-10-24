@@ -87,23 +87,26 @@ public struct Theme: Sendable, Identifiable, Hashable {
 // MARK: - Built-in themes
 
 public extension Theme {
-    /// Default brand: near-black canvas, white type, Familjen Grotesk throughout.
+    /// Default brand: #1A1A1A canvas, white type and controls (no color accent),
+    /// Stack Sans Notch for the logo and titles, Familjen Grotesk for text.
     static let wavetile = Theme(
         id: "wavetile",
         name: "Wavetile",
         palette: .init(
-            accent: Color(hex: 0xE00909),
-            background: Color(hex: 0x151515),
-            surface: Color(hex: 0x222222),
+            accent: .white,
+            onAccent: .black,
+            background: Color(hex: 0x1A1A1A),
+            surface: Color(hex: 0x262626),
             textPrimary: .white,
             textSecondary: .white.opacity(0.6),
             separator: .white.opacity(0.12),
-            artworkPlaceholder: [Color(hex: 0x2A2A2A), Color(hex: 0x1E1E1E)]
+            artworkPlaceholder: [Color(hex: 0x2E2E2E), Color(hex: 0x222222)]
         ),
         typography: .init(
-            wordmark: BrandFont.font(.title2, weight: .bold),
-            largeTitle: BrandFont.font(.largeTitle, weight: .bold),
-            title: BrandFont.font(.title2, weight: .bold),
+            // Logo: fixed size (a mark, not text). 30pt is the largest that sits cleanly in the 44pt bar.
+            wordmark: BrandFont.font(fixedSize: 30, weight: .bold, family: BrandFont.displayFamily),
+            largeTitle: BrandFont.display(.largeTitle),
+            title: BrandFont.display(.title2),
             sectionHeader: BrandFont.font(.title3, weight: .semibold),
             body: BrandFont.font(.body),
             itemTitle: BrandFont.font(.subheadline, weight: .medium),

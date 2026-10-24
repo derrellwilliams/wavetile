@@ -27,7 +27,7 @@ struct PasswordSignInView: View {
                     .onSubmit(submit)
             } footer: {
                 if let error = model.errorMessage {
-                    Label(error, glyph: .warning).foregroundStyle(.red)
+                    Label(error, glyph: .warning).foregroundStyle(.white)
                 }
             }
 

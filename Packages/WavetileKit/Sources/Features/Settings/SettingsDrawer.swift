@@ -83,7 +83,8 @@ struct SettingsDrawer: View {
                     Text("Use Cellular Data").font(theme.typography.body)
                 }
             }
-            .tint(theme.palette.accent)
+            // A white tint would hide the white knob; neutral gray keeps the on state readable.
+            .tint(Color(hex: 0x6E6E73))
             .padding(.horizontal, theme.spacing.lg)
             .padding(.vertical, theme.spacing.sm)
             SettingsRow(.downloads, "Storage Used", value: ByteCountFormatter.string(fromByteCount: downloads.totalBytes, countStyle: .file))
@@ -101,7 +102,7 @@ struct SettingsDrawer: View {
 
     private var profileHeader: some View {
         VStack(alignment: .leading, spacing: theme.spacing.md) {
-            Avatar(name: session.userName)
+            Avatar()
             VStack(alignment: .leading, spacing: theme.spacing.xxs) {
                 Text(session.userName)
                     .font(theme.typography.title)

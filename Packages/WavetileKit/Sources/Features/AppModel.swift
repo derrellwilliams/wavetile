@@ -71,6 +71,7 @@ public final class AppModel {
         }
         if case let .signedIn(signedIn) = phase {
             signedIn.player.stop()
+            WidgetBridge.clear()
             // Downloaded music is tied to this account; remove it from the device.
             signedIn.downloads.manager?.deleteEverything()
             // The cached library is private to this account; don't leave it on disk.

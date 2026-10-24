@@ -1,4 +1,5 @@
 import DesignSystem
+import Library
 import SwiftUI
 
 struct MainTabView: View {
@@ -13,6 +14,8 @@ struct MainTabView: View {
     @State private var showNowPlaying = false
     @State private var connectivity = Connectivity()
     @State private var actions = LibraryActions()
+    @State private var homePath: [LibraryRoute] = []
+    @State private var widgets: WidgetBridge
     @Namespace private var playerZoom
     @State private var selection: AppTab = DebugFlags.initialTab
     /// Whether each tab's navigation stack is showing its root screen (drives edge-swipe-to-open).
@@ -23,7 +26,11 @@ struct MainTabView: View {
     init(app: AppModel, signedIn: AppModel.SignedIn) {
         self.app = app
         self.signedIn = signedIn
-        _home = State(initialValue: HomeModel(library: signedIn.library.api))
+        let home = HomeModel(library: signedIn.library.api)
+        let widgets = WidgetBridge(player: signedIn.player, library: signedIn.library)
+        home.onRecentlyPlayed = { [weak widgets] albums in widgets?.recentsChanged(albums) }
+        _home = State(initialValue: home)
+        _widgets = State(initialValue: widgets)
     }
 
     var body: some View {
@@ -47,7 +54,7 @@ struct MainTabView: View {
     private var tabs: some View {
         TabView(selection: $selection) {
             Tab(value: .home) {
-                HomeView(model: home, userName: signedIn.session.userName, showSettings: $showSettings)
+                HomeView(model: home, userName: signedIn.session.userName, showSettings: $showSettings, path: $homePath)
                     .environment(\.tabRootReporter, reporter(for: .home))
             } label: {
                 Label("Home", glyph: .home)
@@ -74,6 +81,9 @@ struct MainTabView: View {
         // Required on iOS 27 for the detached search button (searchable lives in SearchView).
         .tabViewSearchActivation(.searchTabSelection)
         .tabBarMinimizeBehavior(.onScrollDown)
+        .onChange(of: signedIn.player.current?.queueID) { widgets.playerChanged() }
+        .onChange(of: signedIn.player.isPlaying) { widgets.playerChanged() }
+        .onOpenURL(perform: openLink)
         .onChange(of: signedIn.player.hasQueue) { _, hasQueue in
             if hasQueue, DebugFlags.openNowPlaying { showNowPlaying = true }
         }
@@ -89,6 +99,23 @@ struct MainTabView: View {
 }
 
 extension MainTabView {
+    /// Widget deep links: `wavetile://album/<id>` pushes the album on Home; `now-playing` opens the player.
+    fileprivate func openLink(_ url: URL) {
+        guard url.scheme == "wavetile" else { return }
+        showSettings = false
+        switch url.host() {
+        case "now-playing":
+            if signedIn.player.hasQueue { showNowPlaying = true }
+        case "album":
+            let id = url.lastPathComponent
+            guard let record = try? signedIn.library.database.album(id: id) else { return }
+            selection = .home
+            homePath = [.album(AlbumRoute(album: record.summary, sourceID: "link-\(id)"))]
+        default:
+            break
+        }
+    }
+
     @ViewBuilder fileprivate var miniPlayer: some View {
         let player = signedIn.player
         if let track = player.current {

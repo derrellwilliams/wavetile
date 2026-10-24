@@ -33,9 +33,14 @@ targets:
     platform: iOS
     sources:
       - App
+      - Shared
     dependencies:
       - package: WavetileKit
         product: WavetileKit
+      - package: WavetileKit
+        product: WidgetShared
+      - target: WavetileWidgets
+        embed: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.derrellwilliams.wavetile
@@ -47,6 +52,10 @@ targets:
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+    entitlements:
+      path: App/Wavetile.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.derrellwilliams.wavetile]
     info:
       path: App/Info.plist
       properties:
@@ -54,9 +63,45 @@ targets:
         # Internet traffic must be HTTPS so the access token is never sent in cleartext.
         # Keep playing when the app is backgrounded or the screen is locked.
         UIBackgroundModes: [audio]
+        # Download progress Live Activity.
+        NSSupportsLiveActivities: true
+        # Widget deep links (wavetile://album/<id>, wavetile://now-playing).
+        CFBundleURLTypes:
+          - CFBundleURLName: com.derrellwilliams.wavetile
+            CFBundleURLSchemes: [wavetile]
         NSLocalNetworkUsageDescription: Wavetile connects to Jellyfin servers on your home network.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+
+  WavetileWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Widgets
+      - Shared
+    dependencies:
+      - package: WavetileKit
+        product: WidgetShared
+      - package: WavetileKit
+        product: DesignSystem
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.derrellwilliams.wavetile.widgets
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Wavetile
+        MARKETING_VERSION: "0.1.0"
+        SKIP_INSTALL: YES
+    info:
+      path: Widgets/Info.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: Widgets/WavetileWidgets.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.derrellwilliams.wavetile]
 
 schemes:
   Wavetile:
