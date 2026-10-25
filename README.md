@@ -1,6 +1,6 @@
 # Wavetile
 
-A native iOS 26+ music player for Jellyfin, inspired by Plexamp.
+A native iOS 26+ music player for Jellyfin
 
 ## Setup
 ```sh
