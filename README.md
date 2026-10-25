@@ -1,6 +1,6 @@
 # Wavetile
 
-A native iOS 26+ music player for Jellyfin
+A native iOS 26+ music client for Jellyfin
 
 <img width="3045" height="2048" alt="wavetile" src="https://github.com/user-attachments/assets/21befe57-d58d-4533-ba1b-9fe92bd7ae0a" />
 
