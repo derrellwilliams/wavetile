@@ -19,22 +19,7 @@ open Wavetile.xcodeproj
 | `Packages/WavetileKit/Sources/PreviewSupport` | Fixtures for previews |
 | `Packages/WavetileKit/Sources/Features` | Screens and view models |
 
-## Iterating on design
-- **Tokens:** `DesignSystem/Theme.swift` (colors, type, spacing, radii, artwork) and `DesignSystem/Motion.swift` (springs). Add a theme to `Theme.all` and it appears in Settings → Appearance.
-- **Font:** Familjen Grotesk (SIL OFL) lives in `DesignSystem/Resources/Fonts`. It's registered at launch by `BrandFont.register()`, and the family name is set in `DesignSystem/Typography+Brand.swift`.
-- **Icons:** Phosphor Bold, used through `Glyph` (`DesignSystem/Glyph.swift`). To add one, put its name in `scripts/fetch-icons.sh`, run the script, then add a `Glyph` case. Run `WEIGHT=fill scripts/fetch-icons.sh` to switch weights.
-- **Drawer screenshots:** launch with `-openSettings` (Debug builds only) to start with the Settings drawer open.
-- **Previews:** every component and screen has a `#Preview` backed by `Fixtures`, so no server is needed.
-- **Hot reload:** install [InjectionNext](https://github.com/johnno1962/InjectionNext), launch it, run the Debug build in the Simulator, then save any Swift file. Screens using `@ObserveInjection` + `.enableInjection()` re-render in place.
+<img width="862" height="1866" alt="IMG_2663" src="https://github.com/user-attachments/assets/6b0cf099-9926-4544-a729-6f24bd20ba43" />
+<img width="862" height="1866" alt="IMG_2664" src="https://github.com/user-attachments/assets/54dbf848-e750-4543-bbb2-bab507a21282" />
+<img width="862" height="1866" alt="IMG_2660" src="https://github.com/user-attachments/assets/920ce845-2748-441a-ada5-702c44283586" />
 
-## Tests
-Unit and performance tests (queue logic, sync and downloads bookkeeping, search, and 50k-track query budgets):
-```sh
-cd Packages/WavetileKit
-xcodebuild -scheme WavetileKit-Package -destination 'platform=iOS Simulator,name=iPhone 18 Pro' test
-```
-
-UI tests: an accessibility audit (`performAccessibilityAudit`) of Home, Library, an album, Now Playing and Settings, plus a launch-time metric. They need a signed-in session in the simulator:
-```sh
-xcodebuild -project Wavetile.xcodeproj -scheme Wavetile -destination 'platform=iOS Simulator,name=iPhone 18 Pro' test
-```
