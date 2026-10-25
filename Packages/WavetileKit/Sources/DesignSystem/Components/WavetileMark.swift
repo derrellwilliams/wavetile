@@ -117,5 +117,5 @@ public struct LoadingMark: View {
         WavetileMark()
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .background(Theme.wavetile.palette.background)
+    .background(Theme.dark.palette.background)
 }

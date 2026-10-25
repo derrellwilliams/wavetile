@@ -35,7 +35,7 @@ public final class AppModel {
         self.auth = AuthService(identity: .load(deviceName: deviceName))
         self.store = store
         let savedTheme = UserDefaults.standard.string(forKey: "themeID")
-        self.theme = Theme.all.first { $0.id == savedTheme } ?? .wavetile
+        self.theme = Theme.all.first { $0.id == savedTheme } ?? .dark
     }
 
     /// Restores the saved session from the Keychain. Synchronous so the first frame is already correct.

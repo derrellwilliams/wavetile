@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Every visual decision in the app flows from a `Theme`.
 ///
-/// To rebrand: edit `Theme.wavetile` below, or add a new static theme and pick it in
+/// To rebrand: edit `Theme.dark` below, or add a new static theme and pick it in
 /// Settings → Appearance. Views read tokens via `@Environment(\.theme)`; they never
 /// hard-code colors, fonts, spacing, radii, or animations.
 public struct Theme: Sendable, Identifiable, Hashable {
@@ -92,9 +92,10 @@ public struct Theme: Sendable, Identifiable, Hashable {
 public extension Theme {
     /// Default brand: #1A1A1A canvas, light tan (#ECE4D2) type, logo, icons and controls,
     /// Stack Sans Notch for the logo and titles, Familjen Grotesk for text.
-    static let wavetile = Theme(
+    /// The id stays "wavetile" so existing saved theme choices still resolve.
+    static let dark = Theme(
         id: "wavetile",
-        name: "Wavetile",
+        name: "Dark",
         palette: .init(
             accent: Color(hex: 0xECE4D2),
             onAccent: .black,
@@ -126,29 +127,29 @@ public extension Theme {
         colorScheme: .dark
     )
 
-    /// Alternate theme to prove tokens are swappable; tweak or delete freely.
-    static let midnight: Theme = {
-        var theme = Theme.wavetile
-        theme.id = "midnight"
-        theme.name = "Midnight"
-        theme.palette.accent = Color(red: 0.45, green: 0.55, blue: 1.0)
-        theme.palette.background = Color(hex: 0x0B0E1A)
-        theme.palette.surface = Color(hex: 0x161B2E)
-        theme.typography.wordmark = .system(.title2, design: .rounded).bold()
-        theme.typography.largeTitle = .system(.largeTitle, design: .rounded).bold()
-        theme.typography.title = .system(.title2, design: .rounded).bold()
-        theme.typography.sectionHeader = .system(.title3, design: .rounded).weight(.semibold)
-        theme.typography.nowPlayingTitle = .system(.title2, design: .rounded).weight(.heavy)
-        theme.radius.artwork = 16
-        theme.motion = .playful
+    /// Light: the Dark theme inverted. Tan (#ECE4D2) canvas with #1A1A1A type, logo, icons and
+    /// controls; same fonts, spacing and motion.
+    static let light: Theme = {
+        var theme = Theme.dark
+        theme.id = "light"
+        theme.name = "Light"
+        theme.palette.accent = Color(hex: 0x1A1A1A)
+        theme.palette.onAccent = Color(hex: 0xECE4D2)
+        theme.palette.background = Color(hex: 0xECE4D2)
+        theme.palette.surface = Color(hex: 0xE0D7C3)
+        theme.palette.textPrimary = Color(hex: 0x1A1A1A)
+        theme.palette.textSecondary = Color(hex: 0x262626).opacity(0.6)
+        theme.palette.separator = .black.opacity(0.12)
+        theme.palette.artworkPlaceholder = [Color(hex: 0xD9CFB9), Color(hex: 0xE3DAC6)]
+        theme.colorScheme = .light
         return theme
     }()
 
-    static let all: [Theme] = [.wavetile, .midnight]
+    static let all: [Theme] = [.dark, .light]
 }
 
 public extension EnvironmentValues {
-    @Entry var theme: Theme = .wavetile
+    @Entry var theme: Theme = .dark
 }
 
 public extension Color {
