@@ -78,7 +78,7 @@ public struct Theme: Sendable, Identifiable, Hashable {
 
     public struct Artwork: Sendable, Equatable {
         /// Width of album tiles in horizontal shelves.
-        public var shelfTileWidth: CGFloat = 156
+        public var shelfTileWidth: CGFloat = 148
         /// Leading thumbnail in track rows.
         public var rowThumbnail: CGFloat = 44
         public var miniPlayerThumbnail: CGFloat = 36

@@ -26,6 +26,7 @@
 		DB8A50C54CC4C62786185428 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8024A92BB845E32D58BE675C /* WidgetKit.framework */; };
 		EA900CA1C2FD43CE51EB5AB0 /* WavetileKit in Frameworks */ = {isa = PBXBuildFile; productRef = 5C739332FA7690D931D7AE66 /* WavetileKit */; };
 		EEDB361FA4C75D9B7969F9A0 /* AccessibilityAuditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23EB66484AE2A1A9B71AA29 /* AccessibilityAuditTests.swift */; };
+		EF1E33EDFAA08C60822CD5FB /* SongsActionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 174498F652785AFB46720C5B /* SongsActionsTests.swift */; };
 		F90A1A723AACCA0B621DB416 /* PlaybackIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6B16C4CDE18FD559173CA08 /* PlaybackIntents.swift */; };
 /* End PBXBuildFile section */
 
@@ -62,6 +63,7 @@
 
 /* Begin PBXFileReference section */
 		1486760D06D1462A54B2382C /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		174498F652785AFB46720C5B /* SongsActionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongsActionsTests.swift; sourceTree = "<group>"; };
 		25966CED5BFCB0211FD41404 /* Wavetile.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Wavetile.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		353AC9D25C695D5691A49C82 /* Wavetile.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Wavetile.entitlements; sourceTree = "<group>"; };
 		3808158EAA3BE89F777F6196 /* WavetileWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WavetileWidgets.swift; sourceTree = "<group>"; };
@@ -129,6 +131,7 @@
 				C23EB66484AE2A1A9B71AA29 /* AccessibilityAuditTests.swift */,
 				5EB333D4B5F2B7A38F00ECED /* HomeTests.swift */,
 				9B3DBC04AB9BCCD7E614F3F9 /* SearchTypingTests.swift */,
+				174498F652785AFB46720C5B /* SongsActionsTests.swift */,
 			);
 			path = UITests;
 			sourceTree = "<group>";
@@ -355,6 +358,7 @@
 				EEDB361FA4C75D9B7969F9A0 /* AccessibilityAuditTests.swift in Sources */,
 				197535260D47403824DD5ACF /* HomeTests.swift in Sources */,
 				BFE7CD2369681FAAE8091B79 /* SearchTypingTests.swift in Sources */,
+				EF1E33EDFAA08C60822CD5FB /* SongsActionsTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

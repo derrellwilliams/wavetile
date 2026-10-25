@@ -61,7 +61,8 @@ struct SearchView: View {
                                 PlayableRow(
                                     trackID: track.id, index: index,
                                     tracks: { results.tracks.map(QueuedTrack.init) },
-                                    onTap: { play(track) }
+                                    onTap: { play(track) },
+                                    menu: store.songMenu(for: track, source: "search") { play(track) }
                                 ) {
                                     TrackRow(
                                         title: track.title,
@@ -87,14 +88,12 @@ struct SearchView: View {
             .themedBackground()
             .navigationTitle("Search")
             .tabRootChrome()
-            .libraryDestinations(zoom: zoom)
+            .libraryDestinations(zoom: zoom, path: $path)
             .sheet(item: $actionsTrack) { track in
                 SongActionsSheet(
                     track: track,
                     artwork: store.artwork(itemID: track.albumID, maxPixelWidth: 144),
-                    onPlay: { play(track) },
-                    onAlbum: albumRoute(for: track).map { route in { path.append(route) } },
-                    onArtist: artistRoute(for: track).map { route in { path.append(route) } }
+                    menu: store.songMenu(for: track, source: "search") { play(track) }
                 )
             }
         }
@@ -121,23 +120,6 @@ struct SearchView: View {
         guard let start = queue.firstIndex(where: { $0.trackID == track.id }) else { return }
         player.play(queue, startAt: start)
         openNowPlaying()
-    }
-
-    private func albumRecord(for track: TrackRecord) -> AlbumRecord? {
-        track.albumID.flatMap { try? store.database.album(id: $0) }
-    }
-
-    private func albumRoute(for track: TrackRecord) -> LibraryRoute? {
-        guard let albumID = track.albumID else { return nil }
-        let album = albumRecord(for: track)?.summary
-            ?? AlbumSummary(id: albumID, title: track.albumTitle, artist: track.albumArtistName)
-        return .album(AlbumRoute(album: album, sourceID: "search-track-\(track.id)"))
-    }
-
-    /// The album artist: tracks don't store their own artist ID.
-    private func artistRoute(for track: TrackRecord) -> LibraryRoute? {
-        guard let artistID = albumRecord(for: track)?.artistID else { return nil }
-        return .artist(id: artistID, name: track.albumArtistName)
     }
 
     @ViewBuilder private var emptyState: some View {

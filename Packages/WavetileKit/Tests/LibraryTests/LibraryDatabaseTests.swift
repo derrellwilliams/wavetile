@@ -74,4 +74,41 @@ struct LibraryDatabaseTests {
         #expect(genres.map(\.genre) == ["Jazz", "Rock"])
         #expect(genres.map(\.albumCount) == [1, 2])
     }
+
+    @Test func genreTagsSplitAndDropLabels() {
+        #expect(GenreTag.split("Electronic, Classical") == ["Electronic", "Classical"])
+        #expect(GenreTag.split("Hardcore Punk;Rock") == ["Hardcore Punk", "Rock"])
+        #expect(GenreTag.split("Hip-Hop/Rap") == ["Hip-Hop", "Rap"])
+        #expect(GenreTag.split("R&B") == ["R&B"])
+        #expect(GenreTag.split("lbl:ANTI-").isEmpty)
+    }
+
+    @Test func genresMergeCaseAndHyphenSpellings() async throws {
+        let db = try LibraryDatabase.temporary()
+        try await db.pool.write { db in
+            for id in ["a1", "a2", "a3"] {
+                try AlbumRecord(id: id, title: id, sortTitle: id, artistName: "X", artistID: nil, year: nil, imageTag: nil,
+                                dateAdded: nil, isFavorite: false, generation: 1).insert(db)
+            }
+            try AlbumGenreRecord(albumID: "a1", genre: "folk").insert(db)
+            try AlbumGenreRecord(albumID: "a2", genre: "folk").insert(db)
+            try AlbumGenreRecord(albumID: "a3", genre: "Folk").insert(db)
+            try AlbumGenreRecord(albumID: "a1", genre: "Hip-Hop").insert(db)
+            try AlbumGenreRecord(albumID: "a2", genre: "hip hop").insert(db)
+        }
+        var genres: [GenreSummary] = []
+        for try await value in db.genres().values(in: db.pool) {
+            genres = value
+            break
+        }
+        #expect(genres.map(\.genre) == ["Folk", "Hip-Hop"])
+        #expect(genres.map(\.albumCount) == [3, 2])
+
+        var albums: [AlbumRecord] = []
+        for try await value in db.albums(genre: "hip hop").values(in: db.pool) {
+            albums = value
+            break
+        }
+        #expect(albums.map(\.id) == ["a1", "a2"])
+    }
 }

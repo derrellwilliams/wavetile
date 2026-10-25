@@ -142,7 +142,6 @@ struct NowPlayingView: View {
                 .accessibilityValue(player.queue.isShuffled ? "On" : "Off")
             Spacer()
             AirPlayButton()
-                .frame(width: 44, height: 44)
             Spacer()
             Button("Repeat", glyph: player.queue.repeatMode == .one ? .repeatOne : .repeat) { player.cycleRepeat() }
                 .foregroundStyle(player.queue.repeatMode == .off ? theme.palette.textSecondary : theme.palette.accent)
@@ -211,29 +210,32 @@ struct Scrubber: View {
     }
 }
 
-/// System AirPlay picker with a Phosphor glyph: the picker is invisible on top and handles taps.
+/// The system AirPlay picker, showing the standard iOS AirPlay audio icon tinted with the accent.
+/// Tapping opens the system speaker list (AirPlay, Bluetooth, this iPhone).
 struct AirPlayButton: View {
     @Environment(\.theme) private var theme
+    var iconSize: CGFloat = 28
 
     var body: some View {
-        ZStack {
-            Glyph.airplay.image
-                .foregroundStyle(theme.palette.accent)
-            RoutePicker()
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("AirPlay")
+        RoutePicker(tint: UIColor(theme.palette.accent))
+            .frame(width: iconSize, height: iconSize)
+            .frame(width: 44, height: 44)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("AirPlay")
     }
 
     private struct RoutePicker: UIViewRepresentable {
+        let tint: UIColor
+
         func makeUIView(context: Context) -> AVRoutePickerView {
             let view = AVRoutePickerView()
-            view.tintColor = .clear
-            view.activeTintColor = .clear
             view.prioritizesVideoDevices = false
             return view
         }
 
-        func updateUIView(_ uiView: AVRoutePickerView, context: Context) {}
+        func updateUIView(_ uiView: AVRoutePickerView, context: Context) {
+            uiView.tintColor = tint
+            uiView.activeTintColor = tint
+        }
     }
 }

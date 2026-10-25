@@ -34,16 +34,22 @@ enum LibrarySection: String, CaseIterable, Hashable {
 extension EnvironmentValues {
     /// The current navigation stack's namespace for album zoom transitions.
     @Entry var libraryZoom: Namespace.ID?
+    /// Pushes a route on the current tab's stack (for menus and sheets, which can't hold a NavigationLink).
+    @Entry var pushLibraryRoute: (LibraryRoute) -> Void = { _ in }
 }
 
 extension View {
     /// Registers `LibraryRoute` destinations. Call once, on a tab's root screen.
-    /// `zoom` is shared with pushed screens so any album tile can zoom into its page.
-    func libraryDestinations(zoom: Namespace.ID) -> some View {
-        environment(\.libraryZoom, zoom)
+    /// `zoom` is shared with pushed screens so any album tile can zoom into its page; `path` is
+    /// the stack's path, so menus anywhere in the stack can push via `pushLibraryRoute`.
+    func libraryDestinations(zoom: Namespace.ID, path: Binding<[LibraryRoute]>) -> some View {
+        let push: (LibraryRoute) -> Void = { path.wrappedValue.append($0) }
+        return environment(\.libraryZoom, zoom)
+            .environment(\.pushLibraryRoute, push)
             .navigationDestination(for: LibraryRoute.self) { route in
                 LibraryDestination(route: route, zoom: zoom)
                     .environment(\.libraryZoom, zoom)
+                    .environment(\.pushLibraryRoute, push)
             }
     }
 }
@@ -87,6 +93,7 @@ private struct LibraryDestination: View {
 /// Album tile that pushes the album with a zoom transition from the tapped artwork.
 struct AlbumLink: View {
     @Environment(LibraryStore.self) private var store
+    @Environment(\.pushLibraryRoute) private var push
     @Environment(LibraryActions.self) private var actions
     @Environment(\.libraryZoom) private var zoom
     let album: AlbumSummary
@@ -110,6 +117,10 @@ struct AlbumLink: View {
             Button("Add to Collection", glyph: .collection) { actions.addToCollection([album.id]) }
             Button("Favorite", glyph: .favorite) {
                 Task { try? await store.editor.setFavorite(itemID: album.id, true) }
+            }
+            // Hidden on the artist's own page.
+            if context != "artist", let route = store.artistRoute(albumID: album.id) {
+                Button("Go to Artist", glyph: .artist) { push(route) }
             }
             if let onRemoveFromRecents {
                 Divider()

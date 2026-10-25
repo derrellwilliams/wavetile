@@ -42,7 +42,7 @@ struct HomeView: View {
                 }
             }
             .tabRootChrome()
-            .libraryDestinations(zoom: zoom)
+            .libraryDestinations(zoom: zoom, path: $path)
             .markRefreshable { await model.load() }
             .task {
                 // Local shelves are already on screen; refresh from the server once per session.

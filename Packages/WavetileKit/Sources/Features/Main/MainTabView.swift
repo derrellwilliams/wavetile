@@ -159,22 +159,42 @@ extension MainTabView {
 /// Profile button: a 36pt clear-glass circle with the tan Phosphor user glyph. A full 44pt
 /// toolbar disc read heavy on the flat background; the tap area stays at the 44pt minimum.
 struct ProfileButton: View {
-    @Environment(\.theme) private var theme
     @Environment(\.openProfile) private var openProfile
 
     var body: some View {
         Button(action: openProfile) {
-            Glyph.user.image
-                .resizable()
-                .frame(width: 20, height: 20)
-                .foregroundStyle(theme.palette.accent)
-                .frame(width: 36, height: 36)
-                .glassEffect(.clear.interactive(), in: .circle)
-                .frame(width: 44, height: 44)
-                .contentShape(.rect)
+            GlassCircleIcon(glyph: .user)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Profile and Settings")
+    }
+}
+
+/// Tab-root bar icon: a tan glyph in a 36pt clear-glass circle with a 44pt tap area.
+/// Use with `.sharedBackgroundVisibility(.hidden)` so the bar doesn't add its own glass.
+struct GlassCircleIcon: View {
+    @Environment(\.theme) private var theme
+    let glyph: Glyph
+
+    var body: some View {
+        glyph.image
+            .resizable()
+            .frame(width: 20, height: 20)
+            .foregroundStyle(theme.palette.accent)
+            .frame(width: 36, height: 36)
+            .glassEffect(.clear.interactive(), in: .circle)
+            .frame(width: 44, height: 44)
+            .contentShape(.rect)
+    }
+}
+
+/// Top-right speaker switcher: the AirPlay picker in the same glass circle as `ProfileButton`.
+struct SpeakerButton: View {
+    var body: some View {
+        AirPlayButton(iconSize: 22)
+            .frame(width: 36, height: 36)
+            .glassEffect(.clear.interactive(), in: .circle)
+            .frame(width: 44, height: 44)
     }
 }
 
@@ -210,6 +230,10 @@ private struct TabRootChrome: ViewModifier {
                     ProfileButton()
                 }
                 // The button brings its own glass; don't wrap it in the bar's.
+                .sharedBackgroundVisibility(.hidden)
+                ToolbarItem(placement: .topBarTrailing) {
+                    SpeakerButton()
+                }
                 .sharedBackgroundVisibility(.hidden)
             }
             // Pushing a screen makes the root disappear; returning makes it reappear.

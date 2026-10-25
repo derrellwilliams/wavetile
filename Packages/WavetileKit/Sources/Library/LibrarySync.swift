@@ -106,7 +106,7 @@ public actor LibrarySync {
                     generation: generation
                 ).upsert(db)
                 try AlbumGenreRecord.filter(Column("albumID") == id).deleteAll(db)
-                for genre in Set(item.genres ?? []) where !genre.isEmpty {
+                for genre in Set((item.genres ?? []).flatMap(GenreTag.split)) {
                     try AlbumGenreRecord(albumID: id, genre: genre).insert(db)
                 }
             }
@@ -303,7 +303,8 @@ extension TrackRecord {
         self.init(
             id: id,
             title: title,
-            sortTitle: SortKey.make(item.sortName ?? title),
+            // Not item.sortName: for tracks Jellyfin makes it "disc - track - title" (track order).
+            sortTitle: SortKey.make(title),
             albumID: item.albumID,
             albumTitle: item.album ?? "",
             artistName: item.artists?.joined(separator: ", ") ?? item.albumArtist ?? "Unknown Artist",

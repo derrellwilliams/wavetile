@@ -8,10 +8,11 @@ struct LibraryView: View {
     @Environment(\.theme) private var theme
     @Environment(LibraryStore.self) private var store
     @Namespace private var zoom
+    @State private var path: [LibraryRoute] = []
     @State private var recentlyAdded: [AlbumRecord] = []
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(LibrarySection.allCases, id: \.self) { section in
@@ -63,7 +64,7 @@ struct LibraryView: View {
             .markRefreshable { await store.syncNow() }
             .navigationTitle("Library")
             .tabRootChrome()
-            .libraryDestinations(zoom: zoom)
+            .libraryDestinations(zoom: zoom, path: $path)
             .task {
                 do {
                     for try await albums in store.observe(store.database.albums(sort: .recentlyAdded)) {

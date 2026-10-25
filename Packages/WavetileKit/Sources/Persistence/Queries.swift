@@ -36,17 +36,6 @@ public extension LibraryDatabase {
         }
     }
 
-    func albums(genre: String) -> ValueObservation<ValueReducers.Fetch<[AlbumRecord]>> {
-        ValueObservation.tracking { db in
-            try AlbumRecord.fetchAll(db, sql: """
-                SELECT album.* FROM album
-                JOIN albumGenre ON albumGenre.albumID = album.id
-                WHERE albumGenre.genre = ?
-                ORDER BY album.sortTitle
-                """, arguments: [genre])
-        }
-    }
-
     func album(id: String) throws -> AlbumRecord? {
         try pool.read { try AlbumRecord.fetchOne($0, key: id) }
     }
@@ -69,14 +58,6 @@ public extension LibraryDatabase {
         }
     }
 
-    func genres() -> ValueObservation<ValueReducers.Fetch<[GenreSummary]>> {
-        ValueObservation.tracking { db in
-            try GenreSummary.fetchAll(db, sql: """
-                SELECT genre, COUNT(*) AS albumCount FROM albumGenre
-                GROUP BY genre ORDER BY genre COLLATE NOCASE
-                """)
-        }
-    }
 
     func playlists() -> ValueObservation<ValueReducers.Fetch<[PlaylistRecord]>> {
         ValueObservation.tracking { db in

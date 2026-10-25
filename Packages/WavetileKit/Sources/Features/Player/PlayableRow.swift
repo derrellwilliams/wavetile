@@ -39,10 +39,13 @@ struct PlayableRow<Label: View>: View {
     @Environment(Connectivity.self) private var connectivity
     @Environment(LibraryActions.self) private var actions
     @Environment(LibraryStore.self) private var store
+    @Environment(\.pushLibraryRoute) private var push
     let trackID: String
     let index: Int
     let tracks: () -> [QueuedTrack]
     var onTap: (() -> Void)?
+    /// Adds Play / Go to Album / Go to Artist to the long press, matching the ⋯ sheet.
+    var menu: SongMenu?
     @ViewBuilder let label: Label
 
     var body: some View {
@@ -51,6 +54,12 @@ struct PlayableRow<Label: View>: View {
             .disabled(!isAvailable)
             .opacity(isAvailable ? 1 : 0.35)
             .contextMenu {
+                if let menu {
+                    Button("Play", glyph: .play, action: menu.play)
+                    if let album = menu.album { Button("Go to Album", glyph: .album) { push(album) } }
+                    if let artist = menu.artist { Button("Go to Artist", glyph: .artist) { push(artist) } }
+                    Divider()
+                }
                 Button("Play Next", glyph: .playNext) {
                     if let track = tracks()[safe: index] { player.playNext([track.requeued()]) }
                 }
@@ -69,15 +78,7 @@ struct PlayableRow<Label: View>: View {
     private var tapAction: some View {
         Button {
             if let onTap { return onTap() }
-            var queue = tracks()
-            var start = index
-            if !connectivity.isOnline {
-                // Offline: queue only what's on the device so playback doesn't hit dead tracks.
-                let tapped = queue[safe: index]?.queueID
-                queue = queue.filter { downloads.isDownloaded($0.trackID) }
-                start = queue.firstIndex { $0.queueID == tapped } ?? 0
-            }
-            player.play(queue, startAt: start)
+            player.play(tracks(), startAt: index, online: connectivity.isOnline, downloads: downloads)
         } label: {
             label.contentShape(.rect)
         }
@@ -92,5 +93,20 @@ struct PlayableRow<Label: View>: View {
 extension Array {
     subscript(safe index: Int) -> Element? {
         indices.contains(index) ? self[index] : nil
+    }
+}
+
+extension AudioPlayer {
+    /// Plays `queue` from `index`. Offline, queues only what's on the device so playback
+    /// doesn't hit dead tracks.
+    func play(_ queue: [QueuedTrack], startAt index: Int, online: Bool, downloads: DownloadsStore) {
+        var queue = queue
+        var start = index
+        if !online {
+            let tapped = queue[safe: index]?.queueID
+            queue = queue.filter { downloads.isDownloaded($0.trackID) }
+            start = queue.firstIndex { $0.queueID == tapped } ?? 0
+        }
+        play(queue, startAt: start)
     }
 }

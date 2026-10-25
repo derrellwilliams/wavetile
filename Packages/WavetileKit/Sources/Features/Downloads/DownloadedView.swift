@@ -11,11 +11,12 @@ struct DownloadedView: View {
     @Environment(DownloadsStore.self) private var downloads
     @Environment(Connectivity.self) private var connectivity
     @Namespace private var zoom
+    @State private var path: [LibraryRoute] = []
     @State private var collections: [DownloadedCollection] = []
     @State private var confirmRemoveAll = false
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ScrollView {
                 VStack(alignment: .leading, spacing: theme.spacing.lg) {
                     if !connectivity.isOnline {
@@ -52,10 +53,13 @@ struct DownloadedView: View {
                     Menu {
                         Button("Remove All Downloads", glyph: .trash, role: .destructive) { confirmRemoveAll = true }
                     } label: {
-                        Label("More", glyph: .more)
+                        GlassCircleIcon(glyph: .more)
                     }
+                    .accessibilityLabel("More")
                     .disabled(collections.isEmpty)
                 }
+                // Matches the profile and speaker buttons, which bring their own glass.
+                .sharedBackgroundVisibility(.hidden)
             }
             .confirmationDialog("Remove all downloaded music?", isPresented: $confirmRemoveAll, titleVisibility: .visible) {
                 Button("Remove All", role: .destructive) { downloads.removeAll() }
@@ -63,7 +67,7 @@ struct DownloadedView: View {
                 Text("You can download it again anytime.")
             }
             .tabRootChrome()
-            .libraryDestinations(zoom: zoom)
+            .libraryDestinations(zoom: zoom, path: $path)
             .task {
                 do {
                     for try await value in library.observe(library.database.downloadedCollections()) { collections = value }
