@@ -60,7 +60,7 @@ struct LibraryView: View {
                 .padding(.bottom, theme.spacing.xxl)
             }
             .themedBackground()
-            .refreshable { await store.syncNow() }
+            .markRefreshable { await store.syncNow() }
             .navigationTitle("Library")
             .tabRootChrome()
             .libraryDestinations(zoom: zoom)

@@ -41,13 +41,15 @@ struct MainTabView: View {
         } drawer: {
             SettingsDrawer(app: app, session: signedIn.session, isOpen: $showSettings)
         }
+        // Sheets must sit inside the environment below, or their content can't find the library
+        // store and SwiftUI traps (TestFlight 1.0.0 (2): Add to Collection crashed).
+        .libraryActionSheets(actions)
         .environment(signedIn.library)
         .environment(\.isAudioPlaying, signedIn.player.isPlaying)
         .environment(signedIn.player)
         .environment(signedIn.downloads)
         .environment(connectivity)
         .environment(actions)
-        .libraryActionSheets(actions)
         .task { await signedIn.downloads.observe() }
         // Background library sync: on launch if stale (>1h); pull to refresh in Library forces one.
         .task { await signedIn.library.syncIfNeeded() }

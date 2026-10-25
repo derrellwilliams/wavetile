@@ -32,15 +32,11 @@ struct PasswordSignInView: View {
                 }
             }
 
-            Section {
-                Button(action: submit) {
-                    HStack {
-                        Text("Sign In")
-                        Spacer()
-                        if model.isWorking { ProgressView() }
-                    }
-                }
-                .disabled(username.isEmpty || model.isWorking)
+            // In a footer, not a row: rows clip to the section's large corner radius.
+            Section {} footer: {
+                PrimaryButton("Sign In", isWorking: model.isWorking, action: submit)
+                    .disabled(username.isEmpty || model.isWorking)
+                    .listRowInsets(.init())
             }
         }
         .themedBackground()

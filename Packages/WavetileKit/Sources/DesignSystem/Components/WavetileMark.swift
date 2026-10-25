@@ -10,10 +10,13 @@ public struct WavetileMark: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let isAnimating: Bool
     private let size: CGFloat
+    private let color: Color?
 
-    public init(isAnimating: Bool = false, size: CGFloat = 96) {
+    /// `color` defaults to the theme accent.
+    public init(isAnimating: Bool = false, size: CGFloat = 96, color: Color? = nil) {
         self.isAnimating = isAnimating
         self.size = size
+        self.color = color
     }
 
     private var active: Bool { isAnimating && !reduceMotion }
@@ -23,7 +26,7 @@ public struct WavetileMark: View {
             let start = Self.epoch
             Canvas { canvas, canvasSize in
                 let turn = active ? Self.turn(at: context.date.timeIntervalSince(start)) : 0
-                Self.draw(in: &canvas, size: canvasSize, turn: turn, color: theme.palette.accent)
+                Self.draw(in: &canvas, size: canvasSize, turn: turn, color: color ?? theme.palette.accent)
             }
         }
         .frame(width: size, height: size)

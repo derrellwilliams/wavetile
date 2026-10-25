@@ -23,8 +23,7 @@ struct QuickConnectView: View {
                     VStack(spacing: theme.spacing.md) {
                         Label(error, glyph: .warning)
                             .foregroundStyle(theme.palette.textPrimary)
-                        Button("Try Again") { model.startQuickConnect() }
-                            .buttonStyle(.glass)
+                        PrimaryButton("Try Again") { model.startQuickConnect() }
                     }
                 }
 
@@ -59,10 +58,9 @@ struct QuickConnectView: View {
                         .foregroundStyle(theme.palette.textSecondary)
                 }
                 .font(theme.typography.itemSubtitle)
-                Button("Copy Code", glyph: .copy) {
+                PrimaryButton("Copy Code") {
                     UIPasteboard.general.string = code
                 }
-                .buttonStyle(.glass)
             }
             .padding(theme.spacing.xl)
             .frame(maxWidth: .infinity)

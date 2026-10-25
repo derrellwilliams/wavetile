@@ -17,13 +17,12 @@ struct SignInFlow: View {
             Form {
                 Section {
                     VStack(alignment: .leading, spacing: theme.spacing.sm) {
-                        Glyph.waveform.image
-                            .resizable()
-                            .frame(width: 44, height: 44)
-                            .foregroundStyle(theme.palette.accent)
-                            .pulsing()
+                        WavetileMark(isAnimating: true, size: 96, color: theme.palette.surface)
+                            // Form rows clip to the section's rounded corners; keep the mark clear of them.
+                            .padding(.top, theme.spacing.xl)
                         Text("Connect to Jellyfin")
                             .font(theme.typography.largeTitle)
+                            .foregroundStyle(theme.palette.accent)
                             .tracking(theme.typography.displayTracking)
                         Text("Enter the address you use to reach your server.")
                             .foregroundStyle(theme.palette.textSecondary)
@@ -47,17 +46,13 @@ struct SignInFlow: View {
                     footer
                 }
 
-                Section {
-                    Button {
+                // In a footer, not a row: rows clip to the section's large corner radius.
+                Section {} footer: {
+                    PrimaryButton("Continue", isWorking: model.isWorking) {
                         Task { await model.connect() }
-                    } label: {
-                        HStack {
-                            Text("Continue")
-                            Spacer()
-                            if model.isWorking { ProgressView() }
-                        }
                     }
                     .disabled(model.addressText.isEmpty || model.isWorking)
+                    .listRowInsets(.init())
                 }
             }
             .themedBackground()
