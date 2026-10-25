@@ -60,7 +60,7 @@ struct HomeView: View {
 
     @ViewBuilder private var overlay: some View {
         if model.isLoading {
-            ProgressView()
+            LoadingMark()
         } else if let error = model.errorMessage {
             EmptyState("Nothing Here Yet", glyph: .album, message: error) {
                 Button("Retry") { Task { await model.load() } }

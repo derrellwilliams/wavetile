@@ -112,7 +112,7 @@ struct AlbumDetailView: View {
 
     @ViewBuilder private var trackList: some View {
         if model.isLoading {
-            ProgressView().padding(theme.spacing.xxl)
+            LoadingMark().padding(theme.spacing.xxl)
         } else if let error = model.errorMessage {
             EmptyState("Something Went Wrong", glyph: .warning, message: error) {
                 Button("Retry") { Task { await model.load() } }

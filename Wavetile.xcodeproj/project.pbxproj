@@ -14,7 +14,9 @@
 		8135ACFC8AC70632B7446106 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DC6B363657E0BEF76F29C617 /* Assets.xcassets */; };
 		8BFD26C475733F480EAC876C /* DesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = 709B1E051A338F44F106ED8D /* DesignSystem */; };
 		8DF9135C30695D9F4D79BFC8 /* WidgetShared in Frameworks */ = {isa = PBXBuildFile; productRef = 9E009E055DDD9197D0E85257 /* WidgetShared */; };
+		A83AEC6762EA2557A11AA85B /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = BC49F38495CF5B01CA0BBC54 /* PrivacyInfo.xcprivacy */; };
 		ABBA222B2069AD1299138CFA /* RecentlyPlayedWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BC9880BE0B4A0A353E499A1 /* RecentlyPlayedWidget.swift */; };
+		ACACE25E5587C7EB25AD9197 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 1486760D06D1462A54B2382C /* PrivacyInfo.xcprivacy */; };
 		B6C7A4EF5A040F73222B5B28 /* WavetileApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE62EBD766A57ECC0F9E43CD /* WavetileApp.swift */; };
 		BF1F96350A129326F70095B0 /* WidgetShared in Frameworks */ = {isa = PBXBuildFile; productRef = 0C66071B4354454BDCFC6F65 /* WidgetShared */; };
 		BF226A6E41B4B60AE3190BD9 /* WavetileWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3808158EAA3BE89F777F6196 /* WavetileWidgets.swift */; };
@@ -59,6 +61,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		1486760D06D1462A54B2382C /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		25966CED5BFCB0211FD41404 /* Wavetile.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Wavetile.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		353AC9D25C695D5691A49C82 /* Wavetile.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Wavetile.entitlements; sourceTree = "<group>"; };
 		3808158EAA3BE89F777F6196 /* WavetileWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WavetileWidgets.swift; sourceTree = "<group>"; };
@@ -73,6 +76,7 @@
 		A618CF1452D243D448B37A64 /* WavetileWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WavetileWidgets.entitlements; sourceTree = "<group>"; };
 		ACF0F1CC5471BD62BFDE3E4A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		AE62EBD766A57ECC0F9E43CD /* WavetileApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WavetileApp.swift; sourceTree = "<group>"; };
+		BC49F38495CF5B01CA0BBC54 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		BE64D9F3EAE7A406F7322312 /* WavetileWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = WavetileWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		C23EB66484AE2A1A9B71AA29 /* AccessibilityAuditTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityAuditTests.swift; sourceTree = "<group>"; };
 		C2BEB7FC68820624FDFEB8CE /* DownloadLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadLiveActivity.swift; sourceTree = "<group>"; };
@@ -111,6 +115,7 @@
 				C2BEB7FC68820624FDFEB8CE /* DownloadLiveActivity.swift */,
 				ACF0F1CC5471BD62BFDE3E4A /* Info.plist */,
 				51107A7FCB5C0404CF98041F /* NowPlayingWidget.swift */,
+				1486760D06D1462A54B2382C /* PrivacyInfo.xcprivacy */,
 				8BC9880BE0B4A0A353E499A1 /* RecentlyPlayedWidget.swift */,
 				A618CF1452D243D448B37A64 /* WavetileWidgets.entitlements */,
 				3808158EAA3BE89F777F6196 /* WavetileWidgets.swift */,
@@ -154,6 +159,7 @@
 			children = (
 				DC6B363657E0BEF76F29C617 /* Assets.xcassets */,
 				C64E8E56C9DEE15869AD6949 /* Info.plist */,
+				BC49F38495CF5B01CA0BBC54 /* PrivacyInfo.xcprivacy */,
 				353AC9D25C695D5691A49C82 /* Wavetile.entitlements */,
 				AE62EBD766A57ECC0F9E43CD /* WavetileApp.swift */,
 			);
@@ -236,6 +242,7 @@
 			buildConfigurationList = 1E24418647ADF359EE87A33B /* Build configuration list for PBXNativeTarget "WavetileWidgets" */;
 			buildPhases = (
 				47DBEBEEDEFFB1AEC0C69B4E /* Sources */,
+				1593556C092C43173985CE60 /* Resources */,
 				DA3F69391DD6D19766BD12C1 /* Frameworks */,
 			);
 			buildRules = (
@@ -261,14 +268,17 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					32849DB9DCC1D372D0D41053 = {
-						DevelopmentTeam = "";
+						DevelopmentTeam = 88S9XG6NXK;
+						ProvisioningStyle = Automatic;
 						TestTargetID = 5FD1107209B72A1266BBEFAC;
 					};
 					5FD1107209B72A1266BBEFAC = {
-						DevelopmentTeam = "";
+						DevelopmentTeam = 88S9XG6NXK;
+						ProvisioningStyle = Automatic;
 					};
 					766598309145035D3C6EA6CF = {
-						DevelopmentTeam = "";
+						DevelopmentTeam = 88S9XG6NXK;
+						ProvisioningStyle = Automatic;
 					};
 				};
 			};
@@ -297,11 +307,20 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		1593556C092C43173985CE60 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				ACACE25E5587C7EB25AD9197 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		20BC6E844432B6BA3D9F0D05 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				8135ACFC8AC70632B7446106 /* Assets.xcassets in Resources */,
+				A83AEC6762EA2557A11AA85B /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -388,10 +407,11 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 88S9XG6NXK;
 				EMIT_FRONTEND_COMMAND_LINES = YES;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -411,7 +431,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 1.0.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -445,7 +465,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.derrellwilliams.wavetile.uitests;
 				SDKROOT = iphoneos;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 				TEST_TARGET_NAME = Wavetile;
 			};
 			name = Release;
@@ -463,7 +483,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.derrellwilliams.wavetile.uitests;
 				SDKROOT = iphoneos;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 				TEST_TARGET_NAME = Wavetile;
 			};
 			name = Debug;
@@ -501,10 +521,11 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 88S9XG6NXK;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -517,7 +538,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 1.0.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -544,11 +565,10 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.derrellwilliams.wavetile.widgets;
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -562,9 +582,9 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Wavetile;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -572,7 +592,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.derrellwilliams.wavetile;
 				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -586,9 +606,9 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Wavetile;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -596,7 +616,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.derrellwilliams.wavetile;
 				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -612,11 +632,10 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.derrellwilliams.wavetile.widgets;
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};

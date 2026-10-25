@@ -68,7 +68,7 @@ struct QuickConnectView: View {
             .frame(maxWidth: .infinity)
             .glassEffect(.regular, in: .rect(cornerRadius: theme.radius.card))
         } else if model.errorMessage == nil {
-            ProgressView().controlSize(.large).padding(theme.spacing.xxl)
+            LoadingMark(size: 48).padding(theme.spacing.xxl)
         }
     }
 }

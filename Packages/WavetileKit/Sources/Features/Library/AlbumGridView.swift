@@ -74,7 +74,7 @@ struct LibraryEmptyState: View {
     var body: some View {
         if store.isSyncing || !store.hasSyncedOnce {
             VStack(spacing: 12) {
-                ProgressView()
+                LoadingMark()
                 Text(store.statusText ?? "Syncing your library…")
                     .font(BrandFont.font(.subheadline))
                     .foregroundStyle(.secondary)

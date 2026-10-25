@@ -6,6 +6,8 @@ import UIKit
 public struct RootView: View {
     @ObserveInjection var inject
     let app: AppModel
+    /// Covers the first moments after launch with the turning mark, picking up from the launch image.
+    @State private var showsSplash = true
 
     public init(app: AppModel) {
         self.app = app
@@ -28,12 +30,23 @@ public struct RootView: View {
                     .transition(.opacity)
             }
         }
+        .overlay {
+            if showsSplash {
+                SplashView()
+                    .transition(.opacity)
+            }
+        }
         .animation(app.theme.motion.smooth, value: phaseKey)
         .environment(\.theme, app.theme)
         .tint(app.theme.palette.accent)
         .preferredColorScheme(app.theme.colorScheme)
         .background(app.theme.palette.background.ignoresSafeArea())
         .onAppear { app.restore() }
+        .task {
+            // One quarter turn, then reveal the app.
+            try? await Task.sleep(for: .seconds(WavetileMark.move + 0.15))
+            withAnimation(app.theme.motion.smooth) { showsSplash = false }
+        }
         .enableInjection()
     }
 
@@ -43,6 +56,19 @@ public struct RootView: View {
         case .signedOut: 1
         case .signedIn: 2
         }
+    }
+}
+
+/// Matches the static launch screen (mark centered on the canvas), so launch hands off without a jump.
+private struct SplashView: View {
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        theme.palette.background
+            .ignoresSafeArea()
+            .overlay { WavetileMark(isAnimating: true, size: 96) }
+            .ignoresSafeArea()
+            .accessibilityHidden(true)
     }
 }
 
