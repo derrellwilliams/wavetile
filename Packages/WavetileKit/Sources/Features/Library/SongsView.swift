@@ -9,6 +9,7 @@ struct SongsView: View {
     @ObserveInjection var inject
     @Environment(\.theme) private var theme
     @Environment(LibraryStore.self) private var store
+    @Environment(LibraryActions.self) private var actions
     @Environment(AudioPlayer.self) private var player
     @Environment(DownloadsStore.self) private var downloads
     @State private var tracks: [TrackRecord] = []
@@ -47,7 +48,7 @@ struct SongsView: View {
         }
         .themedBackground()
         .navigationTitle("Songs")
-        .sheet(item: $actionsTrack) { track in
+        .sheet(item: $actionsTrack, onDismiss: actions.presentPending) { track in
             SongActionsSheet(track: track, artwork: store.artwork(itemID: track.albumID, maxPixelWidth: 144), menu: menu(for: track))
         }
         .task {
@@ -56,7 +57,7 @@ struct SongsView: View {
                     tracks = value
                     indexByID = Dictionary(value.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { first, _ in first })
                 }
-            } catch {}
+            } catch { Log.observationFailed(error) }
         }
         .enableInjection()
     }

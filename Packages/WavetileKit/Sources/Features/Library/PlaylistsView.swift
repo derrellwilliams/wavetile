@@ -89,7 +89,7 @@ struct PlaylistsView: View {
         .task {
             do {
                 for try await value in store.observe(store.database.playlists()) { playlists = value }
-            } catch {}
+            } catch { Log.observationFailed(error) }
         }
         .enableInjection()
     }
@@ -234,7 +234,7 @@ struct PlaylistDetailView: View {
     private func observeItems() async {
         do {
             for try await value in store.observe(store.database.playlistItems(playlistID: playlist.id)) { items = value }
-        } catch {}
+        } catch { Log.observationFailed(error) }
     }
 
     private func observeRecord() async {
@@ -242,7 +242,7 @@ struct PlaylistDetailView: View {
             for try await value in store.observe(store.database.playlistObservation(id: playlist.id)) {
                 if let value { playlist = value }
             }
-        } catch {}
+        } catch { Log.observationFailed(error) }
     }
 }
 

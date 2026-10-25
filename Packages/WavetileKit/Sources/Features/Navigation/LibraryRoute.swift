@@ -116,7 +116,7 @@ struct AlbumLink: View {
         .contextMenu {
             Button("Add to Collection", glyph: .collection) { actions.addToCollection([album.id]) }
             Button("Favorite", glyph: .favorite) {
-                Task { try? await store.editor.setFavorite(itemID: album.id, true) }
+                actions.favorite(album.id, store: store)
             }
             // Hidden on the artist's own page.
             if context != "artist", let route = store.artistRoute(albumID: album.id) {

@@ -20,6 +20,9 @@ private struct MarkRefreshModifier: ViewModifier {
     @State private var pull: CGFloat = 0
     @State private var refreshStart: Date?
     @State private var startTurn: Double = 0
+    /// Where the mark stopped when the refresh finished; held while it fades so it doesn't jump
+    /// back to the pull-driven pose. Cleared once the content has settled.
+    @State private var endTurn: Double?
 
     private static let size: CGFloat = 28
     /// Pull distance for one quarter turn while scrubbing.
@@ -41,11 +44,15 @@ private struct MarkRefreshModifier: ViewModifier {
                 max(0, -(geometry.contentOffset.y + geometry.contentInsets.top))
             } action: { _, newValue in
                 pull = newValue
+                if newValue == 0 { endTurn = nil }
             }
             .refreshable {
+                endTurn = nil
                 startTurn = scrubTurn
-                refreshStart = .now
+                let start = Date.now
+                refreshStart = start
                 await action()
+                endTurn = reduceMotion ? 0 : startTurn + WavetileMark.turn(at: Date.now.timeIntervalSince(start))
                 refreshStart = nil
             }
             .overlay(alignment: .top) { indicator }
@@ -57,7 +64,7 @@ private struct MarkRefreshModifier: ViewModifier {
 
     private var indicator: some View {
         TimelineView(.animation(paused: refreshStart == nil || reduceMotion)) { context in
-            let turn = refreshStart.map { startTurn + WavetileMark.turn(at: context.date.timeIntervalSince($0)) } ?? scrubTurn
+            let turn = refreshStart.map { startTurn + WavetileMark.turn(at: context.date.timeIntervalSince($0)) } ?? endTurn ?? scrubTurn
             Canvas { canvas, size in
                 WavetileMark.draw(in: &canvas, size: size, turn: turn, color: theme.palette.accent)
             }

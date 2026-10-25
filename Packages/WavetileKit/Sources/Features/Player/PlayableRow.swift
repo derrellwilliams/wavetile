@@ -47,6 +47,8 @@ struct PlayableRow<Label: View>: View {
     /// Adds Play / Go to Album / Go to Artist to the long press, matching the ⋯ sheet.
     var menu: SongMenu?
     @ViewBuilder let label: Label
+    /// Haptic on the tap that starts playback, not on every track change (auto-advance included).
+    @State private var taps = 0
 
     var body: some View {
         tapAction
@@ -69,14 +71,15 @@ struct PlayableRow<Label: View>: View {
                 Divider()
                 Button("Add to Playlist", glyph: .addToQueue) { actions.addToPlaylist([trackID]) }
                 Button("Favorite", glyph: .favorite) {
-                    Task { try? await store.editor.setFavorite(itemID: trackID, true) }
+                    actions.favorite(trackID, store: store)
                 }
             }
-            .sensoryFeedback(.selection, trigger: player.current?.trackID)
+            .sensoryFeedback(.selection, trigger: taps)
     }
 
     private var tapAction: some View {
         Button {
+            taps += 1
             if let onTap { return onTap() }
             player.play(tracks(), startAt: index, online: connectivity.isOnline, downloads: downloads)
         } label: {

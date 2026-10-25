@@ -41,22 +41,29 @@ public final class AppModel {
     /// Restores the saved session from the Keychain. Synchronous so the first frame is already correct.
     public func restore() {
         guard case .launching = phase else { return }
-        if let (session, token) = store.load() {
-            phase = .signedIn(makeSignedIn(session, token: token))
+        if let (session, token) = store.load(), let signedIn = try? makeSignedIn(session, token: token) {
+            phase = .signedIn(signedIn)
         } else {
+            // No saved session, or no usable library storage (signing in again reports why).
             phase = .signedOut
         }
     }
 
     public func didSignIn(_ session: ServerSession, token: String) throws {
+        let signedIn = try makeSignedIn(session, token: token)
         try store.save(session, token: token)
-        phase = .signedIn(makeSignedIn(session, token: token))
+        phase = .signedIn(signedIn)
     }
 
-    private func makeSignedIn(_ session: ServerSession, token: String) -> SignedIn {
+    /// Throws `StorageUnavailable` only when no database can be created at all (e.g. the disk is full).
+    private func makeSignedIn(_ session: ServerSession, token: String) throws -> SignedIn {
         // A corrupt or unreadable cache shouldn't block sign-in; fall back to a fresh temp database.
-        let database = (try? LibraryDatabase.open(serverID: session.serverID, userID: session.userID))
-            ?? (try! LibraryDatabase.temporary())
+        let database: LibraryDatabase
+        do {
+            database = try LibraryDatabase.open(serverID: session.serverID, userID: session.userID)
+        } catch {
+            do { database = try LibraryDatabase.temporary() } catch { throw StorageUnavailable() }
+        }
         let library = LibraryStore(session: session, token: token, auth: auth, database: database)
         let downloads = DownloadsStore(session: session, library: library)
         let player = AudioPlayer(library: library.api)
@@ -89,6 +96,9 @@ public extension AppModel {
         BackgroundSessionEvents.store(identifier) { completion() }
     }
 }
+
+/// The device couldn't create the library database (usually no free storage).
+struct StorageUnavailable: Error {}
 
 /// Preview/test factory that skips the Keychain.
 extension AppModel {

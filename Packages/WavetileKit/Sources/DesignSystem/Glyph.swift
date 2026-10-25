@@ -129,6 +129,9 @@ public struct GlyphButton: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: size, height: size)
+                // A different glyph is a new icon, so changes (play ↔ pause) use the icon swap.
+                .id(glyph)
+                .transition(.iconSwap)
                 .frame(minWidth: 44, minHeight: 44)
                 .contentShape(.rect)
         }
@@ -170,28 +173,6 @@ public struct EmptyState<Actions: View>: View {
             }
         } actions: {
             actions
-        }
-    }
-}
-
-public extension View {
-    /// Gentle opacity pulse for "live" indicators (now playing, waiting). Off with Reduce Motion.
-    func pulsing(_ active: Bool = true) -> some View {
-        modifier(Pulsing(active: active))
-    }
-}
-
-private struct Pulsing: ViewModifier {
-    let active: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    func body(content: Content) -> some View {
-        if active && !reduceMotion {
-            content.phaseAnimator([1.0, 0.35]) { view, opacity in
-                view.opacity(opacity)
-            } animation: { _ in .easeInOut(duration: 0.8) }
-        } else {
-            content
         }
     }
 }

@@ -63,13 +63,13 @@ final class DownloadsStore {
     private func observeTrackIDs() async {
         do {
             for try await ids in library.observe(database.downloadedTrackIDs()) { downloadedTrackIDs = ids }
-        } catch {}
+        } catch { Log.observationFailed(error) }
     }
 
     private func observeBytes() async {
         do {
             for try await bytes in library.observe(database.totalDownloadedBytes()) { totalBytes = bytes }
-        } catch {}
+        } catch { Log.observationFailed(error) }
     }
 
     private func resumePending() async {

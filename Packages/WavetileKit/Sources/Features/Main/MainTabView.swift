@@ -188,13 +188,34 @@ struct GlassCircleIcon: View {
     }
 }
 
-/// Top-right speaker switcher: the AirPlay picker in the same glass circle as `ProfileButton`.
-struct SpeakerButton: View {
+/// Top-right group: the AirPlay speaker picker plus any screen-specific buttons, sharing one
+/// clear-glass capsule (a circle when AirPlay is alone), per the HIG's grouping of related bar items.
+struct TrailingBarGroup<Extra: View>: View {
+    @ViewBuilder let extra: Extra
+
     var body: some View {
-        AirPlayButton(iconSize: 22)
-            .frame(width: 36, height: 36)
-            .glassEffect(.clear.interactive(), in: .circle)
-            .frame(width: 44, height: 44)
+        HStack(spacing: 0) {
+            AirPlayButton(iconSize: 22)
+                .frame(width: 36, height: 36)
+            extra
+        }
+        .glassEffect(.clear.interactive(), in: .capsule)
+        .frame(height: 44)
+    }
+}
+
+/// A tan glyph sized to sit inside `TrailingBarGroup`'s capsule.
+struct BarGroupIcon: View {
+    @Environment(\.theme) private var theme
+    let glyph: Glyph
+
+    var body: some View {
+        glyph.image
+            .resizable()
+            .frame(width: 20, height: 20)
+            .foregroundStyle(theme.palette.accent)
+            .frame(width: 40, height: 36)
+            .contentShape(.rect)
     }
 }
 
@@ -215,13 +236,22 @@ extension View {
     /// Chrome for a tab's root screen, applied to the content *inside* its `NavigationStack`:
     /// the profile button at top left (opens the drawer), and root reporting so the drawer's
     /// edge swipe only works at the root, never fighting the system back gesture.
+    /// `trailing` adds screen buttons next to AirPlay in the top-right capsule.
     func tabRootChrome() -> some View {
-        modifier(TabRootChrome())
+        modifier(TabRootChrome { EmptyView() })
+    }
+
+    func tabRootChrome<Trailing: View>(@ViewBuilder trailing: () -> Trailing) -> some View {
+        modifier(TabRootChrome(trailing: trailing()))
     }
 }
 
-private struct TabRootChrome: ViewModifier {
+private struct TabRootChrome<Trailing: View>: ViewModifier {
     @Environment(\.tabRootReporter) private var reporter
+    let trailing: Trailing
+
+    init(trailing: Trailing) { self.trailing = trailing }
+    init(@ViewBuilder trailing: () -> Trailing) { self.trailing = trailing() }
 
     func body(content: Content) -> some View {
         content
@@ -232,7 +262,7 @@ private struct TabRootChrome: ViewModifier {
                 // The button brings its own glass; don't wrap it in the bar's.
                 .sharedBackgroundVisibility(.hidden)
                 ToolbarItem(placement: .topBarTrailing) {
-                    SpeakerButton()
+                    TrailingBarGroup { trailing }
                 }
                 .sharedBackgroundVisibility(.hidden)
             }

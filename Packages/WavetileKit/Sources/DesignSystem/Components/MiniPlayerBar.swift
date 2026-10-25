@@ -11,6 +11,8 @@ public struct MiniPlayerBar: View {
     private let isPlaying: Bool
     private let onPlayPause: () -> Void
     private let onNext: () -> Void
+    /// Haptics follow the tap, not `isPlaying`, which also changes on interruptions and remote commands.
+    @State private var playPausePresses = 0
 
     public init(
         title: String,
@@ -42,8 +44,15 @@ public struct MiniPlayerBar: View {
             }
             .lineLimit(1)
             Spacer(minLength: 0)
-            Button(isPlaying ? "Pause" : "Play", glyph: isPlaying ? .pause : .play, action: onPlayPause)
-                .contentTransition(.opacity)
+            Button {
+                playPausePresses += 1
+                onPlayPause()
+            } label: {
+                Label(isPlaying ? "Pause" : "Play", glyph: isPlaying ? .pause : .play)
+                    .id(isPlaying)
+                    .transition(.iconSwap)
+            }
+                .animation(theme.motion.snappy, value: isPlaying)
                 .frame(minWidth: 44, minHeight: 44)
                 .contentShape(.rect)
             if placement != .inline {
@@ -58,7 +67,7 @@ public struct MiniPlayerBar: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Now playing: \(title), \(subtitle)")
         .padding(.horizontal, theme.spacing.md)
-        .sensoryFeedback(.selection, trigger: isPlaying)
+        .sensoryFeedback(.selection, trigger: playPausePresses)
     }
 }
 

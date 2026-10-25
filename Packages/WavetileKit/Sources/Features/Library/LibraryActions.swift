@@ -16,11 +16,50 @@ final class LibraryActions {
         let albumIDs: [String]
     }
 
+    /// A short-lived "it worked" banner for actions that otherwise give no visible result.
+    struct Confirmation: Identifiable, Equatable {
+        let id = UUID()
+        let message: String
+    }
+
     var addToPlaylist: TrackSelection?
     var addToCollection: AlbumSelection?
     var errorMessage: String?
+    private(set) var confirmation: Confirmation?
+
+    func confirm(_ message: String) {
+        let shown = Confirmation(message: message)
+        confirmation = shown
+        AccessibilityNotification.Announcement(message).post()
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            if confirmation?.id == shown.id { confirmation = nil }
+        }
+    }
+
+    /// Favorite from a menu, where (unlike the heart button) nothing on screen changes.
+    func favorite(_ itemID: String, store: LibraryStore) {
+        Task {
+            do {
+                try await store.editor.setFavorite(itemID: itemID, true)
+                confirm("Added to Favorites")
+            } catch {
+                errorMessage = "Couldn't update favorites. Check your connection."
+            }
+        }
+    }
 
     func addToPlaylist(_ trackIDs: [String]) { addToPlaylist = TrackSelection(trackIDs: trackIDs) }
+
+    /// Songs a sheet wants to add to a playlist once it has dismissed (one sheet can't present
+    /// over another that's leaving). The presenter calls `presentPending()` from `onDismiss`.
+    var pendingPlaylistTrackIDs: [String]?
+
+    func presentPending() {
+        guard let ids = pendingPlaylistTrackIDs else { return }
+        pendingPlaylistTrackIDs = nil
+        addToPlaylist(ids)
+    }
     func addToCollection(_ albumIDs: [String]) { addToCollection = AlbumSelection(albumIDs: albumIDs) }
 }
 
@@ -34,6 +73,7 @@ extension View {
 private struct LibraryActionSheets: ViewModifier {
     @Bindable var actions: LibraryActions
     @Environment(\.theme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
         content
@@ -47,11 +87,38 @@ private struct LibraryActionSheets: ViewModifier {
                     .presentationDetents([.medium, .large])
                     .presentationBackground(theme.palette.background)
             }
+            // Slides in from the top and leaves the same way.
+            .overlay(alignment: .top) {
+                if let confirmation = actions.confirmation {
+                    ConfirmationBanner(message: confirmation.message)
+                        .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
+                }
+            }
+            .animation(theme.motion.smooth, value: actions.confirmation)
+            .sensoryFeedback(.success, trigger: actions.confirmation) { _, new in new != nil }
             .alert("Something Went Wrong", isPresented: Binding(get: { actions.errorMessage != nil }, set: { if !$0 { actions.errorMessage = nil } })) {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(actions.errorMessage ?? "")
             }
+    }
+}
+
+/// Glass capsule with a check and a short message, shown below the status bar.
+private struct ConfirmationBanner: View {
+    @Environment(\.theme) private var theme
+    let message: String
+
+    var body: some View {
+        Label(message, glyph: .check)
+            .labelStyle(.tintedIcon)
+            .font(theme.typography.itemTitle)
+            .padding(.horizontal, theme.spacing.lg)
+            .padding(.vertical, theme.spacing.md)
+            .glassEffect(.regular, in: .capsule)
+            .padding(.top, theme.spacing.sm)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)  // Announced when shown instead.
     }
 }
 
@@ -81,7 +148,7 @@ struct FavoriteButton: View {
                 for try await value in store.observe(store.database.isFavorite(itemID: itemID)) {
                     withAnimation(theme.motion.snappy) { isFavorite = value }
                 }
-            } catch {}
+            } catch { Log.observationFailed(error) }
         }
     }
 }
@@ -108,7 +175,7 @@ struct AddToPlaylistSheet: View {
                 .listRowBackground(Color.clear)
                 ForEach(playlists) { playlist in
                     Button {
-                        perform { try await store.editor.addToPlaylist(id: playlist.id, trackIDs: trackIDs) }
+                        perform("Added to \(playlist.name)") { try await store.editor.addToPlaylist(id: playlist.id, trackIDs: trackIDs) }
                     } label: {
                         HStack(spacing: theme.spacing.md) {
                             ArtworkView(store.artwork(itemID: playlist.id, tag: playlist.imageTag, maxPixelWidth: 144))
@@ -138,21 +205,24 @@ struct AddToPlaylistSheet: View {
                     let name = newName.trimmingCharacters(in: .whitespaces)
                     newName = ""
                     guard !name.isEmpty else { return }
-                    perform { try await store.editor.createPlaylist(name: name, trackIDs: trackIDs) }
+                    perform("Created \(name)") { try await store.editor.createPlaylist(name: name, trackIDs: trackIDs) }
                 }
             }
             .task {
                 do {
                     for try await value in store.observe(store.database.playlists()) { playlists = value }
-                } catch {}
+                } catch { Log.observationFailed(error) }
             }
         }
     }
 
-    private func perform(_ work: @escaping () async throws -> Void) {
+    private func perform(_ success: String, _ work: @escaping () async throws -> Void) {
         dismiss()
         Task {
-            do { try await work() } catch { actions.errorMessage = "Couldn't update the playlist. Check your connection." }
+            do {
+                try await work()
+                actions.confirm(success)
+            } catch { actions.errorMessage = "Couldn't update the playlist. Check your connection." }
         }
     }
 }
@@ -179,7 +249,7 @@ struct AddToCollectionSheet: View {
                 .listRowBackground(Color.clear)
                 ForEach(collections) { collection in
                     Button {
-                        perform { try await store.editor.addToCollection(id: collection.id, albumIDs: albumIDs) }
+                        perform("Added to \(collection.name)") { try await store.editor.addToCollection(id: collection.id, albumIDs: albumIDs) }
                     } label: {
                         HStack(spacing: theme.spacing.md) {
                             CollectionMosaic(collectionID: collection.id)
@@ -209,21 +279,24 @@ struct AddToCollectionSheet: View {
                     let name = newName.trimmingCharacters(in: .whitespaces)
                     newName = ""
                     guard !name.isEmpty else { return }
-                    perform { try await store.editor.createCollection(name: name, albumIDs: albumIDs) }
+                    perform("Created \(name)") { try await store.editor.createCollection(name: name, albumIDs: albumIDs) }
                 }
             }
             .task {
                 do {
                     for try await value in store.observe(store.database.collections()) { collections = value }
-                } catch {}
+                } catch { Log.observationFailed(error) }
             }
         }
     }
 
-    private func perform(_ work: @escaping () async throws -> Void) {
+    private func perform(_ success: String, _ work: @escaping () async throws -> Void) {
         dismiss()
         Task {
-            do { try await work() } catch { actions.errorMessage = "Couldn't update the collection. Check your connection." }
+            do {
+                try await work()
+                actions.confirm(success)
+            } catch { actions.errorMessage = "Couldn't update the collection. Check your connection." }
         }
     }
 }

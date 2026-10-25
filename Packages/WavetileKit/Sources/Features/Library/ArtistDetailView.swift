@@ -70,7 +70,7 @@ struct ArtistDetailView: View {
             if imageTag == nil { imageTag = .some(try? store.database.artist(id: artistID)?.imageTag) }
             do {
                 for try await value in store.observe(store.database.albums(artistID: artistID)) { albums = value }
-            } catch {}
+            } catch { Log.observationFailed(error) }
         }
         .enableInjection()
     }

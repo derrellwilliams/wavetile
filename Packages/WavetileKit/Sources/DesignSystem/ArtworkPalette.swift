@@ -100,9 +100,13 @@ public enum ArtworkPaletteLoader {
         guard let url else { return nil }
         if let cached = cache.object(forKey: url as NSURL) { return cached.palette }
         guard let image = try? await ImagePipeline.shared.image(for: url) else { return nil }
-        let palette = await Task.detached(priority: .userInitiated) { ArtworkPalette.extract(from: image) }.value
+        let palette = await extractInBackground(from: image)
         if let palette { cache.setObject(Box(palette), forKey: url as NSURL) }
         return palette
+    }
+
+    @concurrent private static func extractInBackground(from image: UIImage) async -> ArtworkPalette? {
+        ArtworkPalette.extract(from: image)
     }
 }
 

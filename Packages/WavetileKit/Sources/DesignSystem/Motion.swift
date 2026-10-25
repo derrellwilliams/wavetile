@@ -18,6 +18,8 @@ public struct Motion: Sendable, Equatable {
     public var ambient: Animation
     /// Scale applied to pressed tiles and buttons.
     public var pressedScale: CGFloat
+    /// Press-in: lands almost instantly so the touch feels direct. Release uses `snappy`.
+    public var pressIn: Animation = .spring(response: 0.12, dampingFraction: 1)
 
     public static let standard = Motion(
         snappy: .spring(response: 0.3, dampingFraction: 1),
@@ -67,10 +69,34 @@ public struct PressableButtonStyle: ButtonStyle {
     public func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed && !reduceMotion ? theme.motion.pressedScale : 1)
-            .animation(theme.motion.snappy, value: configuration.isPressed)
+            // Asymmetric: the press lands immediately, the release settles.
+            .animation(configuration.isPressed ? theme.motion.pressIn : theme.motion.snappy, value: configuration.isPressed)
     }
 }
 
 public extension ButtonStyle where Self == PressableButtonStyle {
     static var pressable: PressableButtonStyle { .init() }
+}
+
+// MARK: - Icon swap
+
+public extension AnyTransition {
+    /// Swapping one icon for another (play ↔ pause, track number ↔ waveform): the outgoing icon
+    /// shrinks and blurs out while the new one grows in, so the two never read as a double exposure.
+    /// Reduce Motion keeps only the fade.
+    static var iconSwap: AnyTransition {
+        .modifier(active: IconSwapModifier(isActive: true), identity: IconSwapModifier(isActive: false))
+    }
+}
+
+private struct IconSwapModifier: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let isActive: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(isActive && !reduceMotion ? 0.6 : 1)
+            .blur(radius: isActive && !reduceMotion ? 2 : 0)
+            .opacity(isActive ? 0 : 1)
+    }
 }

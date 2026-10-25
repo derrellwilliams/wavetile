@@ -39,7 +39,7 @@ struct DownloadButton: View {
                 for try await value in library.observe(library.database.downloadStatus(collectionID: collectionID)) {
                     withAnimation(theme.motion.smooth) { status = value }
                 }
-            } catch {}
+            } catch { Log.observationFailed(error) }
         }
     }
 

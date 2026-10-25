@@ -33,7 +33,7 @@ struct GenresView: View {
         .task {
             do {
                 for try await value in store.observe(store.database.genres()) { genres = value }
-            } catch {}
+            } catch { Log.observationFailed(error) }
         }
         .enableInjection()
     }

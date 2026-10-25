@@ -33,13 +33,16 @@ public struct TrackRow: View {
         HStack(spacing: theme.spacing.md) {
             leadingView
             VStack(alignment: .leading, spacing: theme.spacing.xxs) {
+                // Long titles wrap to a second line rather than being cut off.
                 Text(title)
                     .font(theme.typography.body)
                     .foregroundStyle(theme.palette.textPrimary)
+                    .lineLimit(isAccessibilitySize ? nil : 2)
                 if let subtitle {
                     Text(subtitle)
                         .font(theme.typography.itemSubtitle)
                         .foregroundStyle(theme.palette.textSecondary)
+                        .lineLimit(isAccessibilitySize ? nil : 1)
                 }
                 // At accessibility sizes the duration moves under the title instead of squeezing it.
                 if isAccessibilitySize, let duration {
@@ -48,8 +51,6 @@ public struct TrackRow: View {
                         .foregroundStyle(theme.palette.textSecondary)
                 }
             }
-            // One line normally; wrap at accessibility text sizes instead of truncating.
-            .lineLimit(isAccessibilitySize ? nil : 1)
             Spacer(minLength: theme.spacing.sm)
             if isDownloaded {
                 Glyph.downloads.image
@@ -85,6 +86,9 @@ public struct TrackRow: View {
                 }
             }
             .font(theme.typography.itemSubtitle.monospacedDigit())
+            .id(isPlaying)
+            .transition(.iconSwap)
+            .animation(theme.motion.snappy, value: isPlaying)
             .frame(minWidth: 24)
         case let .artwork(source):
             ArtworkView(source)

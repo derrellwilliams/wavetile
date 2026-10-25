@@ -51,14 +51,11 @@ struct SongActionsSheet: View {
                     action("Add to Queue", glyph: .queue) { player.addToQueue([QueuedTrack(track).requeued()]) }
                     Divider().overlay(theme.palette.separator)
                     action("Add to Playlist", glyph: .addToQueue) {
-                        // Wait for this sheet to finish dismissing so the playlist sheet can present.
-                        Task {
-                            try? await Task.sleep(for: .milliseconds(400))
-                            actions.addToPlaylist([track.id])
-                        }
+                        // Opens from the presenter's onDismiss, the moment this sheet is gone.
+                        actions.pendingPlaylistTrackIDs = [track.id]
                     }
                     action("Favorite", glyph: .favorite) {
-                        Task { try? await store.editor.setFavorite(itemID: track.id, true) }
+                        actions.favorite(track.id, store: store)
                     }
                 }
             }

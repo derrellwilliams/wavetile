@@ -61,7 +61,7 @@ struct AlbumGridView: View {
             }
             do {
                 for try await value in store.observe(observation) { albums = value }
-            } catch {}
+            } catch { Log.observationFailed(error) }
         }
         .enableInjection()
     }

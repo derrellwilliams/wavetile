@@ -46,7 +46,7 @@ struct ArtistsView: View {
                 for try await artists in store.observe(store.database.artists()) {
                     sections = Self.group(artists)
                 }
-            } catch {}
+            } catch { Log.observationFailed(error) }
         }
         .enableInjection()
     }

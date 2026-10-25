@@ -11,6 +11,7 @@ struct SearchView: View {
     @ObserveInjection var inject
     @Environment(\.theme) private var theme
     @Environment(LibraryStore.self) private var store
+    @Environment(LibraryActions.self) private var actions
     @Namespace private var zoom
     @Environment(AudioPlayer.self) private var player
     @Environment(DownloadsStore.self) private var downloads
@@ -89,7 +90,7 @@ struct SearchView: View {
             .navigationTitle("Search")
             .tabRootChrome()
             .libraryDestinations(zoom: zoom, path: $path)
-            .sheet(item: $actionsTrack) { track in
+            .sheet(item: $actionsTrack, onDismiss: actions.presentPending) { track in
                 SongActionsSheet(
                     track: track,
                     artwork: store.artwork(itemID: track.albumID, maxPixelWidth: 144),

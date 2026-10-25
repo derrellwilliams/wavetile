@@ -13,11 +13,16 @@ public enum ImageCaching {
         ImagePipeline.shared = ImagePipeline(configuration: configuration)
     }
 
+    /// Prefetchers in flight; each is released when it finishes (deallocating one cancels its work).
+    @MainActor private static var active: [ObjectIdentifier: ImagePrefetcher] = [:]
+
     /// Warms the disk cache (e.g. artwork sizes used by a downloaded album).
-    public static func prefetch(_ urls: [URL]) {
+    @MainActor public static func prefetch(_ urls: [URL]) {
+        guard !urls.isEmpty else { return }
         let prefetcher = ImagePrefetcher(pipeline: .shared, destination: .diskCache)
+        let id = ObjectIdentifier(prefetcher)
+        active[id] = prefetcher
+        prefetcher.didComplete = { active[id] = nil }
         prefetcher.startPrefetching(with: urls)
-        // Keep the prefetcher alive until requests are issued.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 60) { _ = prefetcher }
     }
 }

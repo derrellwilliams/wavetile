@@ -115,14 +115,14 @@ struct FavoritesView: View {
     }
 
     private func observeTracks() async {
-        do { for try await value in store.observe(store.database.favoriteTracks()) { tracks = value } } catch {}
+        do { for try await value in store.observe(store.database.favoriteTracks()) { tracks = value } } catch { Log.observationFailed(error) }
     }
 
     private func observeAlbums() async {
-        do { for try await value in store.observe(store.database.favoriteAlbums()) { albums = value } } catch {}
+        do { for try await value in store.observe(store.database.favoriteAlbums()) { albums = value } } catch { Log.observationFailed(error) }
     }
 
     private func observeArtists() async {
-        do { for try await value in store.observe(store.database.favoriteArtists()) { artists = value } } catch {}
+        do { for try await value in store.observe(store.database.favoriteArtists()) { artists = value } } catch { Log.observationFailed(error) }
     }
 }

@@ -91,11 +91,12 @@ final class WidgetBridge {
         guard let url = library.api.imageURL(itemID: itemID, tag: tag, maxPixelWidth: 480),
               let image = try? await ImagePipeline.shared.image(for: url)
         else { return nil }
-        let data = await Task.detached(priority: .utility) { Self.thumbnailJPEG(image) }.value
+        let data = await Self.thumbnailJPEG(image)
         return data.flatMap { WidgetStore.saveArtwork($0, id: itemID) }
     }
 
-    private nonisolated static func thumbnailJPEG(_ image: UIImage) -> Data? {
+    /// Resizing and JPEG encoding run off the main actor.
+    @concurrent private static func thumbnailJPEG(_ image: UIImage) async -> Data? {
         let side: CGFloat = 300
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1

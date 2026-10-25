@@ -7,6 +7,7 @@ import SwiftUI
 struct DownloadedView: View {
     @ObserveInjection var inject
     @Environment(\.theme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(LibraryStore.self) private var library
     @Environment(DownloadsStore.self) private var downloads
     @Environment(Connectivity.self) private var connectivity
@@ -23,6 +24,8 @@ struct DownloadedView: View {
                         Label("You're offline. Downloaded music still plays.", glyph: .offline)
                             .font(theme.typography.itemSubtitle)
                             .foregroundStyle(theme.palette.textSecondary)
+                            // Drops in from the top and leaves the same way.
+                            .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
                     }
                     LazyVGrid(
                         columns: [GridItem(.adaptive(minimum: theme.artwork.shelfTileWidth - 8), spacing: theme.spacing.lg)],
@@ -31,11 +34,14 @@ struct DownloadedView: View {
                     ) {
                         ForEach(collections) { item in
                             tile(item)
+                                // Removing a download fades the tile out; the rest slide into place.
+                                .transition(reduceMotion ? .opacity : .scale(scale: 0.96).combined(with: .opacity))
                         }
                     }
                 }
                 .padding(.horizontal, theme.spacing.screenInset)
                 .padding(.vertical, theme.spacing.lg)
+                .animation(theme.motion.smooth, value: connectivity.isOnline)
             }
             .overlay {
                 if collections.isEmpty {
@@ -48,30 +54,30 @@ struct DownloadedView: View {
             }
             .themedBackground()
             .navigationTitle("Downloaded")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button("Remove All Downloads", glyph: .trash, role: .destructive) { confirmRemoveAll = true }
-                    } label: {
-                        GlassCircleIcon(glyph: .more)
-                    }
-                    .accessibilityLabel("More")
-                    .disabled(collections.isEmpty)
-                }
-                // Matches the profile and speaker buttons, which bring their own glass.
-                .sharedBackgroundVisibility(.hidden)
-            }
             .confirmationDialog("Remove all downloaded music?", isPresented: $confirmRemoveAll, titleVisibility: .visible) {
                 Button("Remove All", role: .destructive) { downloads.removeAll() }
             } message: {
                 Text("You can download it again anytime.")
             }
-            .tabRootChrome()
+            .tabRootChrome {
+                Menu {
+                    Button("Remove All Downloads", glyph: .trash, role: .destructive) { confirmRemoveAll = true }
+                } label: {
+                    BarGroupIcon(glyph: .more)
+                }
+                .accessibilityLabel("More")
+                .disabled(collections.isEmpty)
+            }
             .libraryDestinations(zoom: zoom, path: $path)
             .task {
                 do {
-                    for try await value in library.observe(library.database.downloadedCollections()) { collections = value }
-                } catch {}
+                    for try await value in library.observe(library.database.downloadedCollections()) {
+                        // The first load appears as-is; later changes (removals, new downloads) animate.
+                        if collections.isEmpty { collections = value } else {
+                            withAnimation(theme.motion.smooth) { collections = value }
+                        }
+                    }
+                } catch { Log.observationFailed(error) }
             }
         }
         .enableInjection()

@@ -101,6 +101,7 @@ final class SignInModel {
         case let error as URLError where error.code == .appTransportSecurityRequiresSecureConnection:
             "This server uses plain HTTP over the internet. Use an HTTPS address."
         case let error as URLError: error.localizedDescription
+        case is StorageUnavailable: "Wavetile couldn't set up your library. Free up some storage and try again."
         default: "Sign in failed. Check your details and try again."
         }
     }

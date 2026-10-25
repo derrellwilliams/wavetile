@@ -59,6 +59,9 @@ struct LibraryView: View {
                 }
                 .padding(.horizontal, theme.spacing.screenInset)
                 .padding(.bottom, theme.spacing.xxl)
+                // The sync line fading in or out moves Recently Added smoothly, not in a jump.
+                .animation(theme.motion.smooth, value: store.statusText == nil)
+                .animation(theme.motion.smooth, value: store.syncError)
             }
             .themedBackground()
             .markRefreshable { await store.syncNow() }
@@ -70,7 +73,7 @@ struct LibraryView: View {
                     for try await albums in store.observe(store.database.albums(sort: .recentlyAdded)) {
                         recentlyAdded = Array(albums.prefix(12))
                     }
-                } catch {}
+                } catch { Log.observationFailed(error) }
             }
         }
         .enableInjection()
@@ -85,11 +88,13 @@ struct LibraryView: View {
             .font(theme.typography.caption)
             .foregroundStyle(theme.palette.textSecondary)
             .padding(.top, theme.spacing.sm)
+            .transition(.opacity)
         } else if let error = store.syncError {
             Label(error, glyph: .warning)
                 .font(theme.typography.caption)
                 .foregroundStyle(theme.palette.textSecondary)
                 .padding(.top, theme.spacing.sm)
+                .transition(.opacity)
         }
     }
 }

@@ -13,6 +13,7 @@ struct NowPlayingView: View {
     @Environment(AudioPlayer.self) private var player
     @Environment(LibraryStore.self) private var store
     @State private var showQueue = false
+    @State private var playPausePresses = 0
 
     var body: some View {
         // Fixed, full-screen layout when it fits; scrolls when large text makes it taller than
@@ -55,8 +56,10 @@ struct NowPlayingView: View {
                         Label(error, glyph: .warning)
                             .font(theme.typography.caption)
                             .foregroundStyle(theme.palette.textSecondary)
+                            .transition(.opacity)
                     }
                 }
+                .animation(theme.motion.smooth, value: player.errorMessage)
                 .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -105,7 +108,8 @@ struct NowPlayingView: View {
 
     private var artwork: some View {
         ArtworkView(store.artwork(itemID: player.current?.albumID, tag: player.current?.albumImageTag, maxPixelWidth: 1200))
-            .shadow(color: .black.opacity(player.isPlaying ? 0.5 : 0.2), radius: player.isPlaying ? 30 : 12, y: 12)
+            // Fixed radius: only the shadow's opacity animates (radius changes re-render a big blur every frame).
+            .shadow(color: .black.opacity(player.isPlaying ? 0.5 : 0.2), radius: 24, y: 12)
             // Apple Music–style "breathing": artwork recedes when paused.
             .scaleEffect(player.isPlaying || reduceMotion ? 1 : 0.86)
             // State change, not a flick: critically damped, no overshoot.
@@ -120,9 +124,10 @@ struct NowPlayingView: View {
             GlyphButton("Previous", glyph: .previous, size: 34) { player.previous() }
             Spacer()
             GlyphButton(player.isPlaying ? "Pause" : "Play", glyph: player.isPlaying ? .pause : .play, size: 60) {
+                playPausePresses += 1
                 player.togglePlayPause()
             }
-            .contentTransition(.opacity)
+            .animation(theme.motion.snappy, value: player.isPlaying)
             .overlay(alignment: .bottom) {
                 if player.isBuffering { ProgressView().offset(y: 28) }
             }
@@ -132,7 +137,8 @@ struct NowPlayingView: View {
         }
         .buttonStyle(.pressable)
         .foregroundStyle(theme.palette.accent)
-        .sensoryFeedback(.impact(weight: .medium), trigger: player.isPlaying)
+        // On the tap only: isPlaying also flips for interruptions and AirPods/Lock Screen commands.
+        .sensoryFeedback(.impact(weight: .medium), trigger: playPausePresses)
     }
 
     private var secondaryControls: some View {
@@ -155,11 +161,14 @@ struct NowPlayingView: View {
     }
 }
 
-/// Seek bar with live drag: the thumb follows the finger and seeks on release.
+/// Seek bar with live drag: moves 1:1 with the finger relative to where it was grabbed (touching
+/// doesn't jump the position, like Apple Music) and seeks on release.
 struct Scrubber: View {
     @Environment(\.theme) private var theme
     @Environment(AudioPlayer.self) private var player
     @State private var dragProgress: Double?
+    /// Playback progress when the drag began; the drag offsets from here.
+    @State private var dragStart: Double?
 
     var body: some View {
         let duration = max(player.duration, 1)
@@ -177,11 +186,15 @@ struct Scrubber: View {
                 .gesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { value in
-                            dragProgress = min(max(value.location.x / proxy.size.width, 0), 1)
+                            let start = dragStart ?? progress
+                            dragStart = start
+                            dragProgress = min(max(start + value.translation.width / proxy.size.width, 0), 1)
                         }
-                        .onEnded { _ in
-                            if let dragProgress { player.seek(to: dragProgress * duration) }
+                        .onEnded { value in
+                            // A touch without movement only highlights; it never seeks.
+                            if let dragProgress, abs(value.translation.width) > 0 { player.seek(to: dragProgress * duration) }
                             dragProgress = nil
+                            dragStart = nil
                         }
                 )
                 .animation(theme.motion.snappy, value: dragProgress == nil)

@@ -88,7 +88,7 @@ struct CollectionsView: View {
         .task {
             do {
                 for try await value in store.observe(store.database.collections()) { collections = value }
-            } catch {}
+            } catch { Log.observationFailed(error) }
         }
         .enableInjection()
     }
@@ -160,7 +160,7 @@ struct CollectionDetailView: View {
         .task {
             do {
                 for try await value in store.observe(store.database.albums(collectionID: collection.id)) { albums = value }
-            } catch {}
+            } catch { Log.observationFailed(error) }
         }
         .enableInjection()
     }
