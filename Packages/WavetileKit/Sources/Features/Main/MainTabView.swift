@@ -14,7 +14,7 @@ struct MainTabView: View {
     @State private var showNowPlaying = false
     @State private var connectivity = Connectivity()
     @State private var actions = LibraryActions()
-    @State private var homePath: [LibraryRoute] = []
+    @State private var homePath = NavigationPath()
     @State private var widgets: WidgetBridge
     @Namespace private var playerZoom
     @State private var selection: AppTab = DebugFlags.initialTab
@@ -22,12 +22,12 @@ struct MainTabView: View {
     @State private var showSettings = DebugFlags.openSettings
     /// Whether each tab's navigation stack is showing its root screen (drives edge-swipe-to-open).
     @State private var atRoot: [AppTab: Bool] = [:]
-    /// Search's Music | Podcasts filter (Podcasts' "+" opens Search on the Podcasts side).
-    @State private var searchScope: MediaKind = .music
+    /// Search's All | Music | Podcasts filter (Podcasts' "+" opens Search on the Podcasts side).
+    @State private var searchScope: MediaKind = .all
     @State private var showOPMLImporter = false
     @State private var opmlMessage: String?
 
-    enum AppTab: String, Hashable { case home, library, podcasts, downloaded, search }
+    enum AppTab: String, Hashable { case home, library, downloaded, search }
 
     init(app: AppModel, signedIn: AppModel.SignedIn) {
         self.app = app
@@ -80,15 +80,6 @@ struct MainTabView: View {
             } label: {
                 tabLabel("Library", glyph: .library)
             }
-            // Opt-in from the profile drawer; music-only users never see it.
-            if signedIn.podcasts.isEnabled {
-                Tab(value: .podcasts) {
-                    PodcastsView()
-                        .environment(\.tabRootReporter, reporter(for: .podcasts))
-                } label: {
-                    tabLabel("Podcasts", glyph: .podcasts)
-                }
-            }
             Tab(value: .downloaded) {
                 DownloadedView()
                     .environment(\.tabRootReporter, reporter(for: .downloaded))
@@ -111,18 +102,12 @@ struct MainTabView: View {
             signedIn.podcasts.playerChanged()
         }
         .onChange(of: signedIn.podcasts.isEnabled) { _, enabled in
-            if !enabled {
-                if selection == .podcasts { selection = .home }
-                searchScope = .music
-            }
+            if !enabled { searchScope = .all }
         }
         .sheet(isPresented: introBinding) {
             PodcastsIntroSheet(
                 onFindShows: { openPodcastSearch() },
-                onImport: {
-                    selection = .podcasts
-                    showOPMLImporter = true
-                }
+                onImport: { showOPMLImporter = true }
             )
             .environment(signedIn.podcasts)
         }
@@ -155,7 +140,7 @@ extension MainTabView {
             let id = url.lastPathComponent
             guard let record = try? signedIn.library.database.album(id: id) else { return }
             selection = .home
-            homePath = [.album(AlbumRoute(album: record.summary, sourceID: "link-\(id)"))]
+            homePath = NavigationPath([LibraryRoute.album(AlbumRoute(album: record.summary, sourceID: "link-\(id)"))])
         default:
             break
         }

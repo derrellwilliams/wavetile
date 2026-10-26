@@ -211,16 +211,23 @@ public extension PodcastDatabase {
         }
     }
 
-    /// The Podcasts tab's Up Next shelf, like Apple Podcasts: episodes in progress, then the
-    /// user's queue, then the newest unplayed episode of each followed show.
-    func upNextShelf(limit: Int = 20) -> ValueObservation<ValueReducers.Fetch<[EpisodeItem]>> {
+    /// Home's Continue Listening: episodes started but not finished, most recent first.
+    func continueListening(limit: Int = 12) -> ValueObservation<ValueReducers.Fetch<[EpisodeItem]>> {
         ValueObservation.tracking { db in
-            let inProgress = try Self.items(
+            try Self.items(
                 EpisodeRecord
                     .filter(Column("position") > 0 && Column("playedAt") == nil)
                     .order(Column("lastPlayedAt").desc)
-                    .limit(10)
+                    .limit(limit)
             ).fetchAll(db)
+        }
+    }
+
+    /// Home's Up Next in Podcasts, like Apple Podcasts: the user's queue, then the newest
+    /// unplayed episode of each followed show. Episodes in progress are left out (they're in
+    /// Continue Listening).
+    func upNextShelf(limit: Int = 20) -> ValueObservation<ValueReducers.Fetch<[EpisodeItem]>> {
+        ValueObservation.tracking { db in
             let queued = try Self.queueItems(db)
             let newest = try Self.items(EpisodeRecord.filter(sql: """
                 episode.id IN (
@@ -230,7 +237,10 @@ public extension PodcastDatabase {
                 )
                 """)).order(Column("publishedAt").desc).limit(limit).fetchAll(db)
             var seen = Set<String>()
-            return (inProgress + queued + newest).filter { seen.insert($0.id).inserted }.prefix(limit).map(\.self)
+            return (queued + newest)
+                .filter { !$0.episode.isInProgress && seen.insert($0.id).inserted }
+                .prefix(limit)
+                .map(\.self)
         }
     }
 

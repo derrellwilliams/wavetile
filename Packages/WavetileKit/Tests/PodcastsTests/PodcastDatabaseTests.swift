@@ -21,6 +21,12 @@ struct PodcastDatabaseTests {
 
     func id(_ guid: String) -> String { PodcastID.episode(feedURL: feedURL, guid: guid) }
 
+    /// The current value of an observation.
+    func first<T: Sendable>(_ observation: ValueObservation<ValueReducers.Fetch<T>>, in db: PodcastDatabase) async throws -> T {
+        for try await value in observation.values(in: db.pool) { return value }
+        throw CancellationError()
+    }
+
     @Test func upsertKeepsListeningStateAndReportsNewEpisodes() async throws {
         let db = try PodcastDatabase.temporary()
         let first = try await db.upsert(feed: feed([episode("a", daysAgo: 2)]), feedURL: feedURL, validators: nil, follow: true)
@@ -76,6 +82,18 @@ struct PodcastDatabaseTests {
         #expect(try db.queueNow().map(\.episode.guid) == ["c", "a", "b"])
         try await db.setQueue([id("b"), id("c")])
         #expect(try db.queueNow().map(\.episode.guid) == ["b", "c"])
+    }
+
+    @Test func continueListeningAndUpNextDontOverlap() async throws {
+        let db = try PodcastDatabase.temporary()
+        _ = try await db.upsert(feed: feed([episode("a", daysAgo: 3), episode("b", daysAgo: 2), episode("c", daysAgo: 0)]), feedURL: feedURL, validators: nil, follow: true)
+        try await db.savePosition(episodeID: id("c"), position: 600, duration: 3600)
+        try await db.enqueue(episodeID: id("a"), atFront: false)
+        let resume = try await first(db.continueListening(), in: db)
+        let upNext = try await first(db.upNextShelf(), in: db)
+        #expect(resume.map(\.episode.guid) == ["c"])
+        // Queue first; the newest episode is in progress, so it's only under Continue Listening.
+        #expect(upNext.map(\.episode.guid) == ["a"])
     }
 
     @Test func unfollowedPreviewsAreCleanedUp() async throws {

@@ -42,24 +42,7 @@ struct PodcastSearchResults: View {
                     .listRowBackground(Color.clear)
                 }
             }
-            if !local.shows.isEmpty {
-                Section("Your Shows") {
-                    ForEach(local.shows) { show in
-                        NavigationLink(value: PodcastRoute.show(ShowRoute(show))) {
-                            TrackRow(title: show.title, subtitle: show.author, leading: .artwork(.unsized(show.artworkURL, maxPixelWidth: 168)))
-                        }
-                        .listRowBackground(Color.clear)
-                    }
-                }
-            }
-            if !local.episodes.isEmpty {
-                Section("Episodes") {
-                    ForEach(local.episodes) { item in
-                        EpisodeRow(item: item)
-                            .listRowBackground(Color.clear)
-                    }
-                }
-            }
+            PodcastLocalSections(results: local)
             if !directory.isEmpty {
                 Section("Apple Podcasts") {
                     ForEach(directory) { show in
@@ -116,6 +99,32 @@ struct PodcastSearchResults: View {
             }
         } else if !isSearching, local.isEmpty, directory.isEmpty, pastedFeed == nil {
             EmptyState("No Results", glyph: .search, message: directoryError ?? "No podcasts match “\(trimmed)”.")
+        }
+    }
+}
+
+/// Matching followed shows and their episodes, as list sections (Podcasts and All filters).
+struct PodcastLocalSections: View {
+    let results: PodcastDatabase.SearchResults
+
+    var body: some View {
+        if !results.shows.isEmpty {
+            Section("Your Shows") {
+                ForEach(results.shows) { show in
+                    NavigationLink(value: PodcastRoute.show(ShowRoute(show))) {
+                        TrackRow(title: show.title, subtitle: show.author, leading: .artwork(.unsized(show.artworkURL, maxPixelWidth: 168)))
+                    }
+                    .listRowBackground(Color.clear)
+                }
+            }
+        }
+        if !results.episodes.isEmpty {
+            Section("Episodes") {
+                ForEach(results.episodes) { item in
+                    EpisodeRow(item: item)
+                        .listRowBackground(Color.clear)
+                }
+            }
         }
     }
 }

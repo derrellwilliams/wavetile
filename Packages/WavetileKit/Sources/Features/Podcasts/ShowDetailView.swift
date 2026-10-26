@@ -86,9 +86,9 @@ struct ShowDetailView: View {
                     .multilineTextAlignment(.center)
                     .accessibilityAddTraits(.isHeader)
                 if !(show?.author ?? route.author).isEmpty {
+                    // The text face, not Stack Sans Notch: a publisher name is metadata, not a title.
                     Text(show?.author ?? route.author)
-                        .font(BrandFont.display(.title3))
-                        .tracking(theme.typography.displayTracking)
+                        .font(BrandFont.font(.title3, weight: .medium))
                         .foregroundStyle(theme.palette.textPrimary)
                         .multilineTextAlignment(.center)
                 }

@@ -195,7 +195,7 @@ struct EpisodeMenu: View {
     }
 }
 
-/// A wide card for the Up Next shelf: art, show, title, progress and play.
+/// An episode tile for Home's podcast shelves: art, show, title and time left.
 struct EpisodeCard: View {
     @Environment(\.theme) private var theme
     @Environment(\.pushPodcastRoute) private var push
@@ -226,7 +226,11 @@ struct EpisodeCard: View {
                 .foregroundStyle(theme.palette.textPrimary)
                 .lineLimit(2, reservesSpace: true)
                 .multilineTextAlignment(.leading)
-            EpisodePlayButton(item: item)
+            // Time left as plain text, matching album tiles; tapping the card opens the episode.
+            Text(EpisodeFormat.status(item.episode))
+                .font(theme.typography.itemSubtitle)
+                .foregroundStyle(theme.palette.textSecondary)
+                .monospacedDigit()
         }
         .contentShape(.rect)
         .onTapGesture { push(.episode(id: item.id)) }

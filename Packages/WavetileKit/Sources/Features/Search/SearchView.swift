@@ -3,11 +3,13 @@ import JellyfinKit
 import Library
 import Persistence
 import Playback
+import Podcasts
 import SwiftUI
 
 /// Offline full-text search over the synced library. The search field itself is attached here
 /// (scoped to this tab); `.tabViewSearchActivation` on the TabView makes the tab detach.
-/// With podcasts on, a Music | Podcasts filter switches to `PodcastSearchResults`.
+/// With podcasts on, an All | Music | Podcasts filter appears (All is the default). All shows
+/// music plus followed podcasts, all from the device; only the Podcasts filter asks Apple.
 struct SearchView: View {
     @ObserveInjection var inject
     @Environment(\.theme) private var theme
@@ -22,6 +24,7 @@ struct SearchView: View {
     @Binding var text: String
     @Binding var scope: MediaKind
     @State private var results = LibraryDatabase.SearchResults()
+    @State private var podcastResults = PodcastDatabase.SearchResults()
     @State private var path = NavigationPath()
     /// The song whose ⋯ actions sheet is showing.
     @State private var actionsTrack: TrackRecord?
@@ -29,14 +32,14 @@ struct SearchView: View {
     var body: some View {
         NavigationStack(path: $path) {
             Group {
-                if podcasts.isEnabled && scope == .podcasts {
-                    PodcastSearchResults(text: text)
-                } else {
-                    musicResults
+                switch podcasts.isEnabled ? scope : .music {
+                case .podcasts: PodcastSearchResults(text: text)
+                case .all: allResults
+                case .music: musicResults
                 }
             }
             .safeAreaInset(edge: .top, spacing: 0) {
-                if podcasts.isEnabled { MediaFilter(selection: $scope) }
+                if podcasts.isEnabled { MediaFilter(selection: $scope, options: [.all, .music, .podcasts]) }
             }
             .themedBackground()
             .navigationTitle("Search")
@@ -52,78 +55,116 @@ struct SearchView: View {
             }
         }
         // Scoped to this tab's stack so the field doesn't leak into other tabs' navigation bars.
-        .searchable(text: $text, prompt: podcasts.isEnabled && scope == .podcasts ? "Shows and episodes" : "Artists, albums, songs")
+        .searchable(text: $text, prompt: prompt)
         .task(id: text) {
             // Debounce typing; FTS queries are fast but there's no need to run one per keystroke.
             try? await Task.sleep(for: .milliseconds(150))
             guard !Task.isCancelled else { return }
             results = (try? store.database.search(text)) ?? .init()
+            podcastResults = podcasts.isEnabled ? ((try? podcasts.database.search(text)) ?? .init()) : .init()
         }
         .enableInjection()
     }
 
-    private var musicResults: some View {
-            List {
-                if !results.artists.isEmpty {
-                    Section("Artists") {
-                        ForEach(results.artists) { artist in
-                            NavigationLink(value: LibraryRoute.artist(id: artist.id, name: artist.name)) {
-                                HStack(spacing: theme.spacing.md) {
-                                    ArtworkView(store.artwork(itemID: artist.id, tag: artist.imageTag, maxPixelWidth: 144))
-                                        .frame(width: theme.artwork.rowThumbnail)
-                                        .clipShape(.circle)
-                                    Text(artist.name).font(theme.typography.body)
-                                }
-                            }
-                            .listRowBackground(Color.clear)
-                        }
+    private var prompt: String {
+        switch podcasts.isEnabled ? scope : .music {
+        case .all: "Music and podcasts"
+        case .music: "Artists, albums, songs"
+        case .podcasts: "Shows and episodes"
+        }
+    }
+
+    /// Music and followed podcasts together, local only. Apple's directory is one tap away.
+    private var allResults: some View {
+        List {
+            musicSections
+            PodcastLocalSections(results: podcastResults)
+            if !trimmedText.isEmpty {
+                Section {
+                    Button { scope = .podcasts } label: {
+                        Label("Search Apple Podcasts for “\(trimmedText)”", glyph: .podcasts)
+                            .labelStyle(.tintedIcon)
+                            .font(theme.typography.body.weight(.semibold))
                     }
-                }
-                if !results.albums.isEmpty {
-                    Section("Albums") {
-                        ForEach(results.albums) { album in
-                            NavigationLink(value: LibraryRoute.album(AlbumRoute(album: album.summary, sourceID: "search-\(album.id)"))) {
-                                TrackRow(
-                                    title: album.title,
-                                    subtitle: album.artistName,
-                                    leading: .artwork(store.artwork(itemID: album.id, tag: album.imageTag, maxPixelWidth: 144))
-                                )
-                            }
-                            .listRowBackground(Color.clear)
-                        }
-                    }
-                }
-                if !results.tracks.isEmpty {
-                    Section("Songs") {
-                        ForEach(Array(results.tracks.enumerated()), id: \.element.id) { index, track in
-                            HStack(spacing: theme.spacing.xs) {
-                                PlayableRow(
-                                    trackID: track.id, index: index,
-                                    tracks: { results.tracks.map(QueuedTrack.init) },
-                                    onTap: { play(track) },
-                                    menu: store.songMenu(for: track, source: "search") { play(track) }
-                                ) {
-                                    TrackRow(
-                                        title: track.title,
-                                        subtitle: "\(track.artistName) · \(track.albumTitle)",
-                                        duration: track.durationMs.map { .milliseconds($0) },
-                                        leading: .artwork(store.artwork(itemID: track.albumID, maxPixelWidth: 144)),
-                                        isPlaying: player.current?.trackID == track.id,
-                                        isDownloaded: downloads.isDownloaded(track.id)
-                                    )
-                                }
-                                GlyphButton("More for \(track.title)", glyph: .more, size: 20) { actionsTrack = track }
-                                    .buttonStyle(.plain)
-                                    .foregroundStyle(theme.palette.accent)
-                            }
-                            .listRowBackground(Color.clear)
-                        }
-                    }
+                    .listRowBackground(Color.clear)
                 }
             }
+        }
+        .listStyle(.plain)
+        .scrollDismissesKeyboard(.immediately)
+        .overlay {
+            if trimmedText.isEmpty {
+                EmptyState("Search Everything", glyph: .search, message: "Find artists, albums, songs, and the podcasts you follow.")
+            }
+        }
+    }
+
+    private var trimmedText: String { text.trimmingCharacters(in: .whitespaces) }
+
+    private var musicResults: some View {
+        List { musicSections }
             .listStyle(.plain)
             .scrollDismissesKeyboard(.immediately)
             .overlay { emptyState }
+    }
+
+    @ViewBuilder private var musicSections: some View {
+            if !results.artists.isEmpty {
+                Section("Artists") {
+                    ForEach(results.artists) { artist in
+                        NavigationLink(value: LibraryRoute.artist(id: artist.id, name: artist.name)) {
+                            HStack(spacing: theme.spacing.md) {
+                                ArtworkView(store.artwork(itemID: artist.id, tag: artist.imageTag, maxPixelWidth: 144))
+                                    .frame(width: theme.artwork.rowThumbnail)
+                                    .clipShape(.circle)
+                                Text(artist.name).font(theme.typography.body)
+                            }
+                        }
+                        .listRowBackground(Color.clear)
+                    }
+                }
+            }
+            if !results.albums.isEmpty {
+                Section("Albums") {
+                    ForEach(results.albums) { album in
+                        NavigationLink(value: LibraryRoute.album(AlbumRoute(album: album.summary, sourceID: "search-\(album.id)"))) {
+                            TrackRow(
+                                title: album.title,
+                                subtitle: album.artistName,
+                                leading: .artwork(store.artwork(itemID: album.id, tag: album.imageTag, maxPixelWidth: 144))
+                            )
+                        }
+                        .listRowBackground(Color.clear)
+                    }
+                }
+            }
+            if !results.tracks.isEmpty {
+                Section("Songs") {
+                    ForEach(Array(results.tracks.enumerated()), id: \.element.id) { index, track in
+                        HStack(spacing: theme.spacing.xs) {
+                            PlayableRow(
+                                trackID: track.id, index: index,
+                                tracks: { results.tracks.map(QueuedTrack.init) },
+                                onTap: { play(track) },
+                                menu: store.songMenu(for: track, source: "search") { play(track) }
+                            ) {
+                                TrackRow(
+                                    title: track.title,
+                                    subtitle: "\(track.artistName) · \(track.albumTitle)",
+                                    duration: track.durationMs.map { .milliseconds($0) },
+                                    leading: .artwork(store.artwork(itemID: track.albumID, maxPixelWidth: 144)),
+                                    isPlaying: player.current?.trackID == track.id,
+                                    isDownloaded: downloads.isDownloaded(track.id)
+                                )
+                            }
+                            GlyphButton("More for \(track.title)", glyph: .more, size: 20) { actionsTrack = track }
+                                .buttonStyle(.plain)
+                                .foregroundStyle(theme.palette.accent)
+                        }
+                        .listRowBackground(Color.clear)
+                    }
+                }
+            }
     }
 
     /// Plays the song within its album (so playback continues through the record, not the

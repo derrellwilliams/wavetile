@@ -2,8 +2,10 @@ import DesignSystem
 import Podcasts
 import SwiftUI
 
-/// Every podcast destination, shared by the Podcasts, Search and Downloaded stacks.
+/// Every podcast destination, shared by the Home, Library, Search and Downloaded stacks.
 enum PodcastRoute: Hashable {
+    /// The Podcasts page in Library.
+    case podcasts
     case show(ShowRoute)
     case episode(id: String)
     case list(EpisodeList)
@@ -81,6 +83,8 @@ private struct PodcastDestination: View {
 
     var body: some View {
         switch route {
+        case .podcasts:
+            PodcastsView()
         case let .show(show):
             ShowDetailView(route: show)
         case let .episode(id):

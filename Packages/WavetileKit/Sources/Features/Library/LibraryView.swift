@@ -7,8 +7,9 @@ struct LibraryView: View {
     @ObserveInjection var inject
     @Environment(\.theme) private var theme
     @Environment(LibraryStore.self) private var store
+    @Environment(PodcastsStore.self) private var podcasts
     @Namespace private var zoom
-    @State private var path: [LibraryRoute] = []
+    @State private var path = NavigationPath()
     @State private var recentlyAdded: [AlbumRecord] = []
 
     var body: some View {
@@ -34,6 +35,16 @@ struct LibraryView: View {
                             .contentShape(.rect)
                         }
                         .buttonStyle(.plain)
+                        Divider().overlay(theme.palette.separator).padding(.leading, 28 + theme.spacing.md)
+                    }
+
+                    // Opt-in from the profile drawer; music-only users never see it.
+                    if podcasts.isEnabled {
+                        NavigationLink(value: PodcastRoute.podcasts) {
+                            LinkRow(title: "Podcasts", glyph: .podcasts)
+                        }
+                        .buttonStyle(.plain)
+                        .transition(.opacity)
                         Divider().overlay(theme.palette.separator).padding(.leading, 28 + theme.spacing.md)
                     }
 
@@ -67,7 +78,13 @@ struct LibraryView: View {
             .markRefreshable { await store.syncNow() }
             .navigationTitle("Library")
             .tabRootChrome()
-            .libraryDestinations(zoom: zoom, path: $path)
+            .libraryDestinations(zoom: zoom) { path.append($0) }
+            .podcastDestinations { path.append($0) }
+            // Turning podcasts off while browsing them returns to the Library root.
+            .onChange(of: podcasts.isEnabled) { _, enabled in
+                if !enabled { path = NavigationPath() }
+            }
+            .animation(theme.motion.smooth, value: podcasts.isEnabled)
             .task {
                 do {
                     for try await albums in store.observe(store.database.albums(sort: .recentlyAdded)) {

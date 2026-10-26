@@ -121,26 +121,29 @@ struct OPMLDocument: Transferable {
     }
 }
 
-/// Which kind of audio a screen shows: the Search and Downloaded filter.
+/// Which kind of audio a screen shows: the Search (All | Music | Podcasts) and Downloaded
+/// (Music | Podcasts) filters.
 enum MediaKind: String, CaseIterable, Hashable {
-    case music, podcasts
+    case all, music, podcasts
 
     var title: String {
         switch self {
+        case .all: "All"
         case .music: "Music"
         case .podcasts: "Podcasts"
         }
     }
 }
 
-/// Music | Podcasts segmented filter, shown only when podcasts are on.
+/// Segmented media filter, shown only when podcasts are on.
 struct MediaFilter: View {
     @Environment(\.theme) private var theme
     @Binding var selection: MediaKind
+    var options: [MediaKind] = [.music, .podcasts]
 
     var body: some View {
         Picker("Show", selection: $selection.animation(theme.motion.snappy)) {
-            ForEach(MediaKind.allCases, id: \.self) { Text($0.title).tag($0) }
+            ForEach(options, id: \.self) { Text($0.title).tag($0) }
         }
         .pickerStyle(.segmented)
         .padding(.horizontal, theme.spacing.screenInset)

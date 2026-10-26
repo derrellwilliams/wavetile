@@ -1,20 +1,33 @@
 import DesignSystem
 import JellyfinKit
+import Podcasts
 import PreviewSupport
 import SwiftUI
 
 struct HomeView: View {
     @ObserveInjection var inject
     @Environment(\.theme) private var theme
+    @Environment(PodcastsStore.self) private var podcasts
     @State var model: HomeModel
     @Namespace private var zoom
-    @Binding var path: [LibraryRoute]
+    @Binding var path: NavigationPath
     @State private var didRefresh = false
+    @State private var continueListening: [EpisodeItem] = []
+    @State private var podcastUpNext: [EpisodeItem] = []
 
     var body: some View {
         NavigationStack(path: $path) {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: theme.spacing.xxl) {
+                    // Order: Continue Listening, Recently Played, Up Next in Podcasts, Most Played,
+                    // Recently Added. Podcast shelves appear only when podcasts are on and have
+                    // something to show.
+                    if podcasts.isEnabled, !continueListening.isEmpty {
+                        PodcastHomeShelf(title: "Continue Listening", items: continueListening)
+                    }
+                    if !hasRecentlyPlayed {
+                        podcastUpNextShelf
+                    }
                     ForEach(model.shelves) { shelf in
                         ShelfSection(shelf.title, items: shelf.albums) { album in
                             AlbumLink(
@@ -24,6 +37,9 @@ struct HomeView: View {
                                     ? { withAnimation(theme.motion.smooth) { model.removeFromRecentlyPlayed(album.id) } }
                                     : nil
                             )
+                        }
+                        if shelf.kind == .recentlyPlayed {
+                            podcastUpNextShelf
                         }
                     }
                 }
@@ -42,7 +58,11 @@ struct HomeView: View {
                 }
             }
             .tabRootChrome()
-            .libraryDestinations(zoom: zoom, path: $path)
+            .libraryDestinations(zoom: zoom) { path.append($0) }
+            .podcastDestinations { path.append($0) }
+            // On the always-present scroll view: a task on a shelf that isn't shown never runs.
+            .task(id: podcasts.isEnabled) { await observePodcasts(podcasts.database.continueListening()) { continueListening = $0 } }
+            .task(id: podcasts.isEnabled) { await observePodcasts(podcasts.database.upNextShelf()) { podcastUpNext = $0 } }
             .markRefreshable { await model.load() }
             .task {
                 // Local shelves are already on screen; refresh from the server once per session.
@@ -51,11 +71,34 @@ struct HomeView: View {
                 await model.load()
                 if DebugFlags.openFirstAlbum, let shelf = model.shelves.first,
                    let album = shelf.albums.dropFirst(DebugFlags.albumIndex).first {
-                    path = [.album(AlbumRoute(album: album, sourceID: "\(shelf.kind.rawValue)-\(album.id)"))]
+                    path = NavigationPath([LibraryRoute.album(AlbumRoute(album: album, sourceID: "\(shelf.kind.rawValue)-\(album.id)"))])
                 }
             }
         }
         .enableInjection()
+    }
+
+    private var hasRecentlyPlayed: Bool {
+        model.shelves.contains { $0.kind == .recentlyPlayed }
+    }
+
+    /// Up Next in Podcasts: after Recently Played, or first among the music shelves without it.
+    @ViewBuilder private var podcastUpNextShelf: some View {
+        if podcasts.isEnabled, !podcastUpNext.isEmpty {
+            PodcastHomeShelf(title: "Up Next in Podcasts", items: podcastUpNext)
+        }
+    }
+
+    private func observePodcasts(_ observation: GRDBObservation<[EpisodeItem]>, update: ([EpisodeItem]) -> Void) async {
+        guard podcasts.isEnabled else {
+            update([])
+            return
+        }
+        do {
+            for try await items in podcasts.observe(observation) {
+                withAnimation(theme.motion.smooth) { update(items) }
+            }
+        } catch { Log.observationFailed(error) }
     }
 
     @ViewBuilder private var overlay: some View {
@@ -77,7 +120,8 @@ struct HomeView: View {
             .init(kind: .recentlyPlayed, albums: Array(Fixtures.albums.prefix(6))),
             .init(kind: .mostPlayed, albums: Fixtures.albums.reversed()),
             .init(kind: .recentlyAdded, albums: Array(Fixtures.albums.suffix(5))),
-        ]), path: .constant([]))
+        ]), path: .constant(NavigationPath()))
         .environment(signedIn.library)
+        .environment(signedIn.podcasts)
     }
 }
