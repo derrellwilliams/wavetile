@@ -1,3 +1,4 @@
+import BackgroundTasks
 import DesignSystem
 import Downloads
 import Foundation
@@ -5,6 +6,7 @@ import JellyfinKit
 import Observation
 import Persistence
 import Playback
+import Podcasts
 import PreviewSupport
 
 /// Root app state: who is signed in, and the selected theme.
@@ -21,6 +23,7 @@ public final class AppModel {
         let library: LibraryStore
         let player: AudioPlayer
         let downloads: DownloadsStore
+        let podcasts: PodcastsStore
     }
 
     public private(set) var phase: Phase = .launching
@@ -67,9 +70,18 @@ public final class AppModel {
         let library = LibraryStore(session: session, token: token, auth: auth, database: database)
         let downloads = DownloadsStore(session: session, library: library)
         let player = AudioPlayer(library: library.api)
-        player.localFile = { [weak downloads] trackID in downloads?.localFile(trackID: trackID) }
+        let podcastDatabase = (try? PodcastDatabase.open(serverID: session.serverID, userID: session.userID)) ?? (try? PodcastDatabase.temporary())
+        guard let podcastDatabase else { throw StorageUnavailable() }
+        let podcasts = PodcastsStore(session: session, library: library.api, player: player, database: podcastDatabase)
+        player.localFile = { [weak downloads, weak podcasts] id in
+            downloads?.localFile(trackID: id) ?? podcasts?.localFile(episodeID: id)
+        }
+        player.resumePosition = { [weak podcasts] track in podcasts?.resumePosition(for: track) }
+        player.onEpisodeProgress = { [weak podcasts] track, position, duration in
+            podcasts?.episodeProgress(track, position: position, duration: duration)
+        }
         library.afterSync = { [weak downloads] in await downloads?.syncPlaylists() }
-        return SignedIn(session: session, library: library, player: player, downloads: downloads)
+        return SignedIn(session: session, library: library, player: player, downloads: downloads, podcasts: podcasts)
     }
 
     public func signOut() async {
@@ -81,6 +93,9 @@ public final class AppModel {
             WidgetBridge.clear()
             // Downloaded music is tied to this account; remove it from the device.
             signedIn.downloads.manager?.deleteEverything()
+            // Podcast progress and downloads belong to this account too.
+            signedIn.podcasts.downloads?.deleteEverything()
+            PodcastDatabase.delete(serverID: signedIn.session.serverID, userID: signedIn.session.userID)
             // The cached library is private to this account; don't leave it on disk.
             LibraryDatabase.delete(serverID: signedIn.session.serverID, userID: signedIn.session.userID)
         }
@@ -97,6 +112,43 @@ public extension AppModel {
     }
 }
 
+// MARK: - Background podcast refresh
+
+public extension AppModel {
+    nonisolated static let podcastRefreshTaskID = "com.derrellwilliams.wavetile.podcast-refresh"
+
+    /// Registers the background refresh handler. Call once at launch, before launching finishes.
+    func registerBackgroundTasks() {
+        Self.registerRefresh { [weak self] in
+            guard let self, case let .signedIn(signedIn) = self.phase else { return true }
+            let ok = await signedIn.podcasts.backgroundRefresh()
+            self.scheduleBackgroundRefresh()
+            return ok
+        }
+    }
+
+    /// Asks iOS to wake the app in about an hour to check followed shows for new episodes.
+    func scheduleBackgroundRefresh() {
+        guard case let .signedIn(signedIn) = phase, signedIn.podcasts.isEnabled else { return }
+        let request = BGAppRefreshTaskRequest(identifier: Self.podcastRefreshTaskID)
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 3600)
+        try? BGTaskScheduler.shared.submit(request)
+    }
+
+    /// The launch handler runs on a background queue, so it's built outside the main actor
+    /// (a main-actor closure there traps at runtime).
+    private nonisolated static func registerRefresh(_ refresh: @escaping @Sendable @MainActor () async -> Bool) {
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: podcastRefreshTaskID, using: nil) { task in
+            nonisolated(unsafe) let task = task
+            let work = Task { @MainActor in
+                let ok = await refresh()
+                task.setTaskCompleted(success: ok && !Task.isCancelled)
+            }
+            task.expirationHandler = { work.cancel() }
+        }
+    }
+}
+
 /// The device couldn't create the library database (usually no free storage).
 struct StorageUnavailable: Error {}
 
@@ -107,7 +159,9 @@ extension AppModel {
         if signedIn {
             let session = Fixtures.session
             let store = LibraryStore(session: session, token: "", auth: model.auth, database: try! LibraryDatabase.temporary())
-            model.phase = .signedIn(.init(session: session, library: store, player: AudioPlayer(library: store.api), downloads: DownloadsStore(session: session, library: store)))
+            let player = AudioPlayer(library: store.api)
+            let podcasts = PodcastsStore(session: session, library: store.api, player: player, database: try! PodcastDatabase.temporary())
+            model.phase = .signedIn(.init(session: session, library: store, player: player, downloads: DownloadsStore(session: session, library: store), podcasts: podcasts))
         } else {
             model.phase = .signedOut
         }

@@ -7,6 +7,7 @@ import SwiftUI
 
 /// Offline full-text search over the synced library. The search field itself is attached here
 /// (scoped to this tab); `.tabViewSearchActivation` on the TabView makes the tab detach.
+/// With podcasts on, a Music | Podcasts filter switches to `PodcastSearchResults`.
 struct SearchView: View {
     @ObserveInjection var inject
     @Environment(\.theme) private var theme
@@ -17,14 +18,51 @@ struct SearchView: View {
     @Environment(DownloadsStore.self) private var downloads
     @Environment(Connectivity.self) private var connectivity
     @Environment(\.openNowPlaying) private var openNowPlaying
+    @Environment(PodcastsStore.self) private var podcasts
     @Binding var text: String
+    @Binding var scope: MediaKind
     @State private var results = LibraryDatabase.SearchResults()
-    @State private var path: [LibraryRoute] = []
+    @State private var path = NavigationPath()
     /// The song whose ⋯ actions sheet is showing.
     @State private var actionsTrack: TrackRecord?
 
     var body: some View {
         NavigationStack(path: $path) {
+            Group {
+                if podcasts.isEnabled && scope == .podcasts {
+                    PodcastSearchResults(text: text)
+                } else {
+                    musicResults
+                }
+            }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if podcasts.isEnabled { MediaFilter(selection: $scope) }
+            }
+            .themedBackground()
+            .navigationTitle("Search")
+            .tabRootChrome()
+            .libraryDestinations(zoom: zoom) { path.append($0) }
+            .podcastDestinations { path.append($0) }
+            .sheet(item: $actionsTrack, onDismiss: actions.presentPending) { track in
+                SongActionsSheet(
+                    track: track,
+                    artwork: store.artwork(itemID: track.albumID, maxPixelWidth: 144),
+                    menu: store.songMenu(for: track, source: "search") { play(track) }
+                )
+            }
+        }
+        // Scoped to this tab's stack so the field doesn't leak into other tabs' navigation bars.
+        .searchable(text: $text, prompt: podcasts.isEnabled && scope == .podcasts ? "Shows and episodes" : "Artists, albums, songs")
+        .task(id: text) {
+            // Debounce typing; FTS queries are fast but there's no need to run one per keystroke.
+            try? await Task.sleep(for: .milliseconds(150))
+            guard !Task.isCancelled else { return }
+            results = (try? store.database.search(text)) ?? .init()
+        }
+        .enableInjection()
+    }
+
+    private var musicResults: some View {
             List {
                 if !results.artists.isEmpty {
                     Section("Artists") {
@@ -86,27 +124,6 @@ struct SearchView: View {
             .listStyle(.plain)
             .scrollDismissesKeyboard(.immediately)
             .overlay { emptyState }
-            .themedBackground()
-            .navigationTitle("Search")
-            .tabRootChrome()
-            .libraryDestinations(zoom: zoom, path: $path)
-            .sheet(item: $actionsTrack, onDismiss: actions.presentPending) { track in
-                SongActionsSheet(
-                    track: track,
-                    artwork: store.artwork(itemID: track.albumID, maxPixelWidth: 144),
-                    menu: store.songMenu(for: track, source: "search") { play(track) }
-                )
-            }
-        }
-        // Scoped to this tab's stack so the field doesn't leak into other tabs' navigation bars.
-        .searchable(text: $text, prompt: "Artists, albums, songs")
-        .task(id: text) {
-            // Debounce typing; FTS queries are fast but there's no need to run one per keystroke.
-            try? await Task.sleep(for: .milliseconds(150))
-            guard !Task.isCancelled else { return }
-            results = (try? store.database.search(text)) ?? .init()
-        }
-        .enableInjection()
     }
 
     /// Plays the song within its album (so playback continues through the record, not the

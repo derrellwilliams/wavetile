@@ -1,9 +1,13 @@
+import Nuke
 import NukeUI
 import SwiftUI
 
 /// Where artwork comes from. `.placeholder` gives previews deterministic, network-free art.
 public enum ArtworkSource: Hashable, Sendable {
     case url(URL?)
+    /// Art from a third party that serves one big image (podcast feeds often use 3000px).
+    /// It's downsampled to `maxPixelWidth` on decode so lists don't hold full-size bitmaps.
+    case unsized(URL?, maxPixelWidth: Int)
     case placeholder(seed: Int)
 
     /// Builds a sized request URL for the rendered point size × screen scale.
@@ -30,6 +34,16 @@ public struct ArtworkView: View {
                 switch source {
                 case let .url(url):
                     LazyImage(url: url, transaction: Transaction(animation: theme.motion.snappy)) { state in
+                        if let image = state.image {
+                            image.resizable().scaledToFill()
+                        } else {
+                            placeholder(seed: url?.hashValue ?? 0)
+                        }
+                    }
+                case let .unsized(url, maxPixelWidth):
+                    let size = CGSize(width: maxPixelWidth, height: maxPixelWidth)
+                    let request = url.map { ImageRequest(url: $0, processors: [.resize(size: size, unit: .pixels, contentMode: .aspectFill, crop: true)]) }
+                    LazyImage(request: request, transaction: Transaction(animation: theme.motion.snappy)) { state in
                         if let image = state.image {
                             image.resizable().scaledToFill()
                         } else {

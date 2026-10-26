@@ -9,6 +9,8 @@ public struct MiniPlayerBar: View {
     private let subtitle: String
     private let artwork: ArtworkSource
     private let isPlaying: Bool
+    private let nextGlyph: Glyph
+    private let nextTitle: String
     private let onPlayPause: () -> Void
     private let onNext: () -> Void
     /// Haptics follow the tap, not `isPlaying`, which also changes on interruptions and remote commands.
@@ -19,6 +21,8 @@ public struct MiniPlayerBar: View {
         subtitle: String,
         artwork: ArtworkSource,
         isPlaying: Bool,
+        nextGlyph: Glyph = .next,
+        nextTitle: String = "Next",
         onPlayPause: @escaping () -> Void,
         onNext: @escaping () -> Void
     ) {
@@ -26,6 +30,8 @@ public struct MiniPlayerBar: View {
         self.subtitle = subtitle
         self.artwork = artwork
         self.isPlaying = isPlaying
+        self.nextGlyph = nextGlyph
+        self.nextTitle = nextTitle
         self.onPlayPause = onPlayPause
         self.onNext = onNext
     }
@@ -56,7 +62,7 @@ public struct MiniPlayerBar: View {
                 .frame(minWidth: 44, minHeight: 44)
                 .contentShape(.rect)
             if placement != .inline {
-                Button("Next", glyph: .next, action: onNext)
+                Button(nextTitle, glyph: nextGlyph, action: onNext)
                     .frame(minWidth: 44, minHeight: 44)
                     .contentShape(.rect)
             }

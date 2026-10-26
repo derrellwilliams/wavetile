@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE rss [ <!ENTITY xxe SYSTEM "file:///etc/hosts"> ]>
+<rss version="2.0">
+  <channel>
+    <title>Evil &xxe;</title>
+    <item>
+      <title>&xxe;</title>
+      <guid>x</guid>
+      <enclosure url="https://example.com/x.mp3" type="audio/mpeg"/>
+    </item>
+  </channel>
+</rss>

@@ -1,6 +1,21 @@
 import Foundation
 
+/// Where a podcast episode's audio and art live. Podcast hosts are third parties: these URLs
+/// are fetched without the Jellyfin token.
+public struct PodcastMedia: Hashable, Sendable {
+    public var audioURL: URL
+    public var artworkURL: URL?
+
+    public init(audioURL: URL, artworkURL: URL?) {
+        self.audioURL = audioURL
+        self.artworkURL = artworkURL
+    }
+}
+
 /// A track in the play queue. `queueID` is unique per entry, so the same song can be queued twice.
+///
+/// Podcast episodes use the same type: `trackID` is the episode ID, `artist` the show's author,
+/// `albumTitle` the show, and `podcast` says where to stream from.
 public struct QueuedTrack: Identifiable, Hashable, Sendable {
     public let queueID: UUID
     public let trackID: String
@@ -10,12 +25,14 @@ public struct QueuedTrack: Identifiable, Hashable, Sendable {
     public var albumID: String?
     public var albumImageTag: String?
     public var duration: Duration?
+    public var podcast: PodcastMedia?
 
     public var id: UUID { queueID }
+    public var isEpisode: Bool { podcast != nil }
 
     public init(
         trackID: String, title: String, artist: String, albumTitle: String,
-        albumID: String?, albumImageTag: String? = nil, duration: Duration?
+        albumID: String?, albumImageTag: String? = nil, duration: Duration?, podcast: PodcastMedia? = nil
     ) {
         self.queueID = UUID()
         self.trackID = trackID
@@ -25,12 +42,13 @@ public struct QueuedTrack: Identifiable, Hashable, Sendable {
         self.albumID = albumID
         self.albumImageTag = albumImageTag
         self.duration = duration
+        self.podcast = podcast
     }
 
     /// Same song, new queue entry.
     public func requeued() -> QueuedTrack {
         QueuedTrack(trackID: trackID, title: title, artist: artist, albumTitle: albumTitle,
-                    albumID: albumID, albumImageTag: albumImageTag, duration: duration)
+                    albumID: albumID, albumImageTag: albumImageTag, duration: duration, podcast: podcast)
     }
 }
 

@@ -43,8 +43,12 @@ extension View {
     /// `zoom` is shared with pushed screens so any album tile can zoom into its page; `path` is
     /// the stack's path, so menus anywhere in the stack can push via `pushLibraryRoute`.
     func libraryDestinations(zoom: Namespace.ID, path: Binding<[LibraryRoute]>) -> some View {
-        let push: (LibraryRoute) -> Void = { path.wrappedValue.append($0) }
-        return environment(\.libraryZoom, zoom)
+        libraryDestinations(zoom: zoom) { path.wrappedValue.append($0) }
+    }
+
+    /// For stacks with a `NavigationPath` (Search and Downloaded also hold podcast routes).
+    func libraryDestinations(zoom: Namespace.ID, push: @escaping (LibraryRoute) -> Void) -> some View {
+        environment(\.libraryZoom, zoom)
             .environment(\.pushLibraryRoute, push)
             .navigationDestination(for: LibraryRoute.self) { route in
                 LibraryDestination(route: route, zoom: zoom)

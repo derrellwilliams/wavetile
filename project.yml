@@ -67,8 +67,10 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         # Security: allow plain HTTP only to LAN hosts (typical home Jellyfin).
         # Internet traffic must be HTTPS so the access token is never sent in cleartext.
-        # Keep playing when the app is backgrounded or the screen is locked.
-        UIBackgroundModes: [audio]
+        # Keep playing when the app is backgrounded or the screen is locked; fetch lets iOS
+        # wake the app to check followed podcasts for new episodes.
+        UIBackgroundModes: [audio, fetch]
+        BGTaskSchedulerPermittedIdentifiers: [com.derrellwilliams.wavetile.podcast-refresh]
         # Static launch screen: the mark at rest, handed off to the animated splash in RootView.
         UILaunchScreen:
           UIColorName: LaunchBackground
@@ -84,6 +86,10 @@ targets:
         NSLocalNetworkUsageDescription: Wavetile connects to Jellyfin servers on your home network.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+          # Podcast audio only: some publishers still serve episodes over plain HTTP. This
+          # exception covers AVFoundation media alone; feeds, search, downloads and the Jellyfin
+          # connection (which carries the token) still require HTTPS off the LAN.
+          NSAllowsArbitraryLoadsInMedia: true
 
   WavetileWidgets:
     type: app-extension

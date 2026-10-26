@@ -18,6 +18,8 @@ ICONS=(
   repeat repeat-once queue caret-down speaker-hifi dots-three list-plus arrow-bend-down-right
   check-circle cloud-slash trash download-simple
   heart heart:fill squares-four plus pencil-simple user
+  microphone arrow-counter-clockwise arrow-clockwise moon list-bullets bookmark-simple bookmark-simple:fill
+  rss upload-simple gauge export trend-up clock-counter-clockwise eye-slash
 )
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

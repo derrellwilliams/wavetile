@@ -1,9 +1,12 @@
 import AVKit
 import DesignSystem
 import Playback
+import Podcasts
 import SwiftUI
 
 /// Full player. Presented as a sheet so swipe-down dismisses it, zooming out of the mini player.
+/// Episodes swap the music controls for podcast ones: skip back/forward, speed, sleep timer
+/// and chapters.
 struct NowPlayingView: View {
     @ObserveInjection var inject
     @Environment(\.theme) private var theme
@@ -12,8 +15,13 @@ struct NowPlayingView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(AudioPlayer.self) private var player
     @Environment(LibraryStore.self) private var store
+    @Environment(PodcastsStore.self) private var podcasts
     @State private var showQueue = false
+    @State private var showChapters = false
     @State private var playPausePresses = 0
+    @State private var chapters: [Chapter] = []
+
+    private var isEpisode: Bool { player.current?.isEpisode == true }
 
     var body: some View {
         // Fixed, full-screen layout when it fits; scrolls when large text makes it taller than
@@ -31,7 +39,24 @@ struct NowPlayingView: View {
                 .presentationDetents([.medium, .large])
                 .presentationBackground(theme.palette.background)
         }
+        .sheet(isPresented: $showChapters) {
+            ChaptersSheet(chapters: chapters)
+                .presentationDetents([.medium, .large])
+                .presentationBackground(theme.palette.background)
+        }
+        .task(id: player.current?.trackID) { await loadChapters() }
         .enableInjection()
+    }
+
+    private func loadChapters() async {
+        chapters = []
+        guard let track = player.current, let media = track.podcast,
+              let item = try? podcasts.database.episodeNow(id: track.trackID)
+        else { return }
+        let audio = podcasts.localFile(episodeID: track.trackID) ?? media.audioURL
+        let loaded = await ChapterLoader.load(chaptersURL: item.episode.chaptersURL, audioURL: audio)
+        guard !Task.isCancelled else { return }
+        chapters = loaded
     }
 
     private func content(scrolling: Bool) -> some View {
@@ -49,9 +74,16 @@ struct NowPlayingView: View {
                     Text(player.current?.title ?? "")
                         .font(theme.typography.nowPlayingTitle)
                         .foregroundStyle(theme.palette.textPrimary)
-                    Text(player.current?.artist ?? "")
+                    Text((isEpisode ? player.current?.albumTitle : player.current?.artist) ?? "")
                         .font(theme.typography.nowPlayingSubtitle)
                         .foregroundStyle(theme.palette.textPrimary)
+                    if let chapter = currentChapter {
+                        Text(chapter.title)
+                            .font(theme.typography.caption.weight(.semibold))
+                            .foregroundStyle(theme.palette.textSecondary)
+                            .contentTransition(.opacity)
+                            .animation(theme.motion.smooth, value: chapter)
+                    }
                     if let error = player.errorMessage {
                         Label(error, glyph: .warning)
                             .font(theme.typography.caption)
@@ -63,8 +95,12 @@ struct NowPlayingView: View {
                 .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                if let trackID = player.current?.trackID {
-                    FavoriteButton(itemID: trackID, size: 28)
+                if let track = player.current {
+                    if track.isEpisode {
+                        SaveEpisodeButton(episodeID: track.trackID)
+                    } else {
+                        FavoriteButton(itemID: track.trackID, size: 28)
+                    }
                 }
             }
             .contentTransition(.opacity)
@@ -107,21 +143,30 @@ struct NowPlayingView: View {
     }
 
     private var artwork: some View {
-        ArtworkView(store.artwork(itemID: player.current?.albumID, tag: player.current?.albumImageTag, maxPixelWidth: 1200))
+        ArtworkView(store.artwork(for: player.current, maxPixelWidth: 1200))
             // Fixed radius: only the shadow's opacity animates (radius changes re-render a big blur every frame).
             .shadow(color: .black.opacity(player.isPlaying ? 0.5 : 0.2), radius: 24, y: 12)
             // Apple Music–style "breathing": artwork recedes when paused.
             .scaleEffect(player.isPlaying || reduceMotion ? 1 : 0.86)
             // State change, not a flick: critically damped, no overshoot.
             .animation(theme.motion.smooth, value: player.isPlaying)
-            .id(player.current?.albumID)
+            .id(player.current?.podcast?.artworkURL?.absoluteString ?? player.current?.albumID)
             .transition(.opacity)
+    }
+
+    /// The chapter playing now, if the episode has chapters.
+    private var currentChapter: Chapter? {
+        chapters.last { $0.start <= player.currentTime + 0.5 }
     }
 
     private var transport: some View {
         HStack {
             Spacer()
-            GlyphButton("Previous", glyph: .previous, size: 34) { player.previous() }
+            if isEpisode {
+                SkipButton(seconds: player.skipBackInterval, forward: false) { player.skip(by: -player.skipBackInterval) }
+            } else {
+                GlyphButton("Previous", glyph: .previous, size: 34) { player.previous() }
+            }
             Spacer()
             GlyphButton(player.isPlaying ? "Pause" : "Play", glyph: player.isPlaying ? .pause : .play, size: 60) {
                 playPausePresses += 1
@@ -132,7 +177,11 @@ struct NowPlayingView: View {
                 if player.isBuffering { ProgressView().offset(y: 28) }
             }
             Spacer()
-            GlyphButton("Next", glyph: .next, size: 34) { player.next() }
+            if isEpisode {
+                SkipButton(seconds: player.skipForwardInterval, forward: true) { player.skip(by: player.skipForwardInterval) }
+            } else {
+                GlyphButton("Next", glyph: .next, size: 34) { player.next() }
+            }
             Spacer()
         }
         .buttonStyle(.pressable)
@@ -141,7 +190,43 @@ struct NowPlayingView: View {
         .sensoryFeedback(.impact(weight: .medium), trigger: playPausePresses)
     }
 
-    private var secondaryControls: some View {
+    @ViewBuilder private var secondaryControls: some View {
+        if isEpisode { podcastControls } else { musicControls }
+    }
+
+    private var podcastControls: some View {
+        HStack {
+            Menu {
+                Picker("Playback Speed", selection: Binding(get: { player.podcastRate }, set: { podcasts.setRate($0) })) {
+                    ForEach(AudioPlayer.podcastRates, id: \.self) { rate in
+                        Text("\(Double(rate).formatted())×").tag(rate)
+                    }
+                }
+            } label: {
+                Text("\(Double(player.podcastRate).formatted())×")
+                    .font(theme.typography.itemTitle.monospacedDigit())
+                    .foregroundStyle(player.podcastRate == 1 ? theme.palette.textSecondary : theme.palette.accent)
+                    .frame(minWidth: 44, minHeight: 44)
+            }
+            .accessibilityLabel("Playback Speed")
+            .accessibilityValue("\(Double(player.podcastRate).formatted()) times")
+            Spacer()
+            SleepTimerMenu()
+            Spacer()
+            AirPlayButton()
+            Spacer()
+            Button("Chapters", glyph: .chapters) { showChapters = true }
+                .foregroundStyle(chapters.isEmpty ? theme.palette.textSecondary.opacity(0.4) : theme.palette.accent)
+                .disabled(chapters.isEmpty)
+                .frame(minWidth: 44, minHeight: 44)
+        }
+        .labelStyle(.iconOnly)
+        .buttonStyle(.plain)
+        .frame(height: 44)
+        .sensoryFeedback(.selection, trigger: player.podcastRate)
+    }
+
+    private var musicControls: some View {
         HStack {
             Button("Shuffle", glyph: .shuffle) { player.toggleShuffle() }
                 .foregroundStyle(player.queue.isShuffled ? theme.palette.accent : theme.palette.textSecondary)
@@ -249,6 +334,131 @@ struct AirPlayButton: View {
         func updateUIView(_ uiView: AVRoutePickerView, context: Context) {
             uiView.tintColor = tint
             uiView.activeTintColor = tint
+        }
+    }
+}
+
+/// Skip back/forward with the interval in the glyph, like Podcasts.
+struct SkipButton: View {
+    @Environment(\.theme) private var theme
+    let seconds: Double
+    let forward: Bool
+    let action: () -> Void
+    @State private var taps = 0
+
+    var body: some View {
+        Button {
+            taps += 1
+            action()
+        } label: {
+            ZStack {
+                (forward ? Glyph.skipForward : Glyph.skipBack).image
+                    .resizable()
+                    .frame(width: 40, height: 40)
+                Text("\(Int(seconds))")
+                    .font(.system(size: 11, weight: .bold).monospacedDigit())
+                    .offset(y: 1)
+            }
+            .frame(width: 60, height: 60)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.pressable)
+        .accessibilityLabel(forward ? "Skip Forward \(Int(seconds)) Seconds" : "Skip Back \(Int(seconds)) Seconds")
+        .sensoryFeedback(.impact(weight: .light), trigger: taps)
+    }
+}
+
+/// Sleep timer: minutes or the end of the episode. The moon fills with the accent when set.
+struct SleepTimerMenu: View {
+    @Environment(\.theme) private var theme
+    @Environment(AudioPlayer.self) private var player
+
+    var body: some View {
+        Menu {
+            Button("End of Episode") { player.setSleepTimer(.endOfEpisode) }
+            ForEach([5, 15, 30, 45, 60], id: \.self) { minutes in
+                Button("\(minutes) Minutes") { player.setSleepTimer(.at(.now + Double(minutes) * 60)) }
+            }
+            if player.sleepTimer != nil {
+                Divider()
+                Button("Turn Off Timer", role: .destructive) { player.setSleepTimer(nil) }
+            }
+        } label: {
+            HStack(spacing: theme.spacing.xxs) {
+                Glyph.sleepTimer.image
+                if case let .at(date) = player.sleepTimer {
+                    Text(timerInterval: Date.now ... max(date, .now), countsDown: true)
+                        .font(theme.typography.caption.monospacedDigit())
+                        .frame(maxWidth: 48)
+                }
+            }
+            .foregroundStyle(player.sleepTimer == nil ? theme.palette.textSecondary : theme.palette.accent)
+            .frame(minWidth: 44, minHeight: 44)
+        }
+        .accessibilityLabel("Sleep Timer")
+        .accessibilityValue(player.sleepTimer == nil ? "Off" : "On")
+        .sensoryFeedback(.selection, trigger: player.sleepTimer)
+    }
+}
+
+/// Bookmark toggle for the playing episode.
+struct SaveEpisodeButton: View {
+    @Environment(PodcastsStore.self) private var podcasts
+    let episodeID: String
+    @State private var isSaved = false
+
+    var body: some View {
+        GlyphButton(isSaved ? "Unsave Episode" : "Save Episode", glyph: isSaved ? .saved : .save, size: 28) {
+            isSaved.toggle()
+            podcasts.setSaved(episodeID, isSaved)
+        }
+        .sensoryFeedback(.selection, trigger: isSaved)
+        .task(id: episodeID) {
+            do {
+                for try await item in podcasts.observe(podcasts.database.episode(id: episodeID)) {
+                    isSaved = item?.episode.isSaved ?? false
+                }
+            } catch { Log.observationFailed(error) }
+        }
+    }
+}
+
+/// The playing episode's chapters; tapping one jumps there.
+struct ChaptersSheet: View {
+    @Environment(\.theme) private var theme
+    @Environment(\.dismiss) private var dismiss
+    @Environment(AudioPlayer.self) private var player
+    let chapters: [Chapter]
+
+    var body: some View {
+        NavigationStack {
+            List(chapters) { chapter in
+                let isCurrent = chapters.last { $0.start <= player.currentTime + 0.5 } == chapter
+                Button {
+                    player.seek(to: chapter.start)
+                    if !player.isPlaying { player.resume() }
+                    dismiss()
+                } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: theme.spacing.md) {
+                        Text(Duration.seconds(chapter.start), format: .time(pattern: chapter.start >= 3600 ? .hourMinuteSecond : .minuteSecond))
+                            .font(theme.typography.caption.monospacedDigit())
+                            .foregroundStyle(theme.palette.textSecondary)
+                            .frame(minWidth: 52, alignment: .leading)
+                        Text(chapter.title)
+                            .font(isCurrent ? theme.typography.body.weight(.semibold) : theme.typography.body)
+                            .foregroundStyle(isCurrent ? theme.palette.accent : theme.palette.textPrimary)
+                        Spacer(minLength: 0)
+                    }
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .listRowBackground(Color.clear)
+                .accessibilityAddTraits(isCurrent ? .isSelected : [])
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .navigationTitle("Chapters")
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 }

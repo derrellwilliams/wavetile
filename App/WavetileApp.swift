@@ -6,18 +6,23 @@ import UIKit
 struct WavetileApp: App {
     @UIApplicationDelegateAdaptor private var delegate: AppDelegate
     @State private var app: AppModel
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         // Restore at launch (not on first frame): when iOS relaunches the app in the background
         // to finish downloads, the download session must exist even though no UI is shown.
         let model = AppModel(deviceName: UIDevice.current.name)
         model.restore()
+        model.registerBackgroundTasks()
         _app = State(initialValue: model)
     }
 
     var body: some Scene {
         WindowGroup {
             RootView(app: app)
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background { app.scheduleBackgroundRefresh() }
         }
     }
 }

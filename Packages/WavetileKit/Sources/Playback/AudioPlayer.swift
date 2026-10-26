@@ -7,6 +7,10 @@ import UIKit
 /// The app's audio engine. Owns an `AVQueuePlayer`, a `PlaybackQueue`, Lock Screen /
 /// Control Center integration, and Jellyfin session reporting.
 ///
+/// Podcast episodes play through the same engine: they stream from the publisher without the
+/// Jellyfin token, resume where they left off, honor `podcastRate`, and report progress through
+/// `onEpisodeProgress` instead of to Jellyfin.
+///
 /// Gapless: the next track is always enqueued behind the current one, so AVFoundation
 /// starts it without a gap. Main-actor isolated; AVFoundation does its I/O and decoding on
 /// its own threads, so nothing heavy happens here.
@@ -22,6 +26,34 @@ public final class AudioPlayer {
     public private(set) var errorMessage: String?
 
     public var current: QueuedTrack? { queue.current }
+
+    /// Speed for podcast episodes. Music always plays at 1×.
+    public var podcastRate: Float = 1 {
+        didSet { applyRate() }
+    }
+    /// Seconds jumped by the skip buttons (episodes) and the Lock Screen skip commands.
+    public var skipBackInterval: Double = 15 {
+        didSet { configureSkipIntervals() }
+    }
+    public var skipForwardInterval: Double = 30 {
+        didSet { configureSkipIntervals() }
+    }
+
+    public enum SleepTimer: Equatable, Sendable {
+        case at(Date)
+        case endOfEpisode
+    }
+
+    /// Pauses playback at a time, or when the current item finishes.
+    public private(set) var sleepTimer: SleepTimer?
+
+    /// The rate the current item plays at when playing.
+    public var effectiveRate: Float { current?.isEpisode == true ? podcastRate : 1 }
+
+    /// Saved position for an episode (seconds); playback starts there.
+    @ObservationIgnored public var resumePosition: ((QueuedTrack) -> Double?)?
+    /// Episode progress, every few seconds while playing and whenever it stops (position, duration).
+    @ObservationIgnored public var onEpisodeProgress: ((QueuedTrack, Double, Double) -> Void)?
 
     /// Returns a downloaded file for a track ID; when set, local files play instead of streams.
     @ObservationIgnored public var localFile: ((String) -> URL?)?
@@ -39,6 +71,7 @@ public final class AudioPlayer {
     @ObservationIgnored private var lastProgressReport = Date.distantPast
     @ObservationIgnored private var artworkTask: Task<Void, Never>?
     @ObservationIgnored private var isSeeking = false
+    @ObservationIgnored private var sleepTask: Task<Void, Never>?
 
     private struct Entry {
         let track: QueuedTrack
@@ -99,6 +132,26 @@ public final class AudioPlayer {
         }
     }
 
+    /// Jumps forward (positive) or back (negative) within the current item.
+    public func skip(by seconds: Double) {
+        let end = duration > 0 ? duration - 1 : .greatestFiniteMagnitude
+        seek(to: min(max(0, currentTime + seconds), end))
+    }
+
+    public func setSleepTimer(_ timer: SleepTimer?) {
+        sleepTask?.cancel()
+        sleepTask = nil
+        sleepTimer = timer
+        updateActionAtItemEnd()
+        guard case let .at(date) = timer else { return }
+        sleepTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(max(0, date.timeIntervalSinceNow)))
+            guard !Task.isCancelled, let self else { return }
+            self.sleepTimer = nil
+            self.pause()
+        }
+    }
+
     public func seek(to seconds: Double) {
         let target = CMTime(seconds: max(0, seconds), preferredTimescale: 600)
         isSeeking = true
@@ -147,14 +200,20 @@ public final class AudioPlayer {
 
     public func cycleRepeat() {
         queue.cycleRepeat()
-        // Repeat-one replays in place; otherwise let the queue player advance by itself.
-        player.actionAtItemEnd = queue.repeatMode == .one ? .pause : .advance
+        updateActionAtItemEnd()
         enqueueNext()
+    }
+
+    /// Repeat-one replays in place and the end-of-episode sleep timer stops there; otherwise the
+    /// queue player advances by itself.
+    private func updateActionAtItemEnd() {
+        player.actionAtItemEnd = queue.repeatMode == .one || sleepTimer == .endOfEpisode ? .pause : .advance
     }
 
     /// Stops playback and clears the queue (sign out).
     public func stop() {
         reportStopped()
+        setSleepTimer(nil)
         player.pause()
         forgetAllItems()
         queue = PlaybackQueue()
@@ -177,11 +236,25 @@ public final class AudioPlayer {
         player.insert(item, after: nil)
         duration = track.duration.map { Double($0.components.seconds) } ?? 0
         enqueueNext()
+        applyRate()
+        seekToResumePosition(track)
         if isPlaying {
             activateSession()
             player.play()
         }
         didStart(track)
+    }
+
+    /// Episodes pick up where the listener left off (positions under 5 s start from the top).
+    private func seekToResumePosition(_ track: QueuedTrack) {
+        guard track.isEpisode, let position = resumePosition?(track), position > 5 else { return }
+        isSeeking = true
+        currentTime = position
+        // A second of tolerance: exact seeks in long MP3s can scan the whole file.
+        let tolerance = CMTime(seconds: 1, preferredTimescale: 600)
+        player.seek(to: CMTime(seconds: position, preferredTimescale: 600), toleranceBefore: tolerance, toleranceAfter: tolerance) { [weak self] _ in
+            Task { @MainActor in self?.isSeeking = false }
+        }
     }
 
     /// Ensures exactly one preloaded item (the automatic next track) follows the current item.
@@ -206,7 +279,18 @@ public final class AudioPlayer {
     private func makeItem(for track: QueuedTrack) -> AVPlayerItem? {
         if let file = localFile?(track.trackID) {
             let item = AVPlayerItem(url: file)
+            if track.isEpisode { item.audioTimePitchAlgorithm = .timeDomain }
             entries[ObjectIdentifier(item)] = Entry(track: track, playSessionID: UUID().uuidString)
+            observeStatus(of: item)
+            return item
+        }
+        if let podcast = track.podcast {
+            // Security: a plain asset with no headers. The Jellyfin token must never reach a podcast host.
+            let item = AVPlayerItem(asset: AVURLAsset(url: podcast.audioURL))
+            // Speech-friendly time stretching for 1.5×, 2× and so on.
+            item.audioTimePitchAlgorithm = .timeDomain
+            item.preferredForwardBufferDuration = 60
+            entries[ObjectIdentifier(item)] = Entry(track: track, playSessionID: "")
             observeStatus(of: item)
             return item
         }
@@ -240,16 +324,28 @@ public final class AudioPlayer {
         duration = entry.track.duration.map { Double($0.components.seconds) } ?? 0
         currentTime = 0
         enqueueNext()
+        applyRate()
+        seekToResumePosition(entry.track)
         didStart(entry.track)
     }
 
     private func didStart(_ track: QueuedTrack) {
         lastProgressReport = Date()
         activeEntry = currentEntry
-        if let entry = activeEntry {
+        if let entry = activeEntry, !track.isEpisode {
             Task { await library.reportStart(trackID: track.trackID, playSessionID: entry.playSessionID, positionSeconds: 0, isPaused: !isPlaying) }
         }
+        enableCommands(forEpisode: track.isEpisode)
         updateNowPlayingMetadata(track)
+    }
+
+    /// Applies the current item's rate. `defaultRate` makes `play()` (and AirPods/Lock Screen
+    /// play) resume at that speed.
+    private func applyRate() {
+        let rate = effectiveRate
+        player.defaultRate = rate
+        if isPlaying, player.rate != 0, player.rate != rate { player.rate = rate }
+        updateNowPlayingPlayback()
     }
 
     private var currentEntry: Entry? {
@@ -280,19 +376,42 @@ public final class AudioPlayer {
             Task { @MainActor in self?.isBuffering = waiting }
         })
 
-        // Repeat-one: the item pauses at its end (actionAtItemEnd = .pause); restart it as a new play.
         notificationTokens.append(NotificationCenter.default.addObserver(
             forName: AVPlayerItem.didPlayToEndTimeNotification, object: nil, queue: .main
         ) { [weak self] note in
             let item = note.object as? AVPlayerItem
             MainActor.assumeIsolated {
-                guard let self, self.queue.repeatMode == .one, item === self.player.currentItem, let track = self.queue.current else { return }
-                self.reportStopped()
-                self.player.seek(to: .zero)
-                self.player.play()
-                self.didStart(track)
+                guard let self, let item else { return }
+                self.itemDidPlayToEnd(item)
             }
         })
+    }
+
+    private func itemDidPlayToEnd(_ item: AVPlayerItem) {
+        // A finished episode is played all the way through, whatever the last clock tick said.
+        if let entry = entries[ObjectIdentifier(item)], entry.track.isEpisode {
+            let length = item.duration.seconds.isFinite ? item.duration.seconds : duration
+            onEpisodeProgress?(entry.track, length, length)
+        }
+        guard item === player.currentItem else { return }
+        // End-of-episode sleep timer: the item paused at its end (actionAtItemEnd = .pause).
+        // Stop, and cue up the next item without playing it.
+        if sleepTimer == .endOfEpisode {
+            reportStopped()
+            sleepTimer = nil
+            isPlaying = false
+            updateActionAtItemEnd()
+            _ = queue.skipForward()
+            loadCurrent()
+            updateNowPlayingPlayback()
+            return
+        }
+        // Repeat-one: the item pauses at its end (actionAtItemEnd = .pause); restart it as a new play.
+        guard queue.repeatMode == .one, let track = queue.current else { return }
+        reportStopped()
+        player.seek(to: .zero)
+        player.play()
+        didStart(track)
     }
 
     private func observeStatus(of item: AVPlayerItem) {
@@ -301,7 +420,8 @@ public final class AudioPlayer {
             let message = item.error?.localizedDescription
             Task { @MainActor in
                 guard let self, item === self.player.currentItem else { return }
-                self.errorMessage = message ?? "This track couldn't be played."
+                let fallback = self.queue.current?.isEpisode == true ? "This episode couldn't be played." : "This track couldn't be played."
+                self.errorMessage = message ?? fallback
                 // Skip unplayable tracks rather than stalling the queue.
                 if self.queue.skipForward() { self.loadCurrent() } else { self.pause() }
             }
@@ -380,6 +500,49 @@ public final class AudioPlayer {
             MainActor.assumeIsolated { self?.seek(to: position) }
             return .success
         }
+        commands.skipBackwardCommand.addTarget { [weak self] event in
+            let interval = (event as? MPSkipIntervalCommandEvent)?.interval
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.skip(by: -(interval ?? self.skipBackInterval))
+            }
+            return .success
+        }
+        commands.skipForwardCommand.addTarget { [weak self] event in
+            let interval = (event as? MPSkipIntervalCommandEvent)?.interval
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.skip(by: interval ?? self.skipForwardInterval)
+            }
+            return .success
+        }
+        commands.changePlaybackRateCommand.supportedPlaybackRates = Self.podcastRates.map { NSNumber(value: $0) }
+        commands.changePlaybackRateCommand.addTarget { [weak self] event in
+            guard let rate = (event as? MPChangePlaybackRateCommandEvent)?.playbackRate else { return .commandFailed }
+            MainActor.assumeIsolated { self?.podcastRate = rate }
+            return .success
+        }
+        configureSkipIntervals()
+        enableCommands(forEpisode: false)
+    }
+
+    /// Speeds offered for podcasts (the player's speed menu and the Lock Screen).
+    public static let podcastRates: [Float] = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3]
+
+    private func configureSkipIntervals() {
+        let commands = MPRemoteCommandCenter.shared()
+        commands.skipBackwardCommand.preferredIntervals = [NSNumber(value: skipBackInterval)]
+        commands.skipForwardCommand.preferredIntervals = [NSNumber(value: skipForwardInterval)]
+    }
+
+    /// Lock Screen shows skip-back/skip-forward for episodes (like Podcasts) and previous/next for music.
+    private func enableCommands(forEpisode isEpisode: Bool) {
+        let commands = MPRemoteCommandCenter.shared()
+        commands.skipBackwardCommand.isEnabled = isEpisode
+        commands.skipForwardCommand.isEnabled = isEpisode
+        commands.changePlaybackRateCommand.isEnabled = isEpisode
+        commands.nextTrackCommand.isEnabled = !isEpisode
+        commands.previousTrackCommand.isEnabled = !isEpisode
     }
 
     private func updateNowPlayingMetadata(_ track: QueuedTrack) {
@@ -389,7 +552,8 @@ public final class AudioPlayer {
             MPMediaItemPropertyAlbumTitle: track.albumTitle,
             MPMediaItemPropertyPlaybackDuration: duration,
             MPNowPlayingInfoPropertyElapsedPlaybackTime: currentTime,
-            MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1.0 : 0.0,
+            MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? Double(effectiveRate) : 0.0,
+            MPNowPlayingInfoPropertyDefaultPlaybackRate: Double(effectiveRate),
             MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.audio.rawValue,
         ]
         if let existing = MPNowPlayingInfoCenter.default().nowPlayingInfo,
@@ -404,14 +568,15 @@ public final class AudioPlayer {
         var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
         info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = currentTime
         info[MPMediaItemPropertyPlaybackDuration] = duration
-        info[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
+        info[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? Double(effectiveRate) : 0.0
+        info[MPNowPlayingInfoPropertyDefaultPlaybackRate] = Double(effectiveRate)
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
     }
 
     private func loadArtwork(for track: QueuedTrack) {
         artworkTask?.cancel()
-        guard let albumID = track.albumID,
-              let url = library.imageURL(itemID: albumID, tag: track.albumImageTag, maxPixelWidth: 600)
+        guard let url = track.podcast?.artworkURL
+            ?? track.albumID.flatMap({ library.imageURL(itemID: $0, tag: track.albumImageTag, maxPixelWidth: 600) })
         else { return }
         artworkTask = Task { [weak self] in
             guard let (data, _) = try? await URLSession.shared.data(from: url),
@@ -436,8 +601,14 @@ public final class AudioPlayer {
     private func reportProgress(force: Bool) {
         guard let entry = activeEntry else { return }
         let track = entry.track
-        guard force || Date().timeIntervalSince(lastProgressReport) >= 10 else { return }
+        // Episodes save locally, so they can afford finer-grained resume points.
+        guard force || Date().timeIntervalSince(lastProgressReport) >= (track.isEpisode ? 5 : 10) else { return }
         lastProgressReport = Date()
+        if track.isEpisode {
+            guard !isSeeking else { return }
+            onEpisodeProgress?(track, currentTime, duration)
+            return
+        }
         let position = currentTime, paused = !isPlaying
         Task { await library.reportProgress(trackID: track.trackID, playSessionID: entry.playSessionID, positionSeconds: position, isPaused: paused) }
     }
@@ -447,6 +618,10 @@ public final class AudioPlayer {
         activeEntry = nil
         let track = entry.track
         let position = currentTime
+        if track.isEpisode {
+            onEpisodeProgress?(track, position, duration)
+            return
+        }
         Task { await library.reportStopped(trackID: track.trackID, playSessionID: entry.playSessionID, positionSeconds: position) }
     }
 }

@@ -1,9 +1,11 @@
 import DesignSystem
 import JellyfinKit
 import Persistence
+import Podcasts
 import SwiftUI
 
-/// Everything on the device: downloaded albums and playlists, with progress. (Storage used is in Settings.)
+/// Everything on the device: downloaded albums and playlists, with progress, and (with podcasts
+/// on) downloaded episodes behind a Music | Podcasts filter. (Storage used is in Settings.)
 struct DownloadedView: View {
     @ObserveInjection var inject
     @Environment(\.theme) private var theme
@@ -11,13 +13,77 @@ struct DownloadedView: View {
     @Environment(LibraryStore.self) private var library
     @Environment(DownloadsStore.self) private var downloads
     @Environment(Connectivity.self) private var connectivity
+    @Environment(PodcastsStore.self) private var podcasts
     @Namespace private var zoom
-    @State private var path: [LibraryRoute] = []
+    @State private var path = NavigationPath()
     @State private var collections: [DownloadedCollection] = []
     @State private var confirmRemoveAll = false
+    @State private var filter: MediaKind = .music
+    @State private var episodes: [EpisodeItem] = []
+
+    private var showsPodcasts: Bool { podcasts.isEnabled && filter == .podcasts }
 
     var body: some View {
         NavigationStack(path: $path) {
+            Group {
+                if showsPodcasts { podcastContent } else { musicContent }
+            }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if podcasts.isEnabled { MediaFilter(selection: $filter) }
+            }
+            .themedBackground()
+            .navigationTitle("Downloaded")
+            .confirmationDialog(showsPodcasts ? "Remove all downloaded episodes?" : "Remove all downloaded music?", isPresented: $confirmRemoveAll, titleVisibility: .visible) {
+                Button("Remove All", role: .destructive) {
+                    if showsPodcasts { podcasts.removeAllDownloads() } else { downloads.removeAll() }
+                }
+            } message: {
+                Text("You can download it again anytime.")
+            }
+            .tabRootChrome {
+                Menu {
+                    Button("Remove All Downloads", glyph: .trash, role: .destructive) { confirmRemoveAll = true }
+                } label: {
+                    BarGroupIcon(glyph: .more)
+                }
+                .accessibilityLabel("More")
+                .disabled(showsPodcasts ? episodes.isEmpty : collections.isEmpty)
+            }
+            .libraryDestinations(zoom: zoom) { path.append($0) }
+            .podcastDestinations { path.append($0) }
+            .task {
+                do {
+                    for try await value in library.observe(library.database.downloadedCollections()) {
+                        // The first load appears as-is; later changes (removals, new downloads) animate.
+                        if collections.isEmpty { collections = value } else {
+                            withAnimation(theme.motion.smooth) { collections = value }
+                        }
+                    }
+                } catch { Log.observationFailed(error) }
+            }
+            .task {
+                do {
+                    for try await value in podcasts.observe(podcasts.database.downloads()) {
+                        withAnimation(theme.motion.smooth) { episodes = value }
+                    }
+                } catch { Log.observationFailed(error) }
+            }
+        }
+        .enableInjection()
+    }
+
+    private var podcastContent: some View {
+        ScrollView {
+            PodcastDownloadsList(items: episodes)
+        }
+        .overlay {
+            if episodes.isEmpty {
+                EmptyState("No Downloaded Episodes", glyph: .downloads, message: "Download episodes to listen offline.")
+            }
+        }
+    }
+
+    private var musicContent: some View {
             ScrollView {
                 VStack(alignment: .leading, spacing: theme.spacing.lg) {
                     if !connectivity.isOnline {
@@ -52,35 +118,6 @@ struct DownloadedView: View {
                     )
                 }
             }
-            .themedBackground()
-            .navigationTitle("Downloaded")
-            .confirmationDialog("Remove all downloaded music?", isPresented: $confirmRemoveAll, titleVisibility: .visible) {
-                Button("Remove All", role: .destructive) { downloads.removeAll() }
-            } message: {
-                Text("You can download it again anytime.")
-            }
-            .tabRootChrome {
-                Menu {
-                    Button("Remove All Downloads", glyph: .trash, role: .destructive) { confirmRemoveAll = true }
-                } label: {
-                    BarGroupIcon(glyph: .more)
-                }
-                .accessibilityLabel("More")
-                .disabled(collections.isEmpty)
-            }
-            .libraryDestinations(zoom: zoom, path: $path)
-            .task {
-                do {
-                    for try await value in library.observe(library.database.downloadedCollections()) {
-                        // The first load appears as-is; later changes (removals, new downloads) animate.
-                        if collections.isEmpty { collections = value } else {
-                            withAnimation(theme.motion.smooth) { collections = value }
-                        }
-                    }
-                } catch { Log.observationFailed(error) }
-            }
-        }
-        .enableInjection()
     }
 
     @ViewBuilder private func tile(_ item: DownloadedCollection) -> some View {

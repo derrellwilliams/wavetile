@@ -1,5 +1,7 @@
 import DesignSystem
+import GRDB
 import Library
+import Podcasts
 import SwiftUI
 
 struct MainTabView: View {
@@ -20,8 +22,12 @@ struct MainTabView: View {
     @State private var showSettings = DebugFlags.openSettings
     /// Whether each tab's navigation stack is showing its root screen (drives edge-swipe-to-open).
     @State private var atRoot: [AppTab: Bool] = [:]
+    /// Search's Music | Podcasts filter (Podcasts' "+" opens Search on the Podcasts side).
+    @State private var searchScope: MediaKind = .music
+    @State private var showOPMLImporter = false
+    @State private var opmlMessage: String?
 
-    enum AppTab: String, Hashable { case home, library, downloaded, search }
+    enum AppTab: String, Hashable { case home, library, podcasts, downloaded, search }
 
     init(app: AppModel, signedIn: AppModel.SignedIn) {
         self.app = app
@@ -38,6 +44,7 @@ struct MainTabView: View {
             tabs
                 .environment(\.openProfile) { showSettings = true }
                 .environment(\.openNowPlaying) { showNowPlaying = true }
+                .environment(\.openPodcastSearch, openPodcastSearch)
         } drawer: {
             SettingsDrawer(app: app, session: signedIn.session, isOpen: $showSettings)
         }
@@ -48,9 +55,12 @@ struct MainTabView: View {
         .environment(\.isAudioPlaying, signedIn.player.isPlaying)
         .environment(signedIn.player)
         .environment(signedIn.downloads)
+        .environment(signedIn.podcasts)
         .environment(connectivity)
         .environment(actions)
         .task { await signedIn.downloads.observe() }
+        .task { await signedIn.podcasts.run() }
+        .task { await applyPodcastDebugFlags() }
         // Background library sync: on launch if stale (>1h); pull to refresh in Library forces one.
         .task { await signedIn.library.syncIfNeeded() }
         .enableInjection()
@@ -70,6 +80,15 @@ struct MainTabView: View {
             } label: {
                 tabLabel("Library", glyph: .library)
             }
+            // Opt-in from the profile drawer; music-only users never see it.
+            if signedIn.podcasts.isEnabled {
+                Tab(value: .podcasts) {
+                    PodcastsView()
+                        .environment(\.tabRootReporter, reporter(for: .podcasts))
+                } label: {
+                    tabLabel("Podcasts", glyph: .podcasts)
+                }
+            }
             Tab(value: .downloaded) {
                 DownloadedView()
                     .environment(\.tabRootReporter, reporter(for: .downloaded))
@@ -77,7 +96,7 @@ struct MainTabView: View {
                 tabLabel("Downloaded", glyph: .downloads)
             }
             Tab(value: .search, role: .search) {
-                SearchView(text: $searchText)
+                SearchView(text: $searchText, scope: $searchScope)
                     .environment(\.tabRootReporter, reporter(for: .search))
             } label: {
                 tabLabel("Search", glyph: .search)
@@ -89,7 +108,25 @@ struct MainTabView: View {
         .onChange(of: signedIn.player.current?.queueID) {
             widgets.playerChanged()
             home.albumStartedPlaying(signedIn.player.current?.albumID)
+            signedIn.podcasts.playerChanged()
         }
+        .onChange(of: signedIn.podcasts.isEnabled) { _, enabled in
+            if !enabled {
+                if selection == .podcasts { selection = .home }
+                searchScope = .music
+            }
+        }
+        .sheet(isPresented: introBinding) {
+            PodcastsIntroSheet(
+                onFindShows: { openPodcastSearch() },
+                onImport: {
+                    selection = .podcasts
+                    showOPMLImporter = true
+                }
+            )
+            .environment(signedIn.podcasts)
+        }
+        .opmlImporter(isPresented: $showOPMLImporter, message: $opmlMessage)
         .onChange(of: signedIn.player.isPlaying) { widgets.playerChanged() }
         .onOpenURL(perform: openLink)
         .onChange(of: signedIn.player.hasQueue) { _, hasQueue in
@@ -124,16 +161,50 @@ extension MainTabView {
         }
     }
 
+    /// The first time podcasts are turned on (once the drawer has closed), explain them.
+    private var introBinding: Binding<Bool> {
+        Binding(
+            get: { signedIn.podcasts.isEnabled && !signedIn.podcasts.hasSeenIntro && !showSettings },
+            set: { if !$0 { signedIn.podcasts.hasSeenIntro = true } }
+        )
+    }
+
+    /// `-enablePodcasts`, `-followFeed <url>` and `-playLatestEpisode` (debug builds only).
+    private func applyPodcastDebugFlags() async {
+        let podcasts = signedIn.podcasts
+        if DebugFlags.enablePodcasts {
+            podcasts.hasSeenIntro = true
+            podcasts.isEnabled = true
+        }
+        if let feed = DebugFlags.followFeed, let show = try? await podcasts.follow(feedURL: feed) {
+            if DebugFlags.playLatestEpisode, let latest = try? await podcasts.database.pool.read({ db in
+                try EpisodeRecord.filter(Column("showID") == show.id).order(Column("publishedAt").desc).fetchOne(db)
+            }), let item = try? podcasts.database.episodeNow(id: latest.id) {
+                podcasts.play(item)
+                if DebugFlags.openNowPlaying { showNowPlaying = true }
+            }
+        }
+    }
+
+    fileprivate func openPodcastSearch() {
+        showSettings = false
+        searchScope = .podcasts
+        selection = .search
+    }
+
     @ViewBuilder fileprivate var miniPlayer: some View {
         let player = signedIn.player
         if let track = player.current {
             MiniPlayerBar(
                 title: track.title,
-                subtitle: track.artist,
-                artwork: signedIn.library.artwork(itemID: track.albumID, tag: track.albumImageTag, maxPixelWidth: 144),
+                // Episodes show their show; songs their artist.
+                subtitle: track.isEpisode ? track.albumTitle : track.artist,
+                artwork: signedIn.library.artwork(for: track, maxPixelWidth: 144),
                 isPlaying: player.isPlaying,
+                nextGlyph: track.isEpisode ? .skipForward : .next,
+                nextTitle: track.isEpisode ? "Skip Forward \(Int(player.skipForwardInterval)) Seconds" : "Next",
                 onPlayPause: { player.togglePlayPause() },
-                onNext: { player.next() }
+                onNext: { track.isEpisode ? player.skip(by: player.skipForwardInterval) : player.next() }
             )
             .contentShape(.rect)
             .onTapGesture { showNowPlaying = true }
@@ -285,6 +356,10 @@ enum DebugFlags {
     static let autodownload = ProcessInfo.processInfo.arguments.contains("-autodownload")
     /// `-tab library` starts on that tab.
     static let initialTab: MainTabView.AppTab = UserDefaults.standard.string(forKey: "tab").flatMap(MainTabView.AppTab.init) ?? .home
+    static let enablePodcasts = ProcessInfo.processInfo.arguments.contains("-enablePodcasts")
+    /// `-followFeed https://…` follows that feed at launch; `-playLatestEpisode` then plays its newest episode.
+    static let followFeed = UserDefaults.standard.string(forKey: "followFeed").flatMap(URL.init(string:))
+    static let playLatestEpisode = ProcessInfo.processInfo.arguments.contains("-playLatestEpisode")
     #else
     static let openSettings = false
     static let openFirstAlbum = false
@@ -293,5 +368,8 @@ enum DebugFlags {
     static let autoplay = false
     static let openNowPlaying = false
     static let autodownload = false
+    static let enablePodcasts = false
+    static let followFeed: URL? = nil
+    static let playLatestEpisode = false
     #endif
 }

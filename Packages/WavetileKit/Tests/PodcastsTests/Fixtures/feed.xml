@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:podcast="https://podcastindex.org/namespace/1.0">
+  <channel>
+    <title>Test Cast &amp; Friends</title>
+    <link>https://example.com</link>
+    <itunes:author>Jane Host</itunes:author>
+    <itunes:type>serial</itunes:type>
+    <description><![CDATA[<p>A show about <b>tests</b>.</p>]]></description>
+    <itunes:image href="https://example.com/art.jpg"/>
+    <image><url>https://example.com/fallback.jpg</url><title>ignored</title></image>
+    <item>
+      <title>Episode Two</title>
+      <guid isPermaLink="false">ep-2</guid>
+      <pubDate>Tue, 20 Oct 2026 08:00:00 +0000</pubDate>
+      <itunes:duration>1:02:03</itunes:duration>
+      <itunes:episode>2</itunes:episode>
+      <itunes:season>1</itunes:season>
+      <itunes:image href="https://example.com/ep2.jpg"/>
+      <enclosure url="https://cdn.example.com/ep2.mp3" length="12345" type="audio/mpeg"/>
+      <podcast:chapters url="https://example.com/ep2-chapters.json" type="application/json+chapters"/>
+      <description>Short &amp; sweet summary</description>
+      <content:encoded><![CDATA[<p>Intro at 0:30</p><script>alert(1)</script><a href="javascript:alert(1)">bad</a>]]></content:encoded>
+    </item>
+    <item>
+      <title>Episode One</title>
+      <guid>ep-1</guid>
+      <pubDate>Mon, 5 Oct 2026 08:00:00 GMT</pubDate>
+      <itunes:duration>2703</itunes:duration>
+      <enclosure url="http://cdn.example.com/ep1.mp3" type="audio/mpeg"/>
+      <itunes:summary>First!</itunes:summary>
+    </item>
+    <item>
+      <title>No audio</title>
+      <guid>ep-0</guid>
+    </item>
+    <item>
+      <title>Bad scheme</title>
+      <enclosure url="file:///etc/passwd" type="audio/mpeg"/>
+    </item>
+  </channel>
+</rss>

@@ -5,6 +5,7 @@ import JellyfinKit
 import Library
 import Observation
 import Persistence
+import Playback
 
 /// The signed-in user's library: local database, background sync, and API access.
 /// Screens read from the database (instant, offline) and observe it for live updates.
@@ -62,6 +63,12 @@ final class LibraryStore {
     }
 
     // MARK: Artwork
+
+    /// Art for anything in the play queue: the album for songs, the episode or show for podcasts.
+    func artwork(for track: QueuedTrack?, maxPixelWidth: Int) -> ArtworkSource {
+        if let podcast = track?.podcast { return .unsized(podcast.artworkURL, maxPixelWidth: maxPixelWidth) }
+        return artwork(itemID: track?.albumID, tag: track?.albumImageTag, maxPixelWidth: maxPixelWidth)
+    }
 
     /// Album or track-album art. `maxPixelWidth` should match the rendered size × scale.
     func artwork(itemID: String?, tag: String? = nil, maxPixelWidth: Int) -> ArtworkSource {

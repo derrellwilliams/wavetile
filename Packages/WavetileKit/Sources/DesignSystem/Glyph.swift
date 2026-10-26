@@ -54,6 +54,20 @@ public enum Glyph: String, CaseIterable, Sendable {
     case add = "plus"
     case edit = "pencil-simple"
     case user
+    case podcasts = "microphone"
+    case skipBack = "arrow-counter-clockwise"
+    case skipForward = "arrow-clockwise"
+    case sleepTimer = "moon"
+    case chapters = "list-bullets"
+    case save = "bookmark-simple"
+    case saved = "bookmark-simple-fill"
+    case feed = "rss"
+    case export = "upload-simple"
+    case speed = "gauge"
+    case share = "export"
+    case trending = "trend-up"
+    case history = "clock-counter-clockwise"
+    case hidePlayed = "eye-slash"
 
     /// 24pt template image; tints with `foregroundStyle`. Add `.resizable()` for other sizes.
     /// Decorative: VoiceOver skips it (otherwise it reads asset names like "magnifying-glass").

@@ -56,6 +56,11 @@ let package = Package(
             swiftSettings: serviceSettings
         ),
         .target(
+            name: "Podcasts",
+            dependencies: ["JellyfinKit", "Downloads", .product(name: "GRDB", package: "GRDB.swift")],
+            swiftSettings: serviceSettings
+        ),
+        .target(
             name: "Playback",
             dependencies: ["JellyfinKit"],
             swiftSettings: serviceSettings
@@ -78,7 +83,7 @@ let package = Package(
         .target(
             name: "Features",
             dependencies: [
-                "JellyfinKit", "Library", "Persistence", "Playback", "Downloads", "DesignSystem", "PreviewSupport", "WidgetShared",
+                "JellyfinKit", "Library", "Persistence", "Playback", "Downloads", "Podcasts", "DesignSystem", "PreviewSupport", "WidgetShared",
             ],
             swiftSettings: uiSettings
         ),
@@ -90,6 +95,12 @@ let package = Package(
         .testTarget(
             name: "LibraryTests",
             dependencies: ["Library", "Persistence", "Downloads"],
+            swiftSettings: serviceSettings
+        ),
+        .testTarget(
+            name: "PodcastsTests",
+            dependencies: ["Podcasts", "Playback"],
+            resources: [.copy("Fixtures")],
             swiftSettings: serviceSettings
         ),
         .testTarget(

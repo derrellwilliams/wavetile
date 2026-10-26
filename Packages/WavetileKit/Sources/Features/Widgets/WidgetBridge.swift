@@ -21,7 +21,13 @@ final class WidgetBridge {
         PlaybackCommandCenter.shared.handler = { [weak player] command in
             switch command {
             case .togglePlayPause: player?.togglePlayPause()
-            case .next: player?.next()
+            case .next:
+                // Episodes skip ahead instead of jumping to the next episode.
+                if let player, player.current?.isEpisode == true {
+                    player.skip(by: player.skipForwardInterval)
+                } else {
+                    player?.next()
+                }
             }
         }
     }
@@ -47,10 +53,20 @@ final class WidgetBridge {
         )
         // Write immediately (title/state), then again once artwork is cached.
         publish(snapshot)
-        guard trackChanged || snapshot.artworkFile == nil, let albumID = track.albumID else { return }
+        guard trackChanged || snapshot.artworkFile == nil else { return }
+        let source: (url: URL, id: String)?
+        if let art = track.podcast?.artworkURL {
+            // Episode IDs are stable hex, so they make safe, reusable file names.
+            source = (art, "podcast\(track.trackID)")
+        } else if let albumID = track.albumID, let url = library.api.imageURL(itemID: albumID, tag: track.albumImageTag, maxPixelWidth: 480) {
+            source = (url, albumID)
+        } else {
+            source = nil
+        }
+        guard let source else { return }
         artworkTask?.cancel()
         artworkTask = Task {
-            guard let file = await saveArtwork(itemID: albumID, tag: track.albumImageTag), !Task.isCancelled,
+            guard let file = await saveArtwork(url: source.url, id: source.id), !Task.isCancelled,
                   player.current?.queueID == track.queueID
             else { return }
             snapshot.artworkFile = file
@@ -88,11 +104,14 @@ final class WidgetBridge {
 
     /// Fetches (usually from the disk cache) and stores a 300px JPEG; widgets can't load URLs.
     private func saveArtwork(itemID: String, tag: String?) async -> String? {
-        guard let url = library.api.imageURL(itemID: itemID, tag: tag, maxPixelWidth: 480),
-              let image = try? await ImagePipeline.shared.image(for: url)
-        else { return nil }
+        guard let url = library.api.imageURL(itemID: itemID, tag: tag, maxPixelWidth: 480) else { return nil }
+        return await saveArtwork(url: url, id: itemID)
+    }
+
+    private func saveArtwork(url: URL, id: String) async -> String? {
+        guard let image = try? await ImagePipeline.shared.image(for: url) else { return nil }
         let data = await Self.thumbnailJPEG(image)
-        return data.flatMap { WidgetStore.saveArtwork($0, id: itemID) }
+        return data.flatMap { WidgetStore.saveArtwork($0, id: id) }
     }
 
     /// Resizing and JPEG encoding run off the main actor.

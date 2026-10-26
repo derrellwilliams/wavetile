@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<opml version="1.0">
+  <head><title>Overcast Podcast Subscriptions</title></head>
+  <body>
+    <outline text="feeds">
+      <outline type="rss" text="Hard Fork" title="Hard Fork" xmlUrl="https://feeds.simplecast.com/6HKOhNgS" htmlUrl="https://www.nytimes.com"/>
+      <outline type="rss" text="Duplicate" xmlUrl="http://feeds.simplecast.com/6HKOhNgS"/>
+      <outline type="rss" text="Other" XMLURL="https://example.com/feed.xml"/>
+      <outline type="rss" text="Bad" xmlUrl="javascript:alert(1)"/>
+    </outline>
+  </body>
+</opml>

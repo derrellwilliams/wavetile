@@ -43,6 +43,8 @@ struct SettingsDrawer: View {
                     }
                 }
 
+                PodcastSettingsSection()
+
                 downloadsSection
 
                 Button {

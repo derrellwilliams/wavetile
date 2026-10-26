@@ -253,7 +253,7 @@ public enum BackgroundSessionEvents {
         handlers.withLock { $0[identifier] = completion }
     }
 
-    static func take(_ identifier: String) -> (@Sendable () -> Void)? {
+    public static func take(_ identifier: String) -> (@Sendable () -> Void)? {
         handlers.withLock { $0.removeValue(forKey: identifier) }
     }
 }
