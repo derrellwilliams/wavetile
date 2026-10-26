@@ -3,12 +3,11 @@ import Playback
 import Podcasts
 import SwiftUI
 
-/// One episode: art, show, title, play, actions, chapters and show notes. Timestamps in the
-/// notes start playback at that time.
+/// One episode, laid out like an album: hero art, title, show, play, chapters and show notes,
+/// with Download, Save and More in the toolbar. Timestamps in the notes start playback there.
 struct EpisodeDetailView: View {
     @ObserveInjection var inject
     @Environment(\.theme) private var theme
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(PodcastsStore.self) private var podcasts
     @Environment(AudioPlayer.self) private var player
     @Environment(\.pushPodcastRoute) private var push
@@ -25,14 +24,18 @@ struct EpisodeDetailView: View {
                 LoadingMark().padding(.top, 120)
             }
         }
-        .scrollIndicators(.hidden)
-        .themedBackground()
-        .navigationBarTitleDisplayMode(.inline)
+        .detailPageChrome()
         .toolbar {
             if let item {
                 ToolbarItem(placement: .topBarTrailing) {
+                    EpisodeDownloadButton(item: item)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    SaveEpisodeButton(episodeID: item.id)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
                     Menu {
-                        EpisodeMenu(item: item)
+                        EpisodeMenu(item: item, includeGoToShow: false)
                     } label: {
                         Label("More", glyph: .more)
                     }
@@ -48,6 +51,14 @@ struct EpisodeDetailView: View {
             return .systemAction
         })
         .task { await observe() }
+        // Structured: tied to the page, cancelled when it closes. Keyed by the episode, so
+        // progress updates to `item` don't reload.
+        .task(id: item?.id) {
+            guard let episode = item?.episode else { return }
+            let loaded = await podcasts.chapters(for: episode)
+            guard !Task.isCancelled else { return }
+            withAnimation(theme.motion.smooth) { chapters = loaded }
+        }
         .enableInjection()
     }
 
@@ -55,11 +66,9 @@ struct EpisodeDetailView: View {
         do {
             for try await value in podcasts.observe(podcasts.database.episode(id: episodeID)) {
                 if value?.episode.notesHTML != item?.episode.notesHTML, let html = value?.episode.notesHTML {
-                    notes = await Self.renderNotes(html)
-                }
-                if item == nil, let value {
-                    item = value
-                    Task { chapters = await ChapterLoader.load(chaptersURL: value.episode.chaptersURL, audioURL: podcasts.localFile(episodeID: value.id) ?? value.episode.audioURL) }
+                    let rendered = await Self.renderNotes(html)
+                    // Notes arrive after the page draws; ease them in rather than popping.
+                    withAnimation(theme.motion.smooth) { notes = rendered }
                 }
                 item = value
             }
@@ -72,140 +81,66 @@ struct EpisodeDetailView: View {
     }
 
     private func content(_ item: EpisodeItem) -> some View {
-        VStack(alignment: .leading, spacing: theme.spacing.xl) {
-            VStack(alignment: dynamicTypeSize.isAccessibilitySize ? .leading : .center, spacing: theme.spacing.md) {
-                ArtworkView(.unsized(item.artworkURL, maxPixelWidth: 720), cornerRadius: theme.radius.small)
-                    .frame(width: 200)
-                    .shadow(color: .black.opacity(theme.artwork.shadowOpacity), radius: theme.artwork.shadowRadius, y: 4)
-                    .frame(maxWidth: .infinity)
-                Button { push(.show(ShowRoute(item.show))) } label: {
-                    Text(item.show.title)
-                        .font(theme.typography.itemTitle)
-                        .foregroundStyle(theme.palette.accent)
-                        .textCase(.uppercase)
-                }
-                .buttonStyle(.plain)
-                .accessibilityHint("Shows the podcast")
-                Text(item.episode.title)
-                    .font(theme.typography.title)
-                    .tracking(theme.typography.displayTracking)
-                    .foregroundStyle(theme.palette.textPrimary)
-                    .multilineTextAlignment(dynamicTypeSize.isAccessibilitySize ? .leading : .center)
-                    .accessibilityAddTraits(.isHeader)
-                Text(metadata(item))
-                    .font(BrandFont.font(.footnote))
-                    .foregroundStyle(theme.palette.textSecondary)
-            }
-            .frame(maxWidth: .infinity)
-
+        VStack(spacing: theme.spacing.xl) {
             VStack(spacing: theme.spacing.md) {
-                PrimaryButton(playTitle(item)) {
-                    if player.current?.trackID == item.id { player.togglePlayPause() } else { podcasts.play(item) }
+                ArtworkHero(artwork: .unsized(item.artworkURL, maxPixelWidth: 1320))
+                DetailHeader(item.episode.title, metadata: metadata(item)) {
+                    Button { push(.show(ShowRoute(item.show))) } label: {
+                        DetailSubtitle(item.show.title)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Shows the podcast")
                 }
-                if item.episode.isInProgress {
-                    ProgressView(value: item.episode.progress)
-                        .tint(theme.palette.accent)
-                        .accessibilityLabel("Listened")
-                        .accessibilityValue(Text(item.episode.progress, format: .percent.precision(.fractionLength(0))))
-                }
-                actions(item)
             }
 
-            if !chapters.isEmpty {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text("Chapters")
-                        .font(theme.typography.sectionHeader)
-                        .foregroundStyle(theme.palette.textPrimary)
-                        .accessibilityAddTraits(.isHeader)
-                        .padding(.bottom, theme.spacing.sm)
-                    ForEach(chapters) { chapter in
-                        Button { podcasts.play(item, from: chapter.start) } label: {
-                            HStack(alignment: .firstTextBaseline, spacing: theme.spacing.md) {
-                                Text(Duration.seconds(chapter.start), format: .time(pattern: chapter.start >= 3600 ? .hourMinuteSecond : .minuteSecond))
-                                    .font(theme.typography.caption.monospacedDigit())
-                                    .foregroundStyle(theme.palette.textSecondary)
-                                    .frame(minWidth: 52, alignment: .leading)
-                                Text(chapter.title)
-                                    .font(theme.typography.body)
-                                    .foregroundStyle(theme.palette.textPrimary)
-                                    .multilineTextAlignment(.leading)
-                                Spacer(minLength: 0)
+            VStack(alignment: .leading, spacing: theme.spacing.xl) {
+                VStack(spacing: theme.spacing.md) {
+                    PrimaryButton(playTitle(item)) {
+                        if player.current?.trackID == item.id { player.togglePlayPause() } else { podcasts.play(item) }
+                    }
+                    if item.episode.isInProgress {
+                        ProgressView(value: item.episode.progress)
+                            .tint(theme.palette.accent)
+                            .accessibilityLabel("Listened")
+                            .accessibilityValue(Text(item.episode.progress, format: .percent.precision(.fractionLength(0))))
+                    }
+                }
+
+                if !chapters.isEmpty {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("Chapters")
+                            .font(theme.typography.sectionHeader)
+                            .foregroundStyle(theme.palette.textPrimary)
+                            .accessibilityAddTraits(.isHeader)
+                            .padding(.bottom, theme.spacing.sm)
+                        // Highlights the chapter playing now when this episode is the one playing.
+                        let current = player.current?.trackID == item.id ? chapters.current(at: player.currentTime) : nil
+                        ForEach(chapters) { chapter in
+                            ChapterRow(chapter: chapter, isCurrent: chapter == current) {
+                                podcasts.play(item, from: chapter.start)
                             }
-                            .padding(.vertical, theme.spacing.sm)
-                            .contentShape(.rect)
+                            Divider().overlay(theme.palette.separator)
                         }
-                        .buttonStyle(.plain)
-                        Divider().overlay(theme.palette.separator)
+                    }
+                }
+
+                if let notes, !notes.characters.isEmpty {
+                    VStack(alignment: .leading, spacing: theme.spacing.sm) {
+                        Text("Show Notes")
+                            .font(theme.typography.sectionHeader)
+                            .foregroundStyle(theme.palette.textPrimary)
+                            .accessibilityAddTraits(.isHeader)
+                        Text(notes)
+                            .font(theme.typography.body)
+                            .foregroundStyle(theme.palette.textPrimary)
+                            .tint(theme.palette.accent)
+                            .textSelection(.enabled)
                     }
                 }
             }
-
-            if let notes, !notes.characters.isEmpty {
-                VStack(alignment: .leading, spacing: theme.spacing.sm) {
-                    Text("Show Notes")
-                        .font(theme.typography.sectionHeader)
-                        .foregroundStyle(theme.palette.textPrimary)
-                        .accessibilityAddTraits(.isHeader)
-                    Text(notes)
-                        .font(theme.typography.body)
-                        .foregroundStyle(theme.palette.textPrimary)
-                        .tint(theme.palette.accent)
-                        .textSelection(.enabled)
-                }
-            }
+            .padding(.horizontal, theme.spacing.screenInset)
         }
-        .padding(.horizontal, theme.spacing.screenInset)
-        .padding(.vertical, theme.spacing.lg)
-    }
-
-    private func actions(_ item: EpisodeItem) -> some View {
-        HStack {
-            actionButton(item.episode.isSaved ? "Saved" : "Save", glyph: item.episode.isSaved ? .saved : .save) {
-                podcasts.setSaved(item.id, !item.episode.isSaved)
-            }
-            Spacer()
-            downloadAction(item)
-            Spacer()
-            actionButton("Play Next", glyph: .playNext) { podcasts.playNext(item) }
-            Spacer()
-            actionButton(item.episode.isPlayed ? "Unplayed" : "Played", glyph: .check) {
-                podcasts.setPlayed([item.id], !item.episode.isPlayed)
-            }
-        }
-        .padding(.horizontal, theme.spacing.sm)
-    }
-
-    @ViewBuilder private func downloadAction(_ item: EpisodeItem) -> some View {
-        switch podcasts.downloadStates[item.id]?.state {
-        case .done?:
-            actionButton("Downloaded", glyph: .downloaded) { podcasts.removeDownload(item.id) }
-                .accessibilityHint("Removes the download")
-        case .queued?, .downloading?:
-            Button { podcasts.removeDownload(item.id) } label: {
-                VStack(spacing: theme.spacing.xs) {
-                    ProgressRing(progress: podcasts.downloadStates[item.id]?.progress ?? 0).frame(width: 22, height: 22)
-                    Text("Cancel").font(theme.typography.caption)
-                }
-                .foregroundStyle(theme.palette.textPrimary)
-                .frame(minWidth: 64, minHeight: 44)
-            }
-            .buttonStyle(.plain)
-        case .failed?, nil:
-            actionButton("Download", glyph: .download) { podcasts.download(item) }
-        }
-    }
-
-    private func actionButton(_ title: String, glyph: Glyph, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(spacing: theme.spacing.xs) {
-                glyph.image.foregroundStyle(theme.palette.accent)
-                Text(title).font(theme.typography.caption)
-            }
-            .foregroundStyle(theme.palette.textPrimary)
-            .frame(minWidth: 64, minHeight: 44)
-            .contentShape(.rect)
-        }
-        .buttonStyle(.pressable)
+        .padding(.bottom, theme.spacing.xxl)
     }
 
     private func playTitle(_ item: EpisodeItem) -> LocalizedStringKey {

@@ -2,7 +2,7 @@ import DesignSystem
 import Persistence
 import SwiftUI
 
-/// Download control for an album or playlist: download → progress ring → downloaded (menu to remove).
+/// Download control for an album or playlist (`EpisodeDownloadButton` is the episode twin): download → progress ring → downloaded (menu to remove).
 /// Icon-only, for the navigation bar (which supplies the glass); the label is read by VoiceOver.
 struct DownloadButton: View {
     @Environment(\.theme) private var theme
@@ -44,9 +44,14 @@ struct DownloadButton: View {
     }
 
     private var label: some View {
-        Label { Text(title) } icon: { icon }
-            .labelStyle(.iconOnly)
-            .contentTransition(.opacity)
+        DownloadIcon(state: indicator, title: title)
+    }
+
+    private var indicator: DownloadIndicator {
+        if status.isDownloaded { .done }
+        else if status.isInProgress { .inProgress(status.progress) }
+        else if status.failed > 0 { .failed }
+        else { .none }
     }
 
     private var title: String {
@@ -55,17 +60,41 @@ struct DownloadButton: View {
         else if status.failed > 0 { "\(status.failed) Failed" }
         else { "Download" }
     }
+}
+
+/// Where a download stands, for the shared icon (albums, playlists and episodes).
+enum DownloadIndicator: Equatable {
+    case none, inProgress(Double), done, failed
+}
+
+/// The download glyph for each state: download → progress ring → check, or a warning.
+/// Icon-only; `title` is what VoiceOver reads.
+struct DownloadIcon: View {
+    let state: DownloadIndicator
+    let title: String
+    /// Nil keeps the glyphs at their natural 24pt (toolbars); rows pass a smaller size.
+    var size: CGFloat?
+
+    var body: some View {
+        Label { Text(title) } icon: { icon }
+            .labelStyle(.iconOnly)
+            .contentTransition(.opacity)
+    }
 
     @ViewBuilder private var icon: some View {
-        if status.isDownloaded {
-            Glyph.downloaded.image
-        } else if status.isInProgress {
-            ProgressRing(progress: status.progress)
-                .frame(width: 20, height: 20)
-        } else if status.failed > 0 {
-            Glyph.warning.image
+        switch state {
+        case .done: glyph(.downloaded)
+        case let .inProgress(progress): ProgressRing(progress: progress).frame(width: size ?? 20, height: size ?? 20)
+        case .failed: glyph(.warning)
+        case .none: glyph(.download)
+        }
+    }
+
+    @ViewBuilder private func glyph(_ glyph: Glyph) -> some View {
+        if let size {
+            glyph.image.resizable().frame(width: size, height: size)
         } else {
-            Glyph.download.image
+            glyph.image
         }
     }
 }

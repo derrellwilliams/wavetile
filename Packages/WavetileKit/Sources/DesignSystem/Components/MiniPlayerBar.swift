@@ -81,7 +81,7 @@ public struct MiniPlayerBar: View {
     @Previewable @State var isPlaying = true
     TabView {
         Tab { Text("Home") } label: { Label("Home", glyph: .home) }
-        Tab { Text("Library") } label: { Label("Library", glyph: .library) }
+        Tab { Text("Music") } label: { Label("Music", glyph: .library) }
     }
     .tabViewBottomAccessory {
         MiniPlayerBar(

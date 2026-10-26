@@ -12,19 +12,15 @@ struct HomeView: View {
     @Namespace private var zoom
     @Binding var path: NavigationPath
     @State private var didRefresh = false
-    @State private var continueListening: [EpisodeItem] = []
     @State private var podcastUpNext: [EpisodeItem] = []
 
     var body: some View {
         NavigationStack(path: $path) {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: theme.spacing.xxl) {
-                    // Order: Continue Listening, Recently Played, Up Next in Podcasts, Most Played,
-                    // Recently Added. Podcast shelves appear only when podcasts are on and have
-                    // something to show.
-                    if podcasts.isEnabled, !continueListening.isEmpty {
-                        PodcastHomeShelf(title: "Continue Listening", items: continueListening)
-                    }
+                    // Order: Recently Played, Up Next in Podcasts, Most Played, Recently Added.
+                    // Up Next appears only when podcasts are on and it has episodes. (Continue
+                    // Listening lives at the top of the Podcasts tab.)
                     if !hasRecentlyPlayed {
                         podcastUpNextShelf
                     }
@@ -61,7 +57,6 @@ struct HomeView: View {
             .libraryDestinations(zoom: zoom) { path.append($0) }
             .podcastDestinations { path.append($0) }
             // On the always-present scroll view: a task on a shelf that isn't shown never runs.
-            .task(id: podcasts.isEnabled) { await observePodcasts(podcasts.database.continueListening()) { continueListening = $0 } }
             .task(id: podcasts.isEnabled) { await observePodcasts(podcasts.database.upNextShelf()) { podcastUpNext = $0 } }
             .markRefreshable { await model.load() }
             .task {
@@ -85,7 +80,7 @@ struct HomeView: View {
     /// Up Next in Podcasts: after Recently Played, or first among the music shelves without it.
     @ViewBuilder private var podcastUpNextShelf: some View {
         if podcasts.isEnabled, !podcastUpNext.isEmpty {
-            PodcastHomeShelf(title: "Up Next in Podcasts", items: podcastUpNext)
+            EpisodeShelf(title: "Up Next in Podcasts", items: podcastUpNext)
         }
     }
 

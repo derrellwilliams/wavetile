@@ -3,10 +3,26 @@ import Playback
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// The profile drawer's Podcasts section: the opt-in toggle, then (when on) playback, download,
-/// sync and import/export settings.
+/// The profile drawer's Podcasts section: only the opt-in switch. Everything else lives behind
+/// the gear on the Podcasts tab (`PodcastSettingsView`).
 struct PodcastSettingsSection: View {
     @Environment(\.theme) private var theme
+    @Environment(PodcastsStore.self) private var podcasts
+
+    var body: some View {
+        @Bindable var podcasts = podcasts
+        SettingsSection(title: "Podcasts") {
+            SettingsToggle(.podcasts, "Show Podcasts", isOn: $podcasts.isEnabled.animation(theme.motion.smooth))
+        }
+    }
+}
+
+/// Podcast settings, from the gear on the Podcasts tab: playback, downloads, sync and
+/// import/export. Same sections and rows as the profile drawer.
+struct PodcastSettingsView: View {
+    @Environment(\.theme) private var theme
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(PodcastsStore.self) private var podcasts
     @State private var showImporter = false
     @State private var importMessage: String?
@@ -15,55 +31,76 @@ struct PodcastSettingsSection: View {
 
     var body: some View {
         @Bindable var podcasts = podcasts
-        SettingsSection(title: "Podcasts") {
-            SettingsToggle(.podcasts, "Show Podcasts", isOn: $podcasts.isEnabled.animation(theme.motion.smooth))
-            if podcasts.isEnabled {
-                Menu {
-                    Picker("Skip Back", selection: $podcasts.skipBack) {
-                        ForEach([10.0, 15, 30], id: \.self) { Text("\(Int($0)) seconds").tag($0) }
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: theme.spacing.xxl) {
+                    SettingsSection(title: "Playback") {
+                        Menu {
+                            Picker("Skip Back", selection: $podcasts.skipBack) {
+                                ForEach([10.0, 15, 30], id: \.self) { Text("\(Int($0)) seconds").tag($0) }
+                            }
+                        } label: {
+                            SettingsRow(.skipBack, "Skip Back", value: "\(Int(podcasts.skipBack))s")
+                        }
+                        Menu {
+                            Picker("Skip Forward", selection: $podcasts.skipForward) {
+                                ForEach([15.0, 30, 45, 60], id: \.self) { Text("\(Int($0)) seconds").tag($0) }
+                            }
+                        } label: {
+                            SettingsRow(.skipForward, "Skip Forward", value: "\(Int(podcasts.skipForward))s")
+                        }
+                        Menu {
+                            Picker("Default Speed", selection: $podcasts.defaultRate) {
+                                ForEach(AudioPlayer.podcastRates, id: \.self) { Text("\(Double($0).formatted())×").tag(Double($0)) }
+                            }
+                        } label: {
+                            SettingsRow(.speed, "Default Speed", value: "\(podcasts.defaultRate.formatted())×")
+                        }
                     }
-                } label: {
-                    SettingsRow(.skipBack, "Skip Back", value: "\(Int(podcasts.skipBack))s")
-                }
-                Menu {
-                    Picker("Skip Forward", selection: $podcasts.skipForward) {
-                        ForEach([15.0, 30, 45, 60], id: \.self) { Text("\(Int($0)) seconds").tag($0) }
+
+                    SettingsSection(title: "Downloads") {
+                        Menu {
+                            Picker("Auto-Download", selection: $podcasts.autoDownloadCount) {
+                                Text("Off").tag(0)
+                                Text("Latest Episode").tag(1)
+                                Text("Latest 3 Episodes").tag(3)
+                                Text("Latest 5 Episodes").tag(5)
+                            }
+                        } label: {
+                            SettingsRow(.download, "Auto-Download", value: podcasts.autoDownloadCount == 0 ? "Off" : "Latest \(podcasts.autoDownloadCount)")
+                        }
+                        SettingsToggle(.trash, "Remove Played Downloads", isOn: $podcasts.deletePlayedDownloads)
+                        SettingsRow(.downloads, "Episode Storage", value: ByteCountFormatter.string(fromByteCount: podcasts.totalBytes, countStyle: .file))
+                        Button { confirmRemoveDownloads = true } label: {
+                            SettingsRow(.trash, "Remove Episode Downloads", value: "")
+                        }
+                        .disabled(podcasts.totalBytes == 0)
                     }
-                } label: {
-                    SettingsRow(.skipForward, "Skip Forward", value: "\(Int(podcasts.skipForward))s")
-                }
-                Menu {
-                    Picker("Default Speed", selection: $podcasts.defaultRate) {
-                        ForEach(AudioPlayer.podcastRates, id: \.self) { Text("\(Double($0).formatted())×").tag(Double($0)) }
+
+                    SettingsSection(title: "Shows") {
+                        SettingsToggle(.server, "Sync with Jellyfin", isOn: $podcasts.syncWithJellyfin)
+                        Button { showImporter = true } label: {
+                            SettingsRow(.download, "Import OPML", value: "")
+                        }
+                        ShareLink(item: OPMLDocument(text: podcasts.exportOPML()), preview: SharePreview("Wavetile Podcasts.opml")) {
+                            SettingsRow(.export, "Export OPML", value: "")
+                        }
+                        Button { confirmRemove = true } label: {
+                            SettingsRow(.trash, "Remove All Podcast Data", value: "")
+                        }
                     }
-                } label: {
-                    SettingsRow(.speed, "Default Speed", value: "\(podcasts.defaultRate.formatted())×")
                 }
-                Menu {
-                    Picker("Auto-Download", selection: $podcasts.autoDownloadCount) {
-                        Text("Off").tag(0)
-                        Text("Latest Episode").tag(1)
-                        Text("Latest 3 Episodes").tag(3)
-                        Text("Latest 5 Episodes").tag(5)
-                    }
-                } label: {
-                    SettingsRow(.download, "Auto-Download", value: podcasts.autoDownloadCount == 0 ? "Off" : "Latest \(podcasts.autoDownloadCount)")
-                }
-                SettingsToggle(.trash, "Remove Played Downloads", isOn: $podcasts.deletePlayedDownloads)
-                SettingsToggle(.server, "Sync with Jellyfin", isOn: $podcasts.syncWithJellyfin)
-                SettingsRow(.downloads, "Episode Storage", value: ByteCountFormatter.string(fromByteCount: podcasts.totalBytes, countStyle: .file))
-                Button { showImporter = true } label: {
-                    SettingsRow(.download, "Import OPML", value: "")
-                }
-                ShareLink(item: OPMLDocument(text: podcasts.exportOPML()), preview: SharePreview("Wavetile Podcasts.opml")) {
-                    SettingsRow(.export, "Export OPML", value: "")
-                }
-                Button { confirmRemoveDownloads = true } label: {
-                    SettingsRow(.trash, "Remove Episode Downloads", value: "")
-                }
-                .disabled(podcasts.totalBytes == 0)
-                Button { confirmRemove = true } label: {
-                    SettingsRow(.trash, "Remove All Podcast Data", value: "")
+                .padding(.horizontal, dynamicTypeSize.isAccessibilitySize ? theme.spacing.md : theme.spacing.xl)
+                .padding(.vertical, theme.spacing.lg)
+            }
+            .scrollIndicators(.hidden)
+            .foregroundStyle(theme.palette.textPrimary)
+            .themedBackground()
+            .navigationTitle("Podcast Settings")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done", glyph: .check) { dismiss() }
                 }
             }
         }

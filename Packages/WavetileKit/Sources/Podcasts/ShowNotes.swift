@@ -107,6 +107,41 @@ public enum ShowNotes {
         return output
     }
 
+    /// Chapters from a timestamp list in the notes: lines that start or end with a time, like
+    /// `00:00 Intro`, `[12:34] - Topic`, `• 1:02:03 – Q&A` or `Topic (12:34)`. Needs at least two
+    /// entries in increasing order; when the notes hold several lists, the longest one wins.
+    /// Times past the end of the episode are dropped.
+    public static func chapters(html: String, duration: Double? = nil) -> [Chapter] {
+        guard !html.isEmpty else { return [] }
+        let text = String(attributed(html: html).characters)
+        let leading = /^[\s•·*\-–—]*[\[(]?((?:\d{1,2}:)?\d{1,2}:[0-5]\d)[\])]?\s*[-–—:|.]?\s*(\S.*)$/
+        let trailing = /^[\s•·*\-–—]*(\S.*?)\s*[-–—:|]?\s*[\[(]?((?:\d{1,2}:)?\d{1,2}:[0-5]\d)[\])]?\s*$/
+        func seconds(_ stamp: Substring) -> Double? {
+            let parts = stamp.split(separator: ":").compactMap { Double($0) }
+            guard parts.count == 2 || parts.count == 3 else { return nil }
+            return parts.reduce(0) { $0 * 60 + $1 }
+        }
+
+        var runs: [[Chapter]] = [[]]
+        for line in text.split(whereSeparator: \.isNewline) where line.count <= 200 {
+            var found: (Substring, Substring)?
+            if let match = line.wholeMatch(of: leading) {
+                found = (match.output.1, match.output.2)
+            } else if let match = line.wholeMatch(of: trailing) {
+                found = (match.output.2, match.output.1)
+            }
+            guard let (stamp, rawTitle) = found, let start = seconds(stamp) else { continue }
+            if let duration, duration > 0, start >= duration { continue }
+            let title = rawTitle.trimmingCharacters(in: .whitespaces.union(.init(charactersIn: "-–—:|")))
+            guard !title.isEmpty else { continue }
+            // A time that goes backwards starts a new list (e.g. a second list of links).
+            if let last = runs[runs.count - 1].last, start <= last.start { runs.append([]) }
+            runs[runs.count - 1].append(Chapter(start: start, title: title))
+        }
+        let best = runs.max { $0.count < $1.count } ?? []
+        return best.count >= 2 ? best : []
+    }
+
     /// Plain-text timestamps (`1:02:03`, `12:34`) become seek links.
     static func linkTimestamps(_ text: String) -> AttributedString {
         var result = AttributedString()

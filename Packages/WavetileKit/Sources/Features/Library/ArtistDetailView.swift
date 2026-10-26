@@ -54,13 +54,8 @@ struct ArtistDetailView: View {
             }
             .padding(.bottom, theme.spacing.xxl)
         }
-        .scrollIndicators(.hidden)
-        .ignoresSafeArea(edges: .top)
-        // Full-bleed art: no dimming/blur band under the navigation bar.
-        .scrollEdgeEffectHidden(true, for: .top)
-        .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
-        .themedBackground()
-        .navigationBarTitleDisplayMode(.inline)
+        // Full-bleed art: no bar background or blur band under the navigation bar.
+        .detailPageChrome()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 FavoriteButton(itemID: artistID)

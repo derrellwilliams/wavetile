@@ -135,3 +135,27 @@ struct PodcastIDTests {
         #expect(PodcastNetwork.secure(URL(string: "file:///etc/passwd")!) == nil)
     }
 }
+
+struct ShowNotesChapterTests {
+    /// Each timestamp style podcasts use, paired with a plain first chapter so it forms a list.
+    @Test(arguments: [
+        ("05:12 The news", 312.0, "The news"),
+        ("[05:12] - The news", 312, "The news"),
+        ("(1:02:03) Q&amp;A", 3723, "Q&A"),
+        ("• 05:12 – The news", 312, "The news"),
+        ("The news (05:12)", 312, "The news"),
+        ("The news – 05:12", 312, "The news"),
+    ])
+    func readsTimestampStyle(line: String, start: Double, title: String) {
+        let chapters = ShowNotes.chapters(html: "<p>This week.</p><p>00:00 Intro<br>\(line)</p>")
+        #expect(chapters == [Chapter(start: 0, title: "Intro"), Chapter(start: start, title: title)])
+    }
+
+    @Test func needsAnOrderedListOfTwoOrMore() {
+        #expect(ShowNotes.chapters(html: "<p>Recorded at 10:30 in the studio</p>").isEmpty)
+        #expect(ShowNotes.chapters(html: "<p>12:00 Late</p><p>01:00 Early</p>").isEmpty)
+        // The longest increasing list wins; times past the end are dropped.
+        let html = "<p>00:00 A<br>10:00 B<br>20:00 C</p><p>05:00 X<br>06:00 Y</p><p>2:00:00 Too late</p>"
+        #expect(ShowNotes.chapters(html: html, duration: 3600).map(\.title) == ["A", "B", "C"])
+    }
+}

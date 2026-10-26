@@ -32,7 +32,7 @@ struct DownloadedView: View {
                 if podcasts.isEnabled { MediaFilter(selection: $filter) }
             }
             .themedBackground()
-            .navigationTitle("Downloaded")
+            .navigationTitle("Downloads")
             .confirmationDialog(showsPodcasts ? "Remove all downloaded episodes?" : "Remove all downloaded music?", isPresented: $confirmRemoveAll, titleVisibility: .visible) {
                 Button("Remove All", role: .destructive) {
                     if showsPodcasts { podcasts.removeAllDownloads() } else { downloads.removeAll() }

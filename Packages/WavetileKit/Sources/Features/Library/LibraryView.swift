@@ -3,11 +3,11 @@ import Library
 import Persistence
 import SwiftUI
 
+/// The Music tab (the Jellyfin library): browse sections and Recently Added.
 struct LibraryView: View {
     @ObserveInjection var inject
     @Environment(\.theme) private var theme
     @Environment(LibraryStore.self) private var store
-    @Environment(PodcastsStore.self) private var podcasts
     @Namespace private var zoom
     @State private var path = NavigationPath()
     @State private var recentlyAdded: [AlbumRecord] = []
@@ -18,33 +18,9 @@ struct LibraryView: View {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(LibrarySection.allCases, id: \.self) { section in
                         NavigationLink(value: LibraryRoute.section(section)) {
-                            HStack(spacing: theme.spacing.md) {
-                                section.glyph.image
-                                    .foregroundStyle(theme.palette.accent)
-                                    .frame(width: 28)
-                                Text(section.title)
-                                    .font(theme.typography.sectionHeader)
-                                    .foregroundStyle(theme.palette.textPrimary)
-                                Spacer()
-                                Glyph.chevron.image
-                                    .resizable()
-                                    .frame(width: 14, height: 14)
-                                    .foregroundStyle(theme.palette.textSecondary)
-                            }
-                            .padding(.vertical, theme.spacing.md + 2)
-                            .contentShape(.rect)
+                            LinkRow(title: section.title, glyph: section.glyph)
                         }
                         .buttonStyle(.plain)
-                        Divider().overlay(theme.palette.separator).padding(.leading, 28 + theme.spacing.md)
-                    }
-
-                    // Opt-in from the profile drawer; music-only users never see it.
-                    if podcasts.isEnabled {
-                        NavigationLink(value: PodcastRoute.podcasts) {
-                            LinkRow(title: "Podcasts", glyph: .podcasts)
-                        }
-                        .buttonStyle(.plain)
-                        .transition(.opacity)
                         Divider().overlay(theme.palette.separator).padding(.leading, 28 + theme.spacing.md)
                     }
 
@@ -76,15 +52,9 @@ struct LibraryView: View {
             }
             .themedBackground()
             .markRefreshable { await store.syncNow() }
-            .navigationTitle("Library")
+            .navigationTitle("Music")
             .tabRootChrome()
             .libraryDestinations(zoom: zoom) { path.append($0) }
-            .podcastDestinations { path.append($0) }
-            // Turning podcasts off while browsing them returns to the Library root.
-            .onChange(of: podcasts.isEnabled) { _, enabled in
-                if !enabled { path = NavigationPath() }
-            }
-            .animation(theme.motion.smooth, value: podcasts.isEnabled)
             .task {
                 do {
                     for try await albums in store.observe(store.database.albums(sort: .recentlyAdded)) {

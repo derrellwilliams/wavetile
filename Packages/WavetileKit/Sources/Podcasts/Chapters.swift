@@ -12,12 +12,15 @@ public struct Chapter: Hashable, Sendable, Identifiable {
     }
 }
 
-/// Loads episode chapters: Podcasting 2.0 JSON chapters when the feed links them, otherwise
-/// chapters embedded in the audio file (ID3 / MP4).
+/// Loads episode chapters, best source first: Podcasting 2.0 JSON chapters when the feed links
+/// them, then chapters embedded in the audio file (ID3 / MP4), then a timestamp list in the
+/// show notes ("00:00 Intro", "(12:34) Topic").
 public enum ChapterLoader {
-    @concurrent public static func load(chaptersURL: URL?, audioURL: URL) async -> [Chapter] {
+    @concurrent public static func load(chaptersURL: URL?, audioURL: URL, notesHTML: String = "", duration: Double? = nil) async -> [Chapter] {
         if let chaptersURL, let chapters = try? await json(chaptersURL), !chapters.isEmpty { return chapters }
-        return await embedded(audioURL)
+        let embedded = await embedded(audioURL)
+        if !embedded.isEmpty { return embedded }
+        return ShowNotes.chapters(html: notesHTML, duration: duration)
     }
 
     static func json(_ url: URL) async throws -> [Chapter] {

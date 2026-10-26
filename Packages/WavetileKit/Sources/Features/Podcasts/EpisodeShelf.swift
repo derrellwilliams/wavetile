@@ -2,10 +2,10 @@ import DesignSystem
 import Podcasts
 import SwiftUI
 
-/// A podcast shelf on Home (when podcasts are on): Continue Listening or Up Next in Podcasts.
-/// Home owns the data and only places a shelf when it has episodes, so Home stays music-only
-/// until there's something to show.
-struct PodcastHomeShelf: View {
+/// A horizontal row of episode cards: Up Next in Podcasts on Home; Continue Listening and
+/// Latest Episodes on the Podcasts tab. The screen owns the data and only places a shelf when
+/// it has episodes.
+struct EpisodeShelf: View {
     @Environment(\.theme) private var theme
     let title: String
     let items: [EpisodeItem]

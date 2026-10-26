@@ -1,10 +1,10 @@
 import XCTest
 
-/// Library → Songs rows offer the same ⋯ actions as search.
+/// Music → Songs rows offer the same ⋯ actions as search.
 final class SongsActionsTests: XCTestCase {
     @MainActor func testSongsGoToAlbumAndArtist() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-tab", "library"]
+        app.launchArguments = ["-tab", "music"]
         app.launch()
         _ = app.wait(for: .runningForeground, timeout: 10)
 
@@ -31,7 +31,7 @@ final class SongsActionsTests: XCTestCase {
     /// Long press on a song offers the same actions as its ⋯ sheet.
     @MainActor func testSongsLongPressMatchesMoreSheet() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-tab", "library"]
+        app.launchArguments = ["-tab", "music"]
         app.launch()
         _ = app.wait(for: .runningForeground, timeout: 10)
 

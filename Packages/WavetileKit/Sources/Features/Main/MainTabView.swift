@@ -27,7 +27,7 @@ struct MainTabView: View {
     @State private var showOPMLImporter = false
     @State private var opmlMessage: String?
 
-    enum AppTab: String, Hashable { case home, library, downloaded, search }
+    enum AppTab: String, Hashable { case home, music, podcasts, downloaded, search }
 
     init(app: AppModel, signedIn: AppModel.SignedIn) {
         self.app = app
@@ -74,17 +74,26 @@ struct MainTabView: View {
             } label: {
                 tabLabel("Home", glyph: .home)
             }
-            Tab(value: .library) {
+            Tab(value: .music) {
                 LibraryView()
-                    .environment(\.tabRootReporter, reporter(for: .library))
+                    .environment(\.tabRootReporter, reporter(for: .music))
             } label: {
-                tabLabel("Library", glyph: .library)
+                tabLabel("Music", glyph: .library)
+            }
+            // Opt-in from the profile drawer; music-only users never see it.
+            if signedIn.podcasts.isEnabled {
+                Tab(value: .podcasts) {
+                    PodcastsView()
+                        .environment(\.tabRootReporter, reporter(for: .podcasts))
+                } label: {
+                    tabLabel("Podcasts", glyph: .podcasts)
+                }
             }
             Tab(value: .downloaded) {
                 DownloadedView()
                     .environment(\.tabRootReporter, reporter(for: .downloaded))
             } label: {
-                tabLabel("Downloaded", glyph: .downloads)
+                tabLabel("Downloads", glyph: .downloads)
             }
             Tab(value: .search, role: .search) {
                 SearchView(text: $searchText, scope: $searchScope)
@@ -102,7 +111,9 @@ struct MainTabView: View {
             signedIn.podcasts.playerChanged()
         }
         .onChange(of: signedIn.podcasts.isEnabled) { _, enabled in
-            if !enabled { searchScope = .all }
+            guard !enabled else { return }
+            searchScope = .all
+            if selection == .podcasts { selection = .home }
         }
         .sheet(isPresented: introBinding) {
             PodcastsIntroSheet(
@@ -339,7 +350,7 @@ enum DebugFlags {
     static let openNowPlaying = ProcessInfo.processInfo.arguments.contains("-openNowPlaying")
     /// `-autodownload` downloads the album opened by `-openFirstAlbum`.
     static let autodownload = ProcessInfo.processInfo.arguments.contains("-autodownload")
-    /// `-tab library` starts on that tab.
+    /// `-tab music` starts on that tab.
     static let initialTab: MainTabView.AppTab = UserDefaults.standard.string(forKey: "tab").flatMap(MainTabView.AppTab.init) ?? .home
     static let enablePodcasts = ProcessInfo.processInfo.arguments.contains("-enablePodcasts")
     /// `-followFeed https://…` follows that feed at launch; `-playLatestEpisode` then plays its newest episode.

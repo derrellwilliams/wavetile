@@ -57,7 +57,7 @@ final class AccessibilityAuditTests: XCTestCase {
     }
 
     @MainActor func testLibraryAudit() throws {
-        try audit(launch(["-tab", "library"]), screen: "Library")
+        try audit(launch(["-tab", "music"]), screen: "Music")
     }
 
     @MainActor func testAlbumAudit() throws {

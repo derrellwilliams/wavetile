@@ -23,13 +23,8 @@ struct AlbumDetailView: View {
             }
             .padding(.bottom, theme.spacing.xxl)
         }
-        .scrollIndicators(.hidden)
-        .ignoresSafeArea(edges: .top)
-        // Full-bleed art: no dimming/blur band under the navigation bar.
-        .scrollEdgeEffectHidden(true, for: .top)
-        .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
-        .themedBackground()
-        .navigationBarTitleDisplayMode(.inline)
+        // Full-bleed art: no bar background or blur band under the navigation bar.
+        .detailPageChrome()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 DownloadButton(collectionID: model.album.id) {
@@ -64,29 +59,12 @@ struct AlbumDetailView: View {
     }
 
     private var header: some View {
-        VStack(spacing: theme.spacing.xs) {
-            Text(model.album.title)
-                .font(theme.typography.largeTitle)
-                .tracking(theme.typography.displayTracking)
-                .foregroundStyle(theme.palette.textPrimary)
-                .multilineTextAlignment(.center)
-                .accessibilityAddTraits(.isHeader)
-            artistName
-            Text(metadata)
-                // One point up from caption (12pt), still scaling with Dynamic Type.
-                .font(BrandFont.font(.footnote))
-                .foregroundStyle(theme.palette.textSecondary)
-        }
-        .padding(.horizontal, theme.spacing.screenInset)
+        DetailHeader(model.album.title, metadata: metadata) { artistName }
     }
 
     /// Taps through to the artist when the album's artist is known locally.
     @ViewBuilder private var artistName: some View {
-        // Stack Sans Notch, matching the title on the artist page it opens.
-        let label = Text(model.album.artist)
-            .font(BrandFont.display(.title3))
-            .tracking(theme.typography.displayTracking)
-            .foregroundStyle(theme.palette.textPrimary)
+        let label = DetailSubtitle(model.album.artist)
         if let artistID = model.artistID {
             NavigationLink(value: LibraryRoute.artist(id: artistID, name: model.album.artist)) { label }
                 .buttonStyle(.plain)

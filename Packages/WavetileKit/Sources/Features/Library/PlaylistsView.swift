@@ -126,17 +126,7 @@ struct PlaylistDetailView: View {
             VStack(spacing: theme.spacing.xl) {
                 VStack(spacing: theme.spacing.md) {
                     ArtworkHero(artwork: artwork)
-                    VStack(spacing: theme.spacing.xs) {
-                        Text(playlist.name)
-                            .font(theme.typography.largeTitle)
-                            .tracking(theme.typography.displayTracking)
-                            .foregroundStyle(theme.palette.textPrimary)
-                            .multilineTextAlignment(.center)
-                        Text("\(playlist.trackCount) songs · \(Duration.milliseconds(playlist.durationMs).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated)))")
-                            .font(theme.typography.caption)
-                            .foregroundStyle(theme.palette.textSecondary)
-                    }
-                    .padding(.horizontal, theme.spacing.screenInset)
+                    DetailHeader(playlist.name, metadata: "\(playlist.trackCount) songs · \(Duration.milliseconds(playlist.durationMs).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated)))")
                 }
 
                 LazyVStack(spacing: 0) {
@@ -159,13 +149,8 @@ struct PlaylistDetailView: View {
             }
             .padding(.bottom, theme.spacing.xxl)
         }
-        .scrollIndicators(.hidden)
-        .ignoresSafeArea(edges: .top)
-        // Full-bleed art: no dimming/blur band under the navigation bar.
-        .scrollEdgeEffectHidden(true, for: .top)
-        .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
-        .themedBackground()
-        .navigationBarTitleDisplayMode(.inline)
+        // Full-bleed art: no bar background or blur band under the navigation bar.
+        .detailPageChrome()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 DownloadButton(collectionID: playlist.id) {

@@ -50,11 +50,10 @@ struct NowPlayingView: View {
 
     private func loadChapters() async {
         chapters = []
-        guard let track = player.current, let media = track.podcast,
+        guard let track = player.current, track.isEpisode,
               let item = try? podcasts.database.episodeNow(id: track.trackID)
         else { return }
-        let audio = podcasts.localFile(episodeID: track.trackID) ?? media.audioURL
-        let loaded = await ChapterLoader.load(chaptersURL: item.episode.chaptersURL, audioURL: audio)
+        let loaded = await podcasts.chapters(for: item.episode)
         guard !Task.isCancelled else { return }
         chapters = loaded
     }
@@ -97,7 +96,7 @@ struct NowPlayingView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 if let track = player.current {
                     if track.isEpisode {
-                        SaveEpisodeButton(episodeID: track.trackID)
+                        SaveEpisodeButton(episodeID: track.trackID, size: 28)
                     } else {
                         FavoriteButton(itemID: track.trackID, size: 28)
                     }
@@ -106,7 +105,7 @@ struct NowPlayingView: View {
             .contentTransition(.opacity)
             .animation(theme.motion.smooth, value: player.current?.queueID)
 
-            Scrubber()
+            Scrubber(chapterStarts: chapters.map(\.start))
 
             transport
 
@@ -156,7 +155,7 @@ struct NowPlayingView: View {
 
     /// The chapter playing now, if the episode has chapters.
     private var currentChapter: Chapter? {
-        chapters.last { $0.start <= player.currentTime + 0.5 }
+        chapters.current(at: player.currentTime)
     }
 
     private var transport: some View {
@@ -251,6 +250,8 @@ struct NowPlayingView: View {
 struct Scrubber: View {
     @Environment(\.theme) private var theme
     @Environment(AudioPlayer.self) private var player
+    /// Chapter start times (seconds); each one after the first cuts a small gap in the bar.
+    var chapterStarts: [Double] = []
     @State private var dragProgress: Double?
     /// Playback progress when the drag began; the drag offsets from here.
     @State private var dragStart: Double?
@@ -266,6 +267,7 @@ struct Scrubber: View {
                         .frame(width: proxy.size.width * progress)
                 }
                 .frame(height: dragProgress == nil ? 6 : 10)
+                .mask { ChapterGaps(starts: chapterStarts, duration: player.duration, width: proxy.size.width) }
                 .frame(maxHeight: .infinity)
                 .contentShape(.rect)
                 .gesture(
@@ -401,22 +403,27 @@ struct SleepTimerMenu: View {
     }
 }
 
-/// Bookmark toggle for the playing episode.
+/// Bookmark toggle for an episode: the podcast twin of `FavoriteButton` (player and episode page).
 struct SaveEpisodeButton: View {
+    @Environment(\.theme) private var theme
     @Environment(PodcastsStore.self) private var podcasts
     let episodeID: String
+    var size: CGFloat = 24
     @State private var isSaved = false
 
     var body: some View {
-        GlyphButton(isSaved ? "Unsave Episode" : "Save Episode", glyph: isSaved ? .saved : .save, size: 28) {
-            isSaved.toggle()
+        GlyphButton(isSaved ? "Unsave Episode" : "Save Episode", glyph: isSaved ? .saved : .save, size: size) {
+            // Same frame as the tap, so the icon swap answers the touch immediately.
+            withAnimation(theme.motion.snappy) { isSaved.toggle() }
             podcasts.setSaved(episodeID, isSaved)
         }
+        .foregroundStyle(theme.palette.accent)
         .sensoryFeedback(.selection, trigger: isSaved)
         .task(id: episodeID) {
             do {
                 for try await item in podcasts.observe(podcasts.database.episode(id: episodeID)) {
-                    isSaved = item?.episode.isSaved ?? false
+                    let saved = item?.episode.isSaved ?? false
+                    if saved != isSaved { withAnimation(theme.motion.snappy) { isSaved = saved } }
                 }
             } catch { Log.observationFailed(error) }
         }
@@ -425,7 +432,6 @@ struct SaveEpisodeButton: View {
 
 /// The playing episode's chapters; tapping one jumps there.
 struct ChaptersSheet: View {
-    @Environment(\.theme) private var theme
     @Environment(\.dismiss) private var dismiss
     @Environment(AudioPlayer.self) private var player
     let chapters: [Chapter]
@@ -433,32 +439,73 @@ struct ChaptersSheet: View {
     var body: some View {
         NavigationStack {
             List(chapters) { chapter in
-                let isCurrent = chapters.last { $0.start <= player.currentTime + 0.5 } == chapter
-                Button {
+                ChapterRow(chapter: chapter, isCurrent: chapters.current(at: player.currentTime) == chapter) {
                     player.seek(to: chapter.start)
                     if !player.isPlaying { player.resume() }
                     dismiss()
-                } label: {
-                    HStack(alignment: .firstTextBaseline, spacing: theme.spacing.md) {
-                        Text(Duration.seconds(chapter.start), format: .time(pattern: chapter.start >= 3600 ? .hourMinuteSecond : .minuteSecond))
-                            .font(theme.typography.caption.monospacedDigit())
-                            .foregroundStyle(theme.palette.textSecondary)
-                            .frame(minWidth: 52, alignment: .leading)
-                        Text(chapter.title)
-                            .font(isCurrent ? theme.typography.body.weight(.semibold) : theme.typography.body)
-                            .foregroundStyle(isCurrent ? theme.palette.accent : theme.palette.textPrimary)
-                        Spacer(minLength: 0)
-                    }
-                    .contentShape(.rect)
                 }
-                .buttonStyle(.plain)
                 .listRowBackground(Color.clear)
-                .accessibilityAddTraits(isCurrent ? .isSelected : [])
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .navigationTitle("Chapters")
             .navigationBarTitleDisplayMode(.inline)
         }
+    }
+}
+
+/// One chapter: start time and title, highlighted while it plays. Shared by the player's
+/// chapter sheet and the episode page.
+struct ChapterRow: View {
+    @Environment(\.theme) private var theme
+    let chapter: Chapter
+    var isCurrent = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(alignment: .firstTextBaseline, spacing: theme.spacing.md) {
+                Text(Duration.seconds(chapter.start), format: .time(pattern: chapter.start >= 3600 ? .hourMinuteSecond : .minuteSecond))
+                    .font(theme.typography.caption.monospacedDigit())
+                    .foregroundStyle(theme.palette.textSecondary)
+                    .frame(minWidth: 52, alignment: .leading)
+                Text(chapter.title)
+                    .font(isCurrent ? theme.typography.body.weight(.semibold) : theme.typography.body)
+                    .foregroundStyle(isCurrent ? theme.palette.accent : theme.palette.textPrimary)
+                    .multilineTextAlignment(.leading)
+                Spacer(minLength: 0)
+            }
+            .frame(minHeight: 44)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isCurrent ? .isSelected : [])
+    }
+}
+
+/// Opaque everywhere except a 2pt gap at each chapter start, so the scrubber reads as
+/// segments (like Apple Podcasts).
+private struct ChapterGaps: View {
+    let starts: [Double]
+    let duration: Double
+    let width: CGFloat
+
+    var body: some View {
+        Canvas { context, size in
+            context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.black))
+            guard duration > 0 else { return }
+            context.blendMode = .clear
+            for start in starts where start > 0 && start < duration {
+                let x = width * start / duration
+                context.fill(Path(CGRect(x: x - 1, y: 0, width: 2, height: size.height)), with: .color(.black))
+            }
+        }
+    }
+}
+
+extension [Chapter] {
+    /// The chapter playing at `time` (half a second early, so a jump lands in the new one).
+    func current(at time: Double) -> Chapter? {
+        last { $0.start <= time + 0.5 }
     }
 }

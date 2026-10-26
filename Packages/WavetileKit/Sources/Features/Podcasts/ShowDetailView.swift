@@ -32,12 +32,8 @@ struct ShowDetailView: View {
             }
             .padding(.bottom, theme.spacing.xxl)
         }
-        .scrollIndicators(.hidden)
-        .ignoresSafeArea(edges: .top)
-        .scrollEdgeEffectHidden(true, for: .top)
-        .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
-        .themedBackground()
-        .navigationBarTitleDisplayMode(.inline)
+        // Full-bleed art: no bar background or blur band under the navigation bar.
+        .detailPageChrome()
         .toolbar {
             if let show {
                 ToolbarItem(placement: .topBarTrailing) { settingsMenu(show) }
@@ -78,56 +74,45 @@ struct ShowDetailView: View {
 
     private var header: some View {
         VStack(spacing: theme.spacing.md) {
-            VStack(spacing: theme.spacing.xs) {
-                Text(show?.title ?? route.title)
-                    .font(theme.typography.largeTitle)
-                    .tracking(theme.typography.displayTracking)
-                    .foregroundStyle(theme.palette.textPrimary)
-                    .multilineTextAlignment(.center)
-                    .accessibilityAddTraits(.isHeader)
+            DetailHeader(show?.title ?? route.title, metadata: metadata) {
                 if !(show?.author ?? route.author).isEmpty {
-                    // The text face, not Stack Sans Notch: a publisher name is metadata, not a title.
-                    Text(show?.author ?? route.author)
-                        .font(BrandFont.font(.title3, weight: .medium))
-                        .foregroundStyle(theme.palette.textPrimary)
-                        .multilineTextAlignment(.center)
+                    DetailSubtitle(show?.author ?? route.author)
                 }
-                if let metadata {
-                    Text(metadata)
-                        .font(BrandFont.font(.footnote))
+            }
+            VStack(spacing: theme.spacing.md) {
+                HStack(spacing: theme.spacing.sm) {
+                    PrimaryButton(playTitle) { if let item = playTarget { podcasts.play(item) } }
+                        .disabled(playTarget == nil)
+                    followButton
+                }
+                if let summary = show?.summary, !summary.isEmpty {
+                    Text(summary)
+                        .font(theme.typography.itemSubtitle)
                         .foregroundStyle(theme.palette.textSecondary)
+                        .lineLimit(expandedSummary ? nil : 3)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(.rect)
+                        .onTapGesture { withAnimation(theme.motion.smooth) { expandedSummary.toggle() } }
+                        .accessibilityHint(expandedSummary ? "" : "Shows the full description")
                 }
             }
-            HStack(spacing: theme.spacing.sm) {
-                PrimaryButton(playTitle) { if let item = playTarget { podcasts.play(item) } }
-                    .disabled(playTarget == nil)
-                followButton
-            }
-            if let summary = show?.summary, !summary.isEmpty {
-                Text(summary)
-                    .font(theme.typography.itemSubtitle)
-                    .foregroundStyle(theme.palette.textSecondary)
-                    .lineLimit(expandedSummary ? nil : 3)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(.rect)
-                    .onTapGesture { withAnimation(theme.motion.smooth) { expandedSummary.toggle() } }
-                    .accessibilityHint(expandedSummary ? "" : "Shows the full description")
-            }
+            .padding(.horizontal, theme.spacing.screenInset)
         }
-        .padding(.horizontal, theme.spacing.screenInset)
     }
 
     private var followButton: some View {
         Button {
             guard let show else { return }
             let target = !isFollowing
-            isFollowing = target
+            withAnimation(theme.motion.snappy) { isFollowing = target }
             Task { await podcasts.setFollowed(show, target) }
         } label: {
             Label(isFollowing ? "Following" : "Follow", glyph: isFollowing ? .check : .add)
                 .font(.custom(BrandFont.family, size: 13, relativeTo: .footnote).weight(.semibold))
                 .textCase(.uppercase)
                 .labelStyle(.tintedIcon)
+                // Follow ↔ Following crossfades instead of swapping text mid-frame.
+                .contentTransition(.opacity)
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(theme.palette.accent, lineWidth: 1.5))
                 .contentShape(.rect(cornerRadius: 8))
@@ -291,35 +276,5 @@ struct AllShowsView: View {
                 for try await value in podcasts.observe(podcasts.database.followedShows()) { shows = value }
             } catch { Log.observationFailed(error) }
         }
-    }
-}
-
-/// Apple's chart, as a ranked list.
-struct TopShowsView: View {
-    @Environment(\.theme) private var theme
-    @Environment(PodcastsStore.self) private var podcasts
-
-    var body: some View {
-        List {
-            ForEach(Array(podcasts.topShows.enumerated()), id: \.element.id) { index, show in
-                if let route = ShowRoute(show) {
-                    NavigationLink(value: PodcastRoute.show(route)) {
-                        HStack(spacing: theme.spacing.md) {
-                            Text("\(index + 1)")
-                                .font(theme.typography.itemTitle.monospacedDigit())
-                                .foregroundStyle(theme.palette.textSecondary)
-                                .frame(minWidth: 24)
-                            TrackRow(title: show.title, subtitle: show.genre.map { "\(show.author) · \($0)" } ?? show.author,
-                                     leading: .artwork(.unsized(show.artworkURL, maxPixelWidth: 168)))
-                        }
-                    }
-                    .listRowBackground(Color.clear)
-                }
-            }
-        }
-        .listStyle(.plain)
-        .themedBackground()
-        .navigationTitle("Top Shows")
-        .task { await podcasts.loadTopShows() }
     }
 }

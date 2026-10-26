@@ -82,7 +82,6 @@ final class PodcastsStore {
     private(set) var downloadStates: [String: EpisodeDownloadRecord] = [:]
     private(set) var totalBytes: Int64 = 0
     private(set) var isRefreshing = false
-    private(set) var topShows: [DirectoryShow] = []
 
     init(session: ServerSession, library: LibraryClient, player: AudioPlayer, database: PodcastDatabase, defaults: UserDefaults = .standard) {
         self.database = database
@@ -196,11 +195,6 @@ final class PodcastsStore {
     func markOpened(_ show: ShowRecord) {
         guard show.isFollowed else { return }
         Task { try? await database.markOpened(showID: show.id) }
-    }
-
-    func loadTopShows() async {
-        guard topShows.isEmpty, let shows = try? await directory.topShows() else { return }
-        topShows = shows
     }
 
     // MARK: - Playback
@@ -346,6 +340,23 @@ final class PodcastsStore {
 
     func localFile(episodeID: String) -> URL? {
         downloads?.localFile(episodeID: episodeID)
+    }
+
+    @ObservationIgnored private var chapterLoads: [String: Task<[Chapter], Never>] = [:]
+
+    /// An episode's chapters (feed JSON, embedded in the audio, or timestamps in the show
+    /// notes), loaded once per launch. The load is stored before its first `await`, so the
+    /// episode page and the player asking at the same moment share one fetch, not two.
+    func chapters(for episode: EpisodeRecord) async -> [Chapter] {
+        if let load = chapterLoads[episode.id] { return await load.value }
+        let audioURL = localFile(episodeID: episode.id) ?? episode.audioURL
+        // Unstructured on purpose: a caller leaving (closing the player) shouldn't cancel the
+        // fetch another screen is waiting on.
+        let load = Task {
+            await ChapterLoader.load(chaptersURL: episode.chaptersURL, audioURL: audioURL, notesHTML: episode.notesHTML, duration: episode.duration)
+        }
+        chapterLoads[episode.id] = load
+        return await load.value
     }
 
     private func autoDownload() async {

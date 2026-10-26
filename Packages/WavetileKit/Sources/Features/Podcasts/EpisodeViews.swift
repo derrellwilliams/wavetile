@@ -123,21 +123,61 @@ struct EpisodeDownloadBadge: View {
     let episodeID: String
 
     var body: some View {
-        if let state = podcasts.downloadStates[episodeID] {
-            Group {
-                switch state.state {
-                case .queued, .downloading:
-                    ProgressRing(progress: state.progress).frame(width: 16, height: 16)
-                        .accessibilityLabel("Downloading")
-                case .done:
-                    Glyph.downloaded.image.resizable().frame(width: 16, height: 16)
-                        .accessibilityLabel("Downloaded")
-                case .failed:
-                    Glyph.warning.image.resizable().frame(width: 16, height: 16)
-                        .accessibilityLabel("Download failed")
+        if let record = podcasts.downloadStates[episodeID] {
+            DownloadIcon(state: record.indicator, title: record.indicator.episodeTitle, size: 16)
+                .foregroundStyle(theme.palette.textSecondary)
+        }
+    }
+}
+
+/// The episode page's toolbar download control, matching albums' `DownloadButton`:
+/// download → progress ring (menu to cancel) → downloaded (menu to remove).
+struct EpisodeDownloadButton: View {
+    @Environment(\.theme) private var theme
+    @Environment(PodcastsStore.self) private var podcasts
+    let item: EpisodeItem
+
+    private var indicator: DownloadIndicator { podcasts.downloadStates[item.id]?.indicator ?? .none }
+
+    var body: some View {
+        Group {
+            switch indicator {
+            case .done, .inProgress:
+                Menu {
+                    Button(indicator == .done ? "Remove Download" : "Cancel Download", glyph: indicator == .done ? .trash : .close, role: .destructive) {
+                        podcasts.removeDownload(item.id)
+                    }
+                } label: {
+                    DownloadIcon(state: indicator, title: indicator.episodeTitle)
+                }
+            case .none, .failed:
+                Button { podcasts.download(item) } label: {
+                    DownloadIcon(state: indicator, title: indicator.episodeTitle)
                 }
             }
-            .foregroundStyle(theme.palette.textSecondary)
+        }
+        .animation(theme.motion.smooth, value: indicator)
+        .sensoryFeedback(.success, trigger: indicator == .done) { _, done in done }
+    }
+}
+
+extension EpisodeDownloadRecord {
+    var indicator: DownloadIndicator {
+        switch state {
+        case .queued, .downloading: .inProgress(progress)
+        case .done: .done
+        case .failed: .failed
+        }
+    }
+}
+
+extension DownloadIndicator {
+    var episodeTitle: String {
+        switch self {
+        case .none: "Download"
+        case let .inProgress(progress): "Downloading, \(Int(progress * 100)) percent"
+        case .done: "Downloaded"
+        case .failed: "Download Failed, Retry"
         }
     }
 }
@@ -202,41 +242,43 @@ struct EpisodeCard: View {
     let item: EpisodeItem
 
     var body: some View {
-        VStack(alignment: .leading, spacing: theme.spacing.sm) {
-            ArtworkView(.unsized(item.artworkURL, maxPixelWidth: 840), cornerRadius: theme.radius.small)
-                .overlay(alignment: .topLeading) {
-                    if let label {
-                        Text(label)
-                            .font(theme.typography.caption.weight(.bold))
-                            .textCase(.uppercase)
-                            .foregroundStyle(theme.palette.onAccent)
-                            .padding(.horizontal, theme.spacing.sm)
-                            .padding(.vertical, theme.spacing.xxs)
-                            .background(theme.palette.accent, in: .capsule)
-                            .padding(theme.spacing.sm)
+        // A button, not a tap gesture, so the card presses in under the finger like album tiles.
+        Button { push(.episode(id: item.id)) } label: {
+            VStack(alignment: .leading, spacing: theme.spacing.sm) {
+                ArtworkView(.unsized(item.artworkURL, maxPixelWidth: 840), cornerRadius: theme.radius.small)
+                    .overlay(alignment: .topLeading) {
+                        if let label {
+                            Text(label)
+                                .font(theme.typography.caption.weight(.bold))
+                                .textCase(.uppercase)
+                                // Inverse of the play pill: tan text on a dark capsule, so it reads on light art.
+                                .foregroundStyle(theme.palette.accent)
+                                .padding(.horizontal, theme.spacing.sm)
+                                .padding(.vertical, theme.spacing.xxs)
+                                .background(theme.palette.background, in: .capsule)
+                                .padding(theme.spacing.sm)
+                        }
                     }
-                }
-            Text(item.show.title)
-                .font(theme.typography.caption.weight(.semibold))
-                .foregroundStyle(theme.palette.textSecondary)
-                .textCase(.uppercase)
-                .lineLimit(1)
-            Text(item.episode.title)
-                .font(theme.typography.itemTitle)
-                .foregroundStyle(theme.palette.textPrimary)
-                .lineLimit(2, reservesSpace: true)
-                .multilineTextAlignment(.leading)
-            // Time left as plain text, matching album tiles; tapping the card opens the episode.
-            Text(EpisodeFormat.status(item.episode))
-                .font(theme.typography.itemSubtitle)
-                .foregroundStyle(theme.palette.textSecondary)
-                .monospacedDigit()
+                Text(item.show.title)
+                    .font(theme.typography.caption.weight(.semibold))
+                    .foregroundStyle(theme.palette.textSecondary)
+                    .textCase(.uppercase)
+                    .lineLimit(1)
+                Text(item.episode.title)
+                    .font(theme.typography.itemTitle)
+                    .foregroundStyle(theme.palette.textPrimary)
+                    .lineLimit(2, reservesSpace: true)
+                    .multilineTextAlignment(.leading)
+                // Time left as plain text, matching album tiles; tapping the card opens the episode.
+                Text(EpisodeFormat.status(item.episode))
+                    .font(theme.typography.itemSubtitle)
+                    .foregroundStyle(theme.palette.textSecondary)
+                    .monospacedDigit()
+            }
+            .contentShape(.rect)
         }
-        .contentShape(.rect)
-        .onTapGesture { push(.episode(id: item.id)) }
+        .buttonStyle(.pressable)
         .contextMenu { EpisodeMenu(item: item) }
-        .accessibilityElement(children: .contain)
-        .accessibilityAction(named: "Show Episode") { push(.episode(id: item.id)) }
     }
 
     private var label: String? {

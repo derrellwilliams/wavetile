@@ -4,57 +4,68 @@ import Podcasts
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// The Podcasts page in Library: library shortcuts, latest episodes, your shows and top charts,
-/// modeled on Apple Podcasts' Library. (Continue Listening and Up Next live on Home.)
+/// The Podcasts tab: Continue Listening, a row of the latest episodes, then the library
+/// shortcuts, and nothing below (user-specified order). Up Next in Podcasts stays on Home. The
+/// gear opens the podcast settings; the profile drawer only holds the on/off switch.
 struct PodcastsView: View {
     @ObserveInjection var inject
     @Environment(\.theme) private var theme
     @Environment(PodcastsStore.self) private var podcasts
     @Environment(\.openPodcastSearch) private var openPodcastSearch
+    @State private var continueListening: [EpisodeItem] = []
     @State private var latest: [EpisodeItem] = []
-    @State private var shows: [ShowSummary] = []
-    @State private var didLoad = false
+    @State private var hasShows = true
+    @State private var path = NavigationPath()
+    @State private var showSettings = false
     @State private var showAddFeed = false
     @State private var showImporter = false
     @State private var importMessage: String?
 
     var body: some View {
+        NavigationStack(path: $path) {
+            page
+                .tabRootChrome {
+                    AddPodcastMenu(showAddFeed: $showAddFeed, showImporter: $showImporter)
+                    Button { showSettings = true } label: {
+                        BarGroupIcon(glyph: .settings)
+                    }
+                    .accessibilityLabel("Podcast Settings")
+                }
+                .podcastDestinations { path.append($0) }
+        }
+        .sheet(isPresented: $showSettings) {
+            PodcastSettingsView()
+                .presentationDetents([.large])
+                .presentationBackground(theme.palette.background)
+        }
+        .enableInjection()
+    }
+
+    private var page: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: theme.spacing.xxl) {
-                if didLoad && shows.isEmpty {
+                if !hasShows {
                     emptyState
                 }
-                libraryLinks
+                if !continueListening.isEmpty {
+                    EpisodeShelf(title: "Continue Listening", items: continueListening)
+                }
                 if !latest.isEmpty {
-                    latestSection
+                    EpisodeShelf(title: "Latest Episodes", items: latest)
                 }
-                if !shows.isEmpty {
-                    showsShelf
-                }
-                TopShowsShelf()
+                libraryLinks
             }
             .padding(.vertical, theme.spacing.lg)
         }
         .themedBackground()
         .navigationTitle("Podcasts")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                AddPodcastMenu(showAddFeed: $showAddFeed, showImporter: $showImporter)
-            }
-        }
         .markRefreshable { await podcasts.refreshAll() }
-        .task { await observe(podcasts.database.latestEpisodes(limit: 5)) { latest = $0 } }
-        // Here, not on the shelf: the shelf only exists once the chart has loaded.
-        .task { await podcasts.loadTopShows() }
-        .task {
-            await observe(podcasts.database.followedShows()) {
-                shows = $0
-                didLoad = true
-            }
-        }
+        // On the always-present scroll view: a task on a shelf that isn't shown never runs.
+        .task { await observe(podcasts.database.continueListening()) { continueListening = $0 } }
+        .task { await observe(podcasts.database.latestEpisodes(limit: 15)) { latest = $0 } }
+        .task { await observe(podcasts.database.followedShows()) { hasShows = !$0.isEmpty } }
         .sheet(isPresented: $showAddFeed) { AddFeedSheet() }
         .opmlImporter(isPresented: $showImporter, message: $importMessage)
-        .enableInjection()
     }
 
     private func observe<T: Sendable>(_ observation: GRDBObservation<T>, update: (T) -> Void) async {
@@ -82,40 +93,6 @@ struct PodcastsView: View {
         .padding(.horizontal, theme.spacing.screenInset)
     }
 
-    private var latestSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            SectionHeader(title: "Latest Episodes", destination: .list(.latest))
-            LazyVStack(spacing: 0) {
-                ForEach(latest) { item in
-                    EpisodeRow(item: item)
-                    Divider().overlay(theme.palette.separator)
-                }
-            }
-            .padding(.horizontal, theme.spacing.screenInset)
-        }
-    }
-
-    private var showsShelf: some View {
-        VStack(alignment: .leading, spacing: theme.spacing.md) {
-            SectionHeader(title: "Your Shows", destination: .shows)
-            ScrollView(.horizontal) {
-                LazyHStack(alignment: .top, spacing: theme.spacing.lg) {
-                    ForEach(shows) { summary in
-                        NavigationLink(value: PodcastRoute.show(ShowRoute(summary.show))) {
-                            ShowTile(title: summary.show.title, subtitle: summary.show.author, artworkURL: summary.show.artworkURL, newCount: summary.newCount)
-                        }
-                        .buttonStyle(.pressable)
-                        .frame(width: theme.artwork.shelfTileWidth)
-                    }
-                }
-                .scrollTargetLayout()
-            }
-            .contentMargins(.horizontal, theme.spacing.screenInset, for: .scrollContent)
-            .scrollTargetBehavior(.viewAligned)
-            .scrollIndicators(.hidden)
-        }
-    }
-
     private var emptyState: some View {
         EmptyState("Find Your Shows", glyph: .podcasts, message: "Search Apple Podcasts, paste a feed link, or import your subscriptions from another app.") {
             VStack(spacing: theme.spacing.sm) {
@@ -133,55 +110,7 @@ struct PodcastsView: View {
 
 typealias GRDBObservation<T> = ValueObservation<ValueReducers.Fetch<T>>
 
-/// A section title, optionally with a "See All" link.
-struct SectionHeader: View {
-    @Environment(\.theme) private var theme
-    let title: String
-    var destination: PodcastRoute?
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(title)
-                .font(theme.typography.sectionHeader)
-                .foregroundStyle(theme.palette.textPrimary)
-                .accessibilityAddTraits(.isHeader)
-            Spacer()
-            if let destination {
-                NavigationLink("See All", value: destination)
-                    .font(theme.typography.itemSubtitle.weight(.semibold))
-                    .foregroundStyle(theme.palette.accent)
-            }
-        }
-        .padding(.horizontal, theme.spacing.screenInset)
-    }
-}
-
-/// A Library-style row: glyph, title, chevron.
-struct LinkRow: View {
-    @Environment(\.theme) private var theme
-    let title: String
-    let glyph: Glyph
-
-    var body: some View {
-        HStack(spacing: theme.spacing.md) {
-            glyph.image
-                .foregroundStyle(theme.palette.accent)
-                .frame(width: 28)
-            Text(title)
-                .font(theme.typography.sectionHeader)
-                .foregroundStyle(theme.palette.textPrimary)
-            Spacer()
-            Glyph.chevron.image
-                .resizable()
-                .frame(width: 14, height: 14)
-                .foregroundStyle(theme.palette.textSecondary)
-        }
-        .padding(.vertical, theme.spacing.md + 2)
-        .contentShape(.rect)
-    }
-}
-
-/// The "+" on the Podcasts page: search, add a feed link, or import OPML.
+/// The "+" on the Podcasts tab: search, add a feed link, or import OPML.
 struct AddPodcastMenu: View {
     @Environment(\.openPodcastSearch) private var openPodcastSearch
     @Binding var showAddFeed: Bool
@@ -193,41 +122,9 @@ struct AddPodcastMenu: View {
             Button("Add Show by Link", glyph: .feed) { showAddFeed = true }
             Button("Import OPML", glyph: .download) { showImporter = true }
         } label: {
-            Label("Add Podcast", glyph: .add)
+            BarGroupIcon(glyph: .add)
         }
-    }
-}
-
-/// Apple's top shows, as a shelf.
-struct TopShowsShelf: View {
-    @Environment(\.theme) private var theme
-    @Environment(PodcastsStore.self) private var podcasts
-
-    var body: some View {
-        Group {
-            if !podcasts.topShows.isEmpty {
-                VStack(alignment: .leading, spacing: theme.spacing.md) {
-                    SectionHeader(title: "Top Shows", destination: .topShows)
-                    ScrollView(.horizontal) {
-                        LazyHStack(alignment: .top, spacing: theme.spacing.lg) {
-                            ForEach(podcasts.topShows.prefix(15)) { show in
-                                if let route = ShowRoute(show) {
-                                    NavigationLink(value: PodcastRoute.show(route)) {
-                                        ShowTile(title: show.title, subtitle: show.author, artworkURL: show.artworkURL)
-                                    }
-                                    .buttonStyle(.pressable)
-                                    .frame(width: theme.artwork.shelfTileWidth)
-                                }
-                            }
-                        }
-                        .scrollTargetLayout()
-                    }
-                    .contentMargins(.horizontal, theme.spacing.screenInset, for: .scrollContent)
-                    .scrollTargetBehavior(.viewAligned)
-                    .scrollIndicators(.hidden)
-                }
-            }
-        }
+        .accessibilityLabel("Add Podcast")
     }
 }
 
