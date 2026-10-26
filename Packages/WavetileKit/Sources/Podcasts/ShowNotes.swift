@@ -114,8 +114,6 @@ public enum ShowNotes {
     public static func chapters(html: String, duration: Double? = nil) -> [Chapter] {
         guard !html.isEmpty else { return [] }
         let text = String(attributed(html: html).characters)
-        let leading = /^[\s•·*\-–—]*[\[(]?((?:\d{1,2}:)?\d{1,2}:[0-5]\d)[\])]?\s*[-–—:|.]?\s*(\S.*)$/
-        let trailing = /^[\s•·*\-–—]*(\S.*?)\s*[-–—:|]?\s*[\[(]?((?:\d{1,2}:)?\d{1,2}:[0-5]\d)[\])]?\s*$/
         func seconds(_ stamp: Substring) -> Double? {
             let parts = stamp.split(separator: ":").compactMap { Double($0) }
             guard parts.count == 2 || parts.count == 3 else { return nil }
@@ -124,13 +122,7 @@ public enum ShowNotes {
 
         var runs: [[Chapter]] = [[]]
         for line in text.split(whereSeparator: \.isNewline) where line.count <= 200 {
-            var found: (Substring, Substring)?
-            if let match = line.wholeMatch(of: leading) {
-                found = (match.output.1, match.output.2)
-            } else if let match = line.wholeMatch(of: trailing) {
-                found = (match.output.2, match.output.1)
-            }
-            guard let (stamp, rawTitle) = found, let start = seconds(stamp) else { continue }
+            guard let (stamp, rawTitle) = timestampEntry(line), let start = seconds(stamp) else { continue }
             if let duration, duration > 0, start >= duration { continue }
             let title = rawTitle.trimmingCharacters(in: .whitespaces.union(.init(charactersIn: "-–—:|")))
             guard !title.isEmpty else { continue }
@@ -140,6 +132,39 @@ public enum ShowNotes {
         }
         let best = runs.max { $0.count < $1.count } ?? []
         return best.count >= 2 ? best : []
+    }
+
+    /// A line that starts or ends with a time, split into (time, title).
+    static func timestampEntry(_ line: Substring) -> (stamp: Substring, title: Substring)? {
+        let leading = /^[\s•·*\-–—]*[\[(]?((?:\d{1,2}:)?\d{1,2}:[0-5]\d)[\])]?\s*[-–—:|.]?\s*(\S.*)$/
+        let trailing = /^[\s•·*\-–—]*(\S.*?)\s*[-–—:|]?\s*[\[(]?((?:\d{1,2}:)?\d{1,2}:[0-5]\d)[\])]?\s*$/
+        if let match = line.wholeMatch(of: leading) { return (match.output.1, match.output.2) }
+        if let match = line.wholeMatch(of: trailing) { return (match.output.2, match.output.1) }
+        return nil
+    }
+
+    /// The notes without their timestamp list (and a "Chapters:"/"Timestamps:" heading above
+    /// it), for when the episode page already shows the chapters as a tappable list.
+    public static func removingTimestampLines(from notes: AttributedString) -> AttributedString {
+        let heading = /(?i)^\s*(chapters|timestamps|time ?codes|time ?stamps|episode chapters)\s*:?\s*$/
+        var result = AttributedString()
+        let text = notes.characters
+        var lineStart = text.startIndex
+        var lastKeptBlank = true
+        while lineStart < text.endIndex {
+            let lineEnd = text[lineStart...].firstIndex(of: "\n") ?? text.endIndex
+            let next = lineEnd < text.endIndex ? text.index(after: lineEnd) : lineEnd
+            let line = Substring(String(text[lineStart ..< lineEnd]))
+            let isBlank = line.allSatisfy(\.isWhitespace)
+            let drop = timestampEntry(line) != nil || line.wholeMatch(of: heading) != nil || (isBlank && lastKeptBlank)
+            if !drop {
+                result.append(notes[lineStart ..< next])
+                lastKeptBlank = isBlank
+            }
+            lineStart = next
+        }
+        while let last = result.characters.last, last.isWhitespace { result.characters.removeLast() }
+        return result
     }
 
     /// Plain-text timestamps (`1:02:03`, `12:34`) become seek links.

@@ -151,6 +151,12 @@ struct ShowNotesChapterTests {
         #expect(chapters == [Chapter(start: 0, title: "Intro"), Chapter(start: start, title: title)])
     }
 
+    @Test func notesDropTheirTimestampListWhenChaptersShow() {
+        let notes = ShowNotes.attributed(html: "<p>A great episode.</p><p>Timestamps:</p><p>00:00 Intro<br>05:12 News</p><p>Sponsored by Acme.</p>")
+        let text = String(ShowNotes.removingTimestampLines(from: notes).characters)
+        #expect(text == "A great episode.\n\nSponsored by Acme.")
+    }
+
     @Test func needsAnOrderedListOfTwoOrMore() {
         #expect(ShowNotes.chapters(html: "<p>Recorded at 10:30 in the studio</p>").isEmpty)
         #expect(ShowNotes.chapters(html: "<p>12:00 Late</p><p>01:00 Early</p>").isEmpty)

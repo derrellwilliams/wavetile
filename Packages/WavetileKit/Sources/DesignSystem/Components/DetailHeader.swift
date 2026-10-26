@@ -6,18 +6,21 @@ public struct DetailHeader<Subtitle: View>: View {
     @Environment(\.theme) private var theme
     private let title: String
     private let metadata: String?
+    private let compact: Bool
     private let subtitle: Subtitle
 
-    public init(_ title: String, metadata: String? = nil, @ViewBuilder subtitle: () -> Subtitle) {
+    /// `compact` uses the smaller title size, for titles that run long (podcast episodes).
+    public init(_ title: String, metadata: String? = nil, compact: Bool = false, @ViewBuilder subtitle: () -> Subtitle) {
         self.title = title
         self.metadata = metadata
+        self.compact = compact
         self.subtitle = subtitle()
     }
 
     public var body: some View {
         VStack(spacing: theme.spacing.xs) {
             Text(title)
-                .font(theme.typography.largeTitle)
+                .font(compact ? theme.typography.title : theme.typography.largeTitle)
                 .tracking(theme.typography.displayTracking)
                 .foregroundStyle(theme.palette.textPrimary)
                 .multilineTextAlignment(.center)

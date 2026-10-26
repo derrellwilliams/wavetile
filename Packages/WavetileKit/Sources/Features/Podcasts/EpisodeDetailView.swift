@@ -3,7 +3,7 @@ import Playback
 import Podcasts
 import SwiftUI
 
-/// One episode, laid out like an album: hero art, title, show, play, chapters and show notes,
+/// One episode, laid out like an album: hero art, title, show, play, show notes and chapters,
 /// with Download, Save and More in the toolbar. Timestamps in the notes start playback there.
 struct EpisodeDetailView: View {
     @ObserveInjection var inject
@@ -14,6 +14,11 @@ struct EpisodeDetailView: View {
     let episodeID: String
     @State private var item: EpisodeItem?
     @State private var notes: AttributedString?
+    /// The notes as shown: without their timestamp list when the chapters list covers it.
+    @State private var visibleNotes: AttributedString?
+    /// The first paragraph, when the notes run longer; nil when they're one paragraph.
+    @State private var notesPreview: AttributedString?
+    @State private var notesExpanded = false
     @State private var chapters: [Chapter] = []
 
     var body: some View {
@@ -57,7 +62,10 @@ struct EpisodeDetailView: View {
             guard let episode = item?.episode else { return }
             let loaded = await podcasts.chapters(for: episode)
             guard !Task.isCancelled else { return }
-            withAnimation(theme.motion.smooth) { chapters = loaded }
+            withAnimation(theme.motion.smooth) {
+                chapters = loaded
+                updateVisibleNotes()
+            }
         }
         .enableInjection()
     }
@@ -68,11 +76,26 @@ struct EpisodeDetailView: View {
                 if value?.episode.notesHTML != item?.episode.notesHTML, let html = value?.episode.notesHTML {
                     let rendered = await Self.renderNotes(html)
                     // Notes arrive after the page draws; ease them in rather than popping.
-                    withAnimation(theme.motion.smooth) { notes = rendered }
+                    notes = rendered
+                    withAnimation(theme.motion.smooth) { updateVisibleNotes() }
                 }
                 item = value
             }
         } catch { Log.observationFailed(error) }
+    }
+
+    /// Chapters are the tappable list, so the same timestamps aren't repeated in the notes.
+    private func updateVisibleNotes() {
+        guard let notes else { return }
+        let visible = chapters.isEmpty ? notes : ShowNotes.removingTimestampLines(from: notes)
+        visibleNotes = visible
+        // Paragraphs are separated by a blank line; preview only when more text follows.
+        if let breakRange = visible.range(of: "\n\n"),
+           visible[breakRange.upperBound...].characters.contains(where: { !$0.isWhitespace }) {
+            notesPreview = AttributedString(visible[..<breakRange.lowerBound])
+        } else {
+            notesPreview = nil
+        }
     }
 
     /// Sanitizing long notes is string work; keep it off the main actor.
@@ -84,7 +107,8 @@ struct EpisodeDetailView: View {
         VStack(spacing: theme.spacing.xl) {
             VStack(spacing: theme.spacing.md) {
                 ArtworkHero(artwork: .unsized(item.artworkURL, maxPixelWidth: 1320))
-                DetailHeader(item.episode.title, metadata: metadata(item)) {
+                // Episode titles run far longer than album names, so they use the smaller title size.
+                DetailHeader(item.episode.title, metadata: metadata(item), compact: true) {
                     Button { push(.show(ShowRoute(item.show))) } label: {
                         DetailSubtitle(item.show.title)
                     }
@@ -106,6 +130,29 @@ struct EpisodeDetailView: View {
                     }
                 }
 
+                if let visibleNotes, !visibleNotes.characters.isEmpty {
+                    VStack(alignment: .leading, spacing: theme.spacing.sm) {
+                        Text("Show Notes")
+                            .font(theme.typography.sectionHeader)
+                            .foregroundStyle(theme.palette.textPrimary)
+                            .accessibilityAddTraits(.isHeader)
+                        Text(notesExpanded ? visibleNotes : notesPreview ?? visibleNotes)
+                            .font(theme.typography.body)
+                            .foregroundStyle(theme.palette.textPrimary)
+                            .tint(theme.palette.accent)
+                            .textSelection(.enabled)
+                        if notesPreview != nil, !notesExpanded {
+                            Button("Read More") {
+                                withAnimation(theme.motion.smooth) { notesExpanded = true }
+                            }
+                            .font(theme.typography.itemSubtitle.weight(.semibold))
+                            .foregroundStyle(theme.palette.accent)
+                            .frame(minHeight: 44)
+                            .accessibilityHint("Shows the full show notes")
+                        }
+                    }
+                }
+
                 if !chapters.isEmpty {
                     VStack(alignment: .leading, spacing: 0) {
                         Text("Chapters")
@@ -121,20 +168,6 @@ struct EpisodeDetailView: View {
                             }
                             Divider().overlay(theme.palette.separator)
                         }
-                    }
-                }
-
-                if let notes, !notes.characters.isEmpty {
-                    VStack(alignment: .leading, spacing: theme.spacing.sm) {
-                        Text("Show Notes")
-                            .font(theme.typography.sectionHeader)
-                            .foregroundStyle(theme.palette.textPrimary)
-                            .accessibilityAddTraits(.isHeader)
-                        Text(notes)
-                            .font(theme.typography.body)
-                            .foregroundStyle(theme.palette.textPrimary)
-                            .tint(theme.palette.accent)
-                            .textSelection(.enabled)
                     }
                 }
             }

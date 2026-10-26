@@ -259,16 +259,19 @@ struct EpisodeCard: View {
                                 .padding(theme.spacing.sm)
                         }
                     }
-                Text(item.show.title)
-                    .font(theme.typography.caption.weight(.semibold))
-                    .foregroundStyle(theme.palette.textSecondary)
-                    .textCase(.uppercase)
-                    .lineLimit(1)
-                Text(item.episode.title)
-                    .font(theme.typography.itemTitle)
-                    .foregroundStyle(theme.palette.textPrimary)
-                    .lineLimit(2, reservesSpace: true)
-                    .multilineTextAlignment(.leading)
+                // Show and title read as one unit, so they sit closer than the rest of the card.
+                VStack(alignment: .leading, spacing: theme.spacing.xs) {
+                    Text(item.show.title)
+                        .font(theme.typography.caption.weight(.semibold))
+                        .foregroundStyle(theme.palette.textSecondary)
+                        .textCase(.uppercase)
+                        .lineLimit(1)
+                    Text(item.episode.title)
+                        .font(theme.typography.itemTitle)
+                        .foregroundStyle(theme.palette.textPrimary)
+                        .lineLimit(2, reservesSpace: true)
+                        .multilineTextAlignment(.leading)
+                }
                 // Time left as plain text, matching album tiles; tapping the card opens the episode.
                 Text(EpisodeFormat.status(item.episode))
                     .font(theme.typography.itemSubtitle)
