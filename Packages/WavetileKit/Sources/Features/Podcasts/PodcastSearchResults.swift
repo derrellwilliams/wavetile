@@ -2,8 +2,8 @@ import DesignSystem
 import Podcasts
 import SwiftUI
 
-/// Search's Podcasts filter: your shows and episodes (instant, offline), then Apple Podcasts
-/// directory results.
+/// Search's Podcasts filter: shows first, then episodes. Your shows (instant, offline), then
+/// Apple Podcasts shows when they match what was typed; otherwise Apple's results go last.
 ///
 /// Privacy: only text typed under this filter goes to Apple, after typing pauses. Music
 /// searches never leave the device.
@@ -42,23 +42,11 @@ struct PodcastSearchResults: View {
                     .listRowBackground(Color.clear)
                 }
             }
-            PodcastLocalSections(results: local)
-            if !directory.isEmpty {
-                Section("Apple Podcasts") {
-                    ForEach(directory) { show in
-                        if let route = ShowRoute(show) {
-                            NavigationLink(value: PodcastRoute.show(route)) {
-                                TrackRow(
-                                    title: show.title,
-                                    subtitle: [show.author, show.genre].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " · "),
-                                    leading: .artwork(.unsized(show.artworkURL, maxPixelWidth: 168))
-                                )
-                            }
-                            .listRowBackground(Color.clear)
-                        }
-                    }
-                }
-            } else if isSearching {
+            PodcastLocalSections(results: local, part: .shows)
+            if directoryIsRelevant { directorySection }
+            PodcastLocalSections(results: local, part: .episodes)
+            if !directoryIsRelevant { directorySection }
+            if directory.isEmpty, isSearching {
                 HStack {
                     Spacer()
                     LoadingMark()
@@ -83,10 +71,25 @@ struct PodcastSearchResults: View {
             isSearching = true
             defer { isSearching = false }
             do {
-                directory = try await podcasts.directory.search(trimmed)
+                let shows = try await podcasts.directory.search(trimmed)
+                withAnimation(theme.motion.smooth) { directory = shows }
             } catch is CancellationError {
             } catch {
                 if !Task.isCancelled { directoryError = "Couldn't reach Apple Podcasts." }
+            }
+        }
+    }
+
+    /// Apple's shows go above episodes when one of the top results is named (or made by)
+    /// what was typed, e.g. "hard fork"; a topic search like "ai news" keeps episodes first.
+    private var directoryIsRelevant: Bool {
+        directory.prefix(3).contains { $0.matches(trimmed) }
+    }
+
+    @ViewBuilder private var directorySection: some View {
+        if !directory.isEmpty {
+            Section("Apple Podcasts") {
+                ForEach(directory) { DirectoryShowRow(show: $0) }
             }
         }
     }
@@ -103,12 +106,40 @@ struct PodcastSearchResults: View {
     }
 }
 
-/// Matching followed shows and their episodes, as list sections (Podcasts and All filters).
-struct PodcastLocalSections: View {
-    let results: PodcastDatabase.SearchResults
+/// An Apple Podcasts directory show in a results list; opens its page.
+struct DirectoryShowRow: View {
+    let show: DirectoryShow
 
     var body: some View {
-        if !results.shows.isEmpty {
+        if let route = ShowRoute(show) {
+            NavigationLink(value: PodcastRoute.show(route)) {
+                TrackRow(
+                    title: show.title,
+                    subtitle: [show.author, show.genre].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " · "),
+                    leading: .artwork(.unsized(show.artworkURL, maxPixelWidth: 168))
+                )
+            }
+            .listRowBackground(Color.clear)
+        }
+    }
+}
+
+extension DirectoryShow {
+    /// Named or made by what was typed ("hard fork", "ringer"), as opposed to a loose topic hit.
+    func matches(_ query: String) -> Bool {
+        title.localizedStandardContains(query) || author.localizedStandardContains(query)
+    }
+}
+
+/// Matching followed shows and their episodes, as list sections (Podcasts and All filters).
+/// `part` lets the Podcasts filter put Apple's shows between the two.
+struct PodcastLocalSections: View {
+    enum Part { case all, shows, episodes }
+    let results: PodcastDatabase.SearchResults
+    var part = Part.all
+
+    var body: some View {
+        if part != .episodes, !results.shows.isEmpty {
             Section("Your Shows") {
                 ForEach(results.shows) { show in
                     NavigationLink(value: PodcastRoute.show(ShowRoute(show))) {
@@ -118,7 +149,7 @@ struct PodcastLocalSections: View {
                 }
             }
         }
-        if !results.episodes.isEmpty {
+        if part != .shows, !results.episodes.isEmpty {
             Section("Episodes") {
                 ForEach(results.episodes) { item in
                     EpisodeRow(item: item)

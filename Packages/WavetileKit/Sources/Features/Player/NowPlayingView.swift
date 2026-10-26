@@ -460,6 +460,9 @@ struct ChapterRow: View {
     @Environment(\.theme) private var theme
     let chapter: Chapter
     var isCurrent = false
+    /// Padding inside the tap area, so one- and two-line rows get the same space above and
+    /// below. Lists add their own row insets and leave this at 0.
+    var verticalPadding: CGFloat = 0
     let action: () -> Void
 
     var body: some View {
@@ -475,6 +478,7 @@ struct ChapterRow: View {
                     .multilineTextAlignment(.leading)
                 Spacer(minLength: 0)
             }
+            .padding(.vertical, verticalPadding)
             .frame(minHeight: 44)
             .contentShape(.rect)
         }

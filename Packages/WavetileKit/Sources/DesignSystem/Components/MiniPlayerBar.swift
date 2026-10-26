@@ -41,7 +41,11 @@ public struct MiniPlayerBar: View {
             ArtworkView(artwork)
                 .frame(width: theme.artwork.miniPlayerThumbnail)
             VStack(alignment: .leading, spacing: 0) {
-                Text(title).font(theme.typography.itemTitle)
+                // Explicit: the accessory's glass picks its own text color, which turned white
+                // (invisible) over the Light theme's tan.
+                Text(title)
+                    .font(theme.typography.itemTitle)
+                    .foregroundStyle(theme.palette.textPrimary)
                 if placement != .inline {
                     Text(subtitle)
                         .font(theme.typography.caption)
@@ -70,6 +74,7 @@ public struct MiniPlayerBar: View {
         .labelStyle(.iconOnly)
         .buttonStyle(.plain)
         .tint(theme.palette.accent)
+        .foregroundStyle(theme.palette.accent)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Now playing: \(title), \(subtitle)")
         .padding(.horizontal, theme.spacing.md)

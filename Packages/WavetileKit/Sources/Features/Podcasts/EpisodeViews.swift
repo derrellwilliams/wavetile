@@ -285,9 +285,8 @@ struct EpisodeCard: View {
     }
 
     private var label: String? {
-        if item.episode.isInProgress { return "Resume" }
-        if Calendar.current.isDateInToday(item.episode.publishedAt ?? .distantPast) { return "New" }
-        return nil
+        // Resume only; no NEW badge for now.
+        item.episode.isInProgress ? "Resume" : nil
     }
 }
 

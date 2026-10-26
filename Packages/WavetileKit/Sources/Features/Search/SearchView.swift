@@ -9,7 +9,9 @@ import SwiftUI
 /// Offline full-text search over the synced library. The search field itself is attached here
 /// (scoped to this tab); `.tabViewSearchActivation` on the TabView makes the tab detach.
 /// With podcasts on, an All | Music | Podcasts filter appears (All is the default). All shows
-/// music plus followed podcasts, all from the device; only the Podcasts filter asks Apple.
+/// music plus followed podcasts from the device, and Apple Podcasts shows only when they match
+/// what was typed. Privacy: with podcasts on, All and Podcasts send the typed text to Apple's
+/// directory after typing pauses; Music never leaves the device, nor does anything with podcasts off.
 struct SearchView: View {
     @ObserveInjection var inject
     @Environment(\.theme) private var theme
@@ -25,6 +27,8 @@ struct SearchView: View {
     @Binding var scope: MediaKind
     @State private var results = LibraryDatabase.SearchResults()
     @State private var podcastResults = PodcastDatabase.SearchResults()
+    /// Apple Podcasts shows for the All filter, already narrowed to ones named like the query.
+    @State private var appleShows: [DirectoryShow] = []
     @State private var path = NavigationPath()
     /// The song whose ⋯ actions sheet is showing.
     @State private var actionsTrack: TrackRecord?
@@ -63,7 +67,21 @@ struct SearchView: View {
             results = (try? store.database.search(text)) ?? .init()
             podcastResults = podcasts.isEnabled ? ((try? podcasts.database.search(text)) ?? .init()) : .init()
         }
+        .task(id: "\(scope)|\(text)") { await searchApple() }
         .enableInjection()
+    }
+
+    /// All filter only: Apple's shows that match the query, minus ones already followed.
+    private func searchApple() async {
+        appleShows = []
+        let query = trimmedText
+        guard podcasts.isEnabled, scope == .all, query.count >= 2 else { return }
+        // Debounce: Apple allows about 20 searches a minute per device.
+        try? await Task.sleep(for: .milliseconds(500))
+        guard !Task.isCancelled, let shows = try? await podcasts.directory.search(query), !Task.isCancelled else { return }
+        let followed = Set(podcastResults.shows.map(\.feedURL))
+        let relevant = shows.filter { show in show.matches(query) && !(show.feedURL.map(followed.contains) ?? false) }
+        withAnimation(theme.motion.smooth) { appleShows = Array(relevant.prefix(5)) }
     }
 
     private var prompt: String {
@@ -78,17 +96,13 @@ struct SearchView: View {
     private var allResults: some View {
         List {
             musicSections
-            PodcastLocalSections(results: podcastResults)
-            if !trimmedText.isEmpty {
-                Section {
-                    Button { scope = .podcasts } label: {
-                        Label("Search Apple Podcasts for “\(trimmedText)”", glyph: .podcasts)
-                            .labelStyle(.tintedIcon)
-                            .font(theme.typography.body.weight(.semibold))
-                    }
-                    .listRowBackground(Color.clear)
+            PodcastLocalSections(results: podcastResults, part: .shows)
+            if !appleShows.isEmpty {
+                Section("Apple Podcasts") {
+                    ForEach(appleShows) { DirectoryShowRow(show: $0) }
                 }
             }
+            PodcastLocalSections(results: podcastResults, part: .episodes)
         }
         .listStyle(.plain)
         .scrollDismissesKeyboard(.immediately)

@@ -12,7 +12,15 @@ struct HomeView: View {
     @Namespace private var zoom
     @Binding var path: NavigationPath
     @State private var didRefresh = false
-    @State private var podcastUpNext: [EpisodeItem] = []
+    @State private var podcastUpNext: [EpisodeItem]
+
+    /// `upNext` is read synchronously by the caller, so the podcast shelf is on the first frame
+    /// with the music shelves instead of popping in and pushing them around.
+    init(model: HomeModel, path: Binding<NavigationPath>, upNext: [EpisodeItem] = []) {
+        _model = State(initialValue: model)
+        _path = path
+        _podcastUpNext = State(initialValue: upNext)
+    }
 
     var body: some View {
         NavigationStack(path: $path) {

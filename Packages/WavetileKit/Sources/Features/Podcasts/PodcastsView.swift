@@ -17,6 +17,8 @@ struct PodcastsView: View {
     @State private var hasShows = true
     @State private var path = NavigationPath()
     @State private var showSettings = false
+    /// `-openLatestEpisode` fires once per launch, not on every refresh of the list.
+    @State private var didOpenLatest = false
     @State private var showAddFeed = false
     @State private var showImporter = false
     @State private var importMessage: String?
@@ -62,7 +64,15 @@ struct PodcastsView: View {
         .markRefreshable { await podcasts.refreshAll() }
         // On the always-present scroll view: a task on a shelf that isn't shown never runs.
         .task { await observe(podcasts.database.continueListening()) { continueListening = $0 } }
-        .task { await observe(podcasts.database.latestEpisodes(limit: 15)) { latest = $0 } }
+        .task {
+            await observe(podcasts.database.latestEpisodes(limit: 15)) {
+                latest = $0
+                if DebugFlags.openLatestEpisode, !didOpenLatest, let first = $0.first {
+                    didOpenLatest = true
+                    path.append(PodcastRoute.episode(id: first.id))
+                }
+            }
+        }
         .task { await observe(podcasts.database.followedShows()) { hasShows = !$0.isEmpty } }
         .sheet(isPresented: $showAddFeed) { AddFeedSheet() }
         .opmlImporter(isPresented: $showImporter, message: $importMessage)

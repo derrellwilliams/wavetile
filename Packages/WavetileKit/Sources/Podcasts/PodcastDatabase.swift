@@ -227,21 +227,29 @@ public extension PodcastDatabase {
     /// unplayed episode of each followed show. Episodes in progress are left out (they're in
     /// Continue Listening).
     func upNextShelf(limit: Int = 20) -> ValueObservation<ValueReducers.Fetch<[EpisodeItem]>> {
-        ValueObservation.tracking { db in
-            let queued = try Self.queueItems(db)
-            let newest = try Self.items(EpisodeRecord.filter(sql: """
-                episode.id IN (
-                  SELECT e.id FROM episode e JOIN show s ON s.id = e.showID
-                  WHERE s.followedAt IS NOT NULL AND e.playedAt IS NULL AND e.position = 0
-                    AND e.publishedAt = (SELECT MAX(publishedAt) FROM episode x WHERE x.showID = e.showID)
-                )
-                """)).order(Column("publishedAt").desc).limit(limit).fetchAll(db)
-            var seen = Set<String>()
-            return (queued + newest)
-                .filter { !$0.episode.isInProgress && seen.insert($0.id).inserted }
-                .prefix(limit)
-                .map(\.self)
-        }
+        ValueObservation.tracking { db in try Self.upNextShelfItems(db, limit: limit) }
+    }
+
+    /// Up Next right now, synchronously, so Home can draw it on the first frame with its other
+    /// shelves; `upNextShelf()` keeps it current after that.
+    func upNextShelfNow(limit: Int = 20) throws -> [EpisodeItem] {
+        try pool.read { db in try Self.upNextShelfItems(db, limit: limit) }
+    }
+
+    private static func upNextShelfItems(_ db: Database, limit: Int) throws -> [EpisodeItem] {
+        let queued = try Self.queueItems(db)
+        let newest = try Self.items(EpisodeRecord.filter(sql: """
+            episode.id IN (
+              SELECT e.id FROM episode e JOIN show s ON s.id = e.showID
+              WHERE s.followedAt IS NOT NULL AND e.playedAt IS NULL AND e.position = 0
+                AND e.publishedAt = (SELECT MAX(publishedAt) FROM episode x WHERE x.showID = e.showID)
+            )
+            """)).order(Column("publishedAt").desc).limit(limit).fetchAll(db)
+        var seen = Set<String>()
+        return (queued + newest)
+            .filter { !$0.episode.isInProgress && seen.insert($0.id).inserted }
+            .prefix(limit)
+            .map(\.self)
     }
 
     /// The manual Up Next queue, in order.

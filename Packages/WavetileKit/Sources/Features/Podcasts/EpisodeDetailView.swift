@@ -106,7 +106,8 @@ struct EpisodeDetailView: View {
     private func content(_ item: EpisodeItem) -> some View {
         VStack(spacing: theme.spacing.xl) {
             VStack(spacing: theme.spacing.md) {
-                ArtworkHero(artwork: .unsized(item.artworkURL, maxPixelWidth: 1320))
+                // A smaller square over a blur of the art; full-width show art read too big here.
+                ArtworkSpotlight(artwork: .unsized(item.artworkURL, maxPixelWidth: 720))
                 // Episode titles run far longer than album names, so they use the smaller title size.
                 DetailHeader(item.episode.title, metadata: metadata(item), compact: true) {
                     Button { push(.show(ShowRoute(item.show))) } label: {
@@ -163,7 +164,7 @@ struct EpisodeDetailView: View {
                         // Highlights the chapter playing now when this episode is the one playing.
                         let current = player.current?.trackID == item.id ? chapters.current(at: player.currentTime) : nil
                         ForEach(chapters) { chapter in
-                            ChapterRow(chapter: chapter, isCurrent: chapter == current) {
+                            ChapterRow(chapter: chapter, isCurrent: chapter == current, verticalPadding: theme.spacing.md) {
                                 podcasts.play(item, from: chapter.start)
                             }
                             Divider().overlay(theme.palette.separator)
