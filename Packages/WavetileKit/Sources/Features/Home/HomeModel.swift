@@ -23,7 +23,28 @@ final class HomeModel {
         }
     }
 
+    /// A genre's shelf of random albums (shown while there's little play history).
+    struct GenreShelf: Identifiable {
+        let genre: String
+        let albums: [AlbumSummary]
+        var id: String { genre }
+    }
+
+    struct Spotlight {
+        let artistID: String
+        let name: String
+        let imageTag: String?
+        let albums: [AlbumSummary]
+    }
+
     private(set) var shelves: [Shelf] = []
+    // Discovery shelves come from the local library alone, so Home has something to offer
+    // before there's any play history. Random picks are reshuffled on pull to refresh.
+    private(set) var stats: LibraryStats?
+    private(set) var genreShelves: [GenreShelf] = []
+    private(set) var playlists: [PlaylistRecord] = []
+    private(set) var rediscover: [AlbumSummary] = []
+    private(set) var spotlight: Spotlight?
     private(set) var isLoading = false
     private(set) var errorMessage: String?
     /// Called with the Recently Played albums after each load (feeds the widget).
@@ -47,6 +68,11 @@ final class HomeModel {
         loadLocal()
     }
 
+    /// Little play history yet: Home leads with the welcome card, genres and playlists.
+    var isNewListener: Bool {
+        (shelves.first { $0.kind == .recentlyPlayed }?.albums.count ?? 0) < 6
+    }
+
     func removeFromRecentlyPlayed(_ albumID: String) {
         hiddenRecents.insert(albumID)
         applyHiddenRecents()
@@ -60,6 +86,7 @@ final class HomeModel {
     }
 
     private func applyHiddenRecents() {
+        if DebugFlags.freshHome { shelves.removeAll { $0.kind != .recentlyAdded } }
         guard let index = shelves.firstIndex(where: { $0.kind == .recentlyPlayed }) else { return }
         shelves[index].albums.removeAll { hiddenRecents.contains($0.id) }
         if shelves[index].albums.isEmpty { shelves.remove(at: index) }
@@ -85,6 +112,35 @@ final class HomeModel {
             albums.isEmpty ? nil : Shelf(kind: kind, albums: albums.map(\.summary))
         }
         applyHiddenRecents()
+        loadDiscovery()
+    }
+
+    /// Recomputes the discovery shelves, picking new random albums, genres and artist.
+    func loadDiscovery() {
+        guard let database else { return }
+        stats = try? database.libraryStats()
+        let genres = ((try? database.topGenres(limit: 6)) ?? []).shuffled().prefix(2)
+        genreShelves = genres.compactMap { genre in
+            let albums = (try? database.randomAlbums(genre: genre.genre)) ?? []
+            return albums.count < 4 ? nil : GenreShelf(genre: genre.genre, albums: albums.map(\.summary))
+        }
+        playlists = (try? database.playlistsByName()) ?? []
+        rediscover = ((try? database.randomAlbums()) ?? []).map(\.summary)
+        spotlight = (try? database.spotlightArtist()).flatMap { found in
+            found.map { Spotlight(artistID: $0.artist.id, name: $0.artist.name, imageTag: $0.artist.imageTag, albums: $0.albums.map(\.summary)) }
+        }
+    }
+
+    /// After a library sync: fills discovery if it was empty (first launch) without reshuffling
+    /// what's already on screen, and refetches shelves that came back empty mid-sync.
+    func librarySynced() async {
+        if (stats?.albums ?? 0) == 0 { loadDiscovery() }
+        if shelves.isEmpty { await load() }
+    }
+
+    /// Random tracks from the whole library, for Shuffle All.
+    func shuffleAllTracks() -> [TrackRecord] {
+        (try? database?.randomTracks()) ?? []
     }
 
     func load() async {

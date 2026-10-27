@@ -358,7 +358,10 @@ enum DebugFlags {
     static let playLatestEpisode = ProcessInfo.processInfo.arguments.contains("-playLatestEpisode")
     /// `-openLatestEpisode` opens the newest followed episode's page on the Podcasts tab.
     static let openLatestEpisode = ProcessInfo.processInfo.arguments.contains("-openLatestEpisode")
+    /// `-freshHome` shows Home as a new listener sees it: no play history or podcast Up Next.
+    static let freshHome = ProcessInfo.processInfo.arguments.contains("-freshHome")
     #else
+    static let freshHome = false
     static let openSettings = false
     static let openFirstAlbum = false
     static let initialTab: MainTabView.AppTab = .home
