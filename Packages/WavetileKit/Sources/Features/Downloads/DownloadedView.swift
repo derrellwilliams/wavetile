@@ -28,9 +28,6 @@ struct DownloadedView: View {
             Group {
                 if showsPodcasts { podcastContent } else { musicContent }
             }
-            .safeAreaInset(edge: .top, spacing: 0) {
-                if podcasts.isEnabled { MediaFilter(selection: $filter) }
-            }
             .themedBackground()
             .navigationTitle("Downloads")
             .confirmationDialog(showsPodcasts ? "Remove all downloaded episodes?" : "Remove all downloaded music?", isPresented: $confirmRemoveAll, titleVisibility: .visible) {
@@ -74,7 +71,10 @@ struct DownloadedView: View {
 
     private var podcastContent: some View {
         ScrollView {
-            PodcastDownloadsList(items: episodes)
+            VStack(spacing: 0) {
+                filterHeader
+                PodcastDownloadsList(items: episodes)
+            }
         }
         .overlay {
             if episodes.isEmpty {
@@ -83,8 +83,16 @@ struct DownloadedView: View {
         }
     }
 
+    /// Scrolls with the content (not pinned) so the large title and filter move together;
+    /// a pinned filter let the title slide under it on overscroll.
+    @ViewBuilder private var filterHeader: some View {
+        if podcasts.isEnabled { MediaFilter(selection: $filter) }
+    }
+
     private var musicContent: some View {
             ScrollView {
+              VStack(spacing: 0) {
+                filterHeader
                 VStack(alignment: .leading, spacing: theme.spacing.lg) {
                     if !connectivity.isOnline {
                         Label("You're offline. Downloaded music still plays.", glyph: .offline)
@@ -108,6 +116,7 @@ struct DownloadedView: View {
                 .padding(.horizontal, theme.spacing.screenInset)
                 .padding(.vertical, theme.spacing.lg)
                 .animation(theme.motion.smooth, value: connectivity.isOnline)
+              }
             }
             .overlay {
                 if collections.isEmpty {

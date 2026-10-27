@@ -8,7 +8,7 @@ import SwiftUI
 /// run the script, and add a case.
 public enum Glyph: String, CaseIterable, Sendable {
     case home = "house"
-    case library = "stack"
+    case library = "headphones"
     case downloads = "box-arrow-down"
     case search = "magnifying-glass"
     case profile = "user-circle"
