@@ -16,9 +16,6 @@ struct MainTabView: View {
     @State private var actions = LibraryActions()
     @State private var homePath = NavigationPath()
     @State private var widgets: WidgetBridge
-    /// Home's podcast shelf as it was at launch (empty with podcasts off). Read once here, not
-    /// in `body`, which re-runs on every player tick.
-    private let initialUpNext: [EpisodeItem]
     @Namespace private var playerZoom
     @State private var selection: AppTab = DebugFlags.initialTab
     // Debug launch argument `-openSettings` starts with the drawer open (screenshots, design review).
@@ -39,7 +36,6 @@ struct MainTabView: View {
         let widgets = WidgetBridge(player: signedIn.player, library: signedIn.library)
         home.onRecentlyPlayed = { [weak widgets] albums in widgets?.recentsChanged(albums) }
         _home = State(initialValue: home)
-        initialUpNext = signedIn.podcasts.isEnabled ? ((try? signedIn.podcasts.database.upNextShelfNow()) ?? []) : []
         _widgets = State(initialValue: widgets)
     }
 
@@ -73,7 +69,7 @@ struct MainTabView: View {
     private var tabs: some View {
         TabView(selection: $selection) {
             Tab(value: .home) {
-                HomeView(model: home, path: $homePath, upNext: initialUpNext)
+                HomeView(model: home, path: $homePath, upNext: signedIn.podcasts.launchUpNext)
                     .environment(\.tabRootReporter, reporter(for: .home))
             } label: {
                 tabLabel("Home", glyph: .home)

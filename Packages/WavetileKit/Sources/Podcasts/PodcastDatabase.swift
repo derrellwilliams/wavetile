@@ -112,6 +112,11 @@ public final class PodcastDatabase: Sendable {
                 t.column("isAutomatic", .boolean).notNull().defaults(to: false)
             }
         }
+        // Up Next's "newest episode per show" lookup scanned every episode of the show for every
+        // episode row; with this index it's a single seek (launch hung for seconds on big feeds).
+        migrator.registerMigration("v2-episode-show-published") { db in
+            try db.create(index: "episode_on_showID_publishedAt", on: "episode", columns: ["showID", "publishedAt"])
+        }
         return migrator
     }
 }

@@ -22,6 +22,16 @@ final class PodcastsStore {
     @ObservationIgnored private let keyPrefix: String
     @ObservationIgnored private var pushTask: Task<Void, Never>?
     @ObservationIgnored private let log = Logger(subsystem: "com.derrellwilliams.wavetile", category: "podcasts")
+    @ObservationIgnored private var cachedLaunchUpNext: [EpisodeItem]?
+
+    /// Home's podcast shelf as it was at launch (empty with podcasts off), read once per session
+    /// so the first frame isn't empty. Views re-init often; never re-query per init.
+    var launchUpNext: [EpisodeItem] {
+        if let cachedLaunchUpNext { return cachedLaunchUpNext }
+        let items = isEnabled ? ((try? database.upNextShelfNow()) ?? []) : []
+        cachedLaunchUpNext = items
+        return items
+    }
 
     // MARK: Settings (per user)
 
