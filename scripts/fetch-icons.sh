@@ -19,7 +19,7 @@ ICONS=(
   check-circle cloud-slash trash download-simple
   heart heart:fill squares-four plus pencil-simple user
   microphone arrow-counter-clockwise arrow-clockwise moon list-bullets bookmark-simple bookmark-simple:fill
-  rss upload-simple gauge export trend-up clock-counter-clockwise eye-slash
+  rss upload-simple gauge export trend-up clock-counter-clockwise eye-slash hand-waving
 )
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

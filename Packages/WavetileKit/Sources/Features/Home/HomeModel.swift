@@ -138,11 +138,6 @@ final class HomeModel {
         if shelves.isEmpty { await load() }
     }
 
-    /// Random tracks from the whole library, for Shuffle All.
-    func shuffleAllTracks() -> [TrackRecord] {
-        (try? database?.randomTracks()) ?? []
-    }
-
     func load() async {
         guard let library else { return }
         isLoading = shelves.isEmpty

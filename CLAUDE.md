@@ -26,7 +26,7 @@ Native Jellyfin music + podcast player for iPhone (iOS 26.1+, Swift 6, SwiftUI).
 ## Home feed (`Features/Home`)
 Shelves are read from the local DB on init (first frame, works offline), then `load()` refreshes the history shelves from the server once per session.
 - History: Recently Played → Up Next in Podcasts (if enabled) → Most Played → Recently Added.
-- New listener (`HomeModel.isNewListener`: < 6 albums in Recently Played): a welcome card (library counts, Shuffle All, Genres) on top, and 2 genre shelves (random from the 6 largest) + Playlists after Recently Added.
+- New listener (`HomeModel.isNewListener`: < 6 albums in Recently Played): a welcome card (library counts and a nudge to start listening) on top, and 2 genre shelves (random from the 6 largest) + Playlists after Recently Added.
 - Always at the bottom: From Your Library (16 random albums), then Artist Spotlight (random artist, preferring one with a photo and 3+ albums).
 - Random picks change on launch and on pull to refresh, not on the server refresh. After the first library sync, `librarySynced()` fills empty shelves.
 

@@ -10,20 +10,20 @@ struct HomeView: View {
     @Environment(\.theme) private var theme
     @Environment(PodcastsStore.self) private var podcasts
     @Environment(LibraryStore.self) private var store
-    @Environment(AudioPlayer.self) private var player
-    @Environment(DownloadsStore.self) private var downloads
-    @Environment(Connectivity.self) private var connectivity
     @State var model: HomeModel
     @Namespace private var zoom
     @Binding var path: NavigationPath
     @State private var didRefresh = false
     @State private var podcastUpNext: [EpisodeItem]
+    /// Greets a new listener by name on the welcome card.
+    let userName: String
 
     /// `upNext` is read synchronously by the caller, so the podcast shelf is on the first frame
     /// with the music shelves instead of popping in and pushing them around.
-    init(model: HomeModel, path: Binding<NavigationPath>, upNext: [EpisodeItem] = []) {
+    init(model: HomeModel, path: Binding<NavigationPath>, userName: String, upNext: [EpisodeItem] = []) {
         _model = State(initialValue: model)
         _path = path
+        self.userName = userName
         _podcastUpNext = State(initialValue: upNext)
     }
 
@@ -37,9 +37,7 @@ struct HomeView: View {
                     // tab.) With little play history, a welcome card leads and genre and playlist
                     // shelves follow Recently Added.
                     if model.isNewListener, let stats = model.stats, stats.albums > 0 {
-                        WelcomeCard(stats: stats, onShuffle: shuffleAll) {
-                            path.append(LibraryRoute.section(.genres))
-                        }
+                        WelcomeCard(userName: userName, stats: stats)
                     }
                     if !hasRecentlyPlayed {
                         podcastUpNextShelf
@@ -60,16 +58,12 @@ struct HomeView: View {
                     }
                     if model.isNewListener {
                         ForEach(model.genreShelves) { shelf in
-                            ShelfSection(shelf.genre, items: shelf.albums, onTitleTap: {
-                                path.append(LibraryRoute.genre(shelf.genre))
-                            }) { album in
+                            ShelfSection(shelf.genre, items: shelf.albums) { album in
                                 AlbumLink(album: album, context: "genre-\(shelf.genre)")
                             }
                         }
                         if !model.playlists.isEmpty {
-                            ShelfSection("Playlists", items: model.playlists, onTitleTap: {
-                                path.append(LibraryRoute.section(.playlists))
-                            }) { playlist in
+                            ShelfSection("Playlists", items: model.playlists) { playlist in
                                 PlaylistLink(playlist: playlist)
                             }
                         }
@@ -80,9 +74,7 @@ struct HomeView: View {
                         }
                     }
                     if let spotlight = model.spotlight, !spotlight.albums.isEmpty {
-                        ArtistSpotlightShelf(spotlight: spotlight) {
-                            path.append(LibraryRoute.artist(id: spotlight.artistID, name: spotlight.name))
-                        }
+                        ArtistSpotlightShelf(spotlight: spotlight)
                     }
                 }
                 .padding(.vertical, theme.spacing.lg)
@@ -127,13 +119,6 @@ struct HomeView: View {
         .enableInjection()
     }
 
-    /// Plays a random sample of the library (offline, only what's downloaded).
-    private func shuffleAll() {
-        let tracks = model.shuffleAllTracks()
-        guard connectivity.isOnline || tracks.contains(where: { downloads.isDownloaded($0.id) }) else { return }
-        player.play(tracks.map(QueuedTrack.init), startAt: 0, online: connectivity.isOnline, downloads: downloads)
-    }
-
     private var hasRecentlyPlayed: Bool {
         model.shelves.contains { $0.kind == .recentlyPlayed }
     }
@@ -176,7 +161,7 @@ struct HomeView: View {
             .init(kind: .recentlyPlayed, albums: Array(Fixtures.albums.prefix(6))),
             .init(kind: .mostPlayed, albums: Fixtures.albums.reversed()),
             .init(kind: .recentlyAdded, albums: Array(Fixtures.albums.suffix(5))),
-        ]), path: .constant(NavigationPath()))
+        ]), path: .constant(NavigationPath()), userName: Fixtures.session.userName)
         .environment(signedIn.library)
         .environment(signedIn.podcasts)
     }

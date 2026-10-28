@@ -79,9 +79,4 @@ public extension LibraryDatabase {
     func playlistsByName(limit: Int = 16) throws -> [PlaylistRecord] {
         try pool.read { try PlaylistRecord.order(Column("name").collating(.nocase)).limit(limit).fetchAll($0) }
     }
-
-    /// A random sample of tracks, for Shuffle All without loading the whole library.
-    func randomTracks(limit: Int = 200) throws -> [TrackRecord] {
-        try pool.read { try TrackRecord.order(sql: "random()").limit(limit).fetchAll($0) }
-    }
 }

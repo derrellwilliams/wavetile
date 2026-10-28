@@ -69,7 +69,7 @@ struct MainTabView: View {
     private var tabs: some View {
         TabView(selection: $selection) {
             Tab(value: .home) {
-                HomeView(model: home, path: $homePath, upNext: signedIn.podcasts.launchUpNext)
+                HomeView(model: home, path: $homePath, userName: signedIn.session.userName, upNext: signedIn.podcasts.launchUpNext)
                     .environment(\.tabRootReporter, reporter(for: .home))
             } label: {
                 tabLabel("Home", glyph: .home)

@@ -41,7 +41,7 @@ public struct WavetileMark: View {
     public static let hold = 0.5
 
     /// Turn position in quarter turns: whole numbers are rest poses.
-    static func turn(at elapsed: TimeInterval) -> Double {
+    static func turn(at elapsed: TimeInterval, move: Double = move, hold: Double = hold) -> Double {
         let period = move + hold
         let step = (elapsed / period).rounded(.down)
         let within = elapsed - step * period

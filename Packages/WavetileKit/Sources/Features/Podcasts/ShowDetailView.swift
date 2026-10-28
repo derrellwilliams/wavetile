@@ -25,14 +25,15 @@ struct ShowDetailView: View {
         ScrollView {
             VStack(spacing: theme.spacing.xl) {
                 VStack(spacing: theme.spacing.md) {
-                    ArtworkHero(artwork: .unsized(show?.artworkURL ?? route.artworkURL, maxPixelWidth: 1320))
+                    // Same as an episode: a smaller square over a blur of the art.
+                    ArtworkSpotlight(artwork: .unsized(show?.artworkURL ?? route.artworkURL, maxPixelWidth: 720))
                     header
                 }
                 content
             }
             .padding(.bottom, theme.spacing.xxl)
         }
-        // Full-bleed art: no bar background or blur band under the navigation bar.
+        // The blurred art runs under the navigation bar: no bar background or blur band.
         .detailPageChrome()
         .toolbar {
             if let show {

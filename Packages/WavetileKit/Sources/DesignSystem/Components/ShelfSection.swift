@@ -37,42 +37,22 @@ public struct ShelfSection<Item: Identifiable, Tile: View, Header: View>: View {
 }
 
 public extension ShelfSection where Header == ShelfTitle {
-    /// A shelf under a plain title; with `onTitleTap`, the title gets a chevron and opens more.
-    init(_ title: String, items: [Item], onTitleTap: (() -> Void)? = nil, @ViewBuilder tile: @escaping (Item) -> Tile) {
-        self.init(items: items, header: { ShelfTitle(title, action: onTitleTap) }, tile: tile)
+    /// A shelf under a plain title.
+    init(_ title: String, items: [Item], @ViewBuilder tile: @escaping (Item) -> Tile) {
+        self.init(items: items, header: { ShelfTitle(title) }, tile: tile)
     }
 }
 
-/// A shelf's section header, optionally a button with a trailing chevron.
+/// A shelf's section header.
 public struct ShelfTitle: View {
     @Environment(\.theme) private var theme
     private let title: String
-    private let action: (() -> Void)?
 
-    public init(_ title: String, action: (() -> Void)? = nil) {
+    public init(_ title: String) {
         self.title = title
-        self.action = action
     }
 
     public var body: some View {
-        if let action {
-            Button(action: action) {
-                HStack(spacing: theme.spacing.xs) {
-                    label
-                    Glyph.chevron.image
-                        .resizable()
-                        .frame(width: 16, height: 16)
-                        .foregroundStyle(theme.palette.textSecondary)
-                }
-                .contentShape(.rect)
-            }
-            .buttonStyle(.plain)
-        } else {
-            label
-        }
-    }
-
-    private var label: some View {
         Text(title)
             .font(theme.typography.sectionHeader)
             .foregroundStyle(theme.palette.textPrimary)
