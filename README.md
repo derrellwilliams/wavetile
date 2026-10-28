@@ -1,6 +1,6 @@
 # Wavetile
 
-A native iOS 26+ music and podcast player for Jellyfin
+A native iOS 26+ music player for Jellyfin, with an optional podcast layer
 
 <img width="3241" height="1488" alt="wavetile" src="https://github.com/user-attachments/assets/4cfb75fe-5376-4a5d-8e44-516eff4793bf" />
 
