@@ -2,7 +2,7 @@
 
 A native iOS 26+ music client for Jellyfin
 
-<img width="3045" height="2048" alt="wavetile" src="https://github.com/user-attachments/assets/21befe57-d58d-4533-ba1b-9fe92bd7ae0a" />
+<img width="3241" height="1488" alt="wavetile" src="https://github.com/user-attachments/assets/4cfb75fe-5376-4a5d-8e44-516eff4793bf" />
 
 
 ## Setup
