@@ -15,6 +15,7 @@ Native Jellyfin music + podcast player for iPhone (iOS 26.1+, Swift 6, SwiftUI).
 |---|---|
 | `App/` | Thin app target |
 | `Widgets/`, `Shared/` | Widget extension (Now Playing, Recently Played, download Live Activity); playback intents shared with the app |
+| `site/` | Marketing site for wavetile.com (static, Vercel root directory `site`; see `site/README.md`) |
 | `scripts/` | `testflight.sh`, `fetch-icons.sh` (adds Phosphor icons to the DesignSystem asset catalog) |
 | `Packages/WavetileKit/Sources/JellyfinKit` | API client (jellyfin-sdk-swift), auth, Quick Connect, Keychain, Instant Mix |
 | `Persistence` | GRDB library mirror; read queries in `Queries.swift`, `Genres.swift`, `Discovery.swift` |
