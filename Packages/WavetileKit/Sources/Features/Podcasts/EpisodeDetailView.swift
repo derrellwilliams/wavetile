@@ -49,13 +49,17 @@ struct EpisodeDetailView: View {
                 }
             }
         }
-        // Show-notes links: timestamps seek; web links open in Safari (never in-app).
+        // Show-notes links: timestamps seek; web and mail links open in their apps (never in-app).
+        // Notes come from the feed, so other schemes (tel:, sms:, other apps' links) are ignored.
         .environment(\.openURL, OpenURLAction { url in
             if let seconds = ShowNotes.seekTime(url), let item {
                 podcasts.play(item, from: seconds)
                 return .handled
             }
-            return .systemAction
+            switch url.scheme?.lowercased() {
+            case "http", "https", "mailto": return .systemAction
+            default: return .discarded
+            }
         })
         .task { await observe() }
         // Structured: tied to the page, cancelled when it closes. Keyed by the episode, so
@@ -126,7 +130,7 @@ struct EpisodeDetailView: View {
             VStack(spacing: theme.spacing.md) {
                 // A smaller square over a blur of the art; full-width show art read too big here.
                 ArtworkSpotlight(artwork: .unsized(item.artworkURL, maxPixelWidth: 720))
-                // Episode titles run far longer than album names, so they use the smaller title size.
+                // Episode titles run far longer than album names, so they use the smaller text-face title.
                 DetailHeader(item.episode.title, metadata: metadata(item), compact: true) {
                     Button { push(.show(ShowRoute(item.show))) } label: {
                         DetailSubtitle(item.show.title)

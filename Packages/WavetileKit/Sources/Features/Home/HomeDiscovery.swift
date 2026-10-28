@@ -11,6 +11,8 @@ struct WelcomeCard: View {
     let stats: LibraryStats
     /// Bumped once after the first frame so the hand waves.
     @State private var waves = 0
+    /// Home reappears often (tab switches, returning from a page); the hand waves only the first time each launch.
+    private static var hasWaved = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: theme.spacing.xs) {
@@ -39,8 +41,10 @@ struct WelcomeCard: View {
         .background(theme.palette.surface, in: .rect(cornerRadius: theme.radius.card))
         .padding(.horizontal, theme.spacing.screenInset)
         .task {
-            guard !reduceMotion else { return }
+            guard !reduceMotion, !Self.hasWaved else { return }
             try? await Task.sleep(for: .milliseconds(350))
+            guard !Task.isCancelled else { return }
+            Self.hasWaved = true
             waves += 1
         }
     }

@@ -72,13 +72,19 @@ struct SearchView: View {
     }
 
     /// All filter only: Apple's shows that match the query, minus ones already followed.
+    /// The last results stay up while typing, until new ones replace them, so the section doesn't
+    /// vanish and reappear on every keystroke.
     private func searchApple() async {
-        appleShows = []
         let query = trimmedText
-        guard podcasts.isEnabled, scope == .all, query.count >= 2 else { return }
+        guard podcasts.isEnabled, scope == .all, query.count >= 2 else {
+            appleShows = []
+            return
+        }
         // Debounce: Apple allows about 20 searches a minute per device.
         try? await Task.sleep(for: .milliseconds(500))
-        guard !Task.isCancelled, let shows = try? await podcasts.directory.search(query), !Task.isCancelled else { return }
+        guard !Task.isCancelled else { return }
+        let shows = (try? await podcasts.directory.search(query)) ?? []
+        guard !Task.isCancelled else { return }
         let followed = Set(podcastResults.shows.map(\.feedURL))
         let relevant = shows.filter { show in show.matches(query) && !(show.feedURL.map(followed.contains) ?? false) }
         withAnimation(theme.motion.smooth) { appleShows = Array(relevant.prefix(5)) }

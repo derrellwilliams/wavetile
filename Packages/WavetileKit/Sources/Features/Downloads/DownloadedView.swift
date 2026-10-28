@@ -60,7 +60,9 @@ struct DownloadedView: View {
             .task {
                 do {
                     for try await value in podcasts.observe(podcasts.database.downloads()) {
-                        withAnimation(theme.motion.smooth) { episodes = value }
+                        if episodes.isEmpty { episodes = value } else {
+                            withAnimation(theme.motion.smooth) { episodes = value }
+                        }
                     }
                 } catch { Log.observationFailed(error) }
             }

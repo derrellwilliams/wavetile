@@ -137,8 +137,11 @@ struct HomeView: View {
             return
         }
         do {
+            // The first load appears as-is; later changes animate.
+            var loaded = false
             for try await items in podcasts.observe(observation) {
-                withAnimation(theme.motion.smooth) { update(items) }
+                withAnimation(loaded ? theme.motion.smooth : nil) { update(items) }
+                loaded = true
             }
         } catch { Log.observationFailed(error) }
     }

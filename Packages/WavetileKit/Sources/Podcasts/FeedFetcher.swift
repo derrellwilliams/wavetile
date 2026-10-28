@@ -24,15 +24,20 @@ public struct FeedFetcher: Sendable {
         var request = URLRequest(url: url)
         if let etag = validators?.etag { request.setValue(etag, forHTTPHeaderField: "If-None-Match") }
         if let modified = validators?.lastModified { request.setValue(modified, forHTTPHeaderField: "If-Modified-Since") }
-        let (file, response) = try await session.download(for: request)
-        defer { try? FileManager.default.removeItem(at: file) }
+        let (bytes, response) = try await session.bytes(for: request)
         if let http = response as? HTTPURLResponse {
             if http.statusCode == 304 { return .notModified }
             try PodcastNetwork.check(http)
         }
-        let size = (try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init) ?? 0
-        guard size <= Self.maxBytes else { throw FeedError.tooLarge }
-        let data = try Data(contentsOf: file)
+        // Refused up front when the host states a size, and cut off at the cap when it doesn't,
+        // so an oversized feed never fills memory or disk.
+        guard response.expectedContentLength <= Self.maxBytes else { throw FeedError.tooLarge }
+        var data = Data()
+        if response.expectedContentLength > 0 { data.reserveCapacity(Int(response.expectedContentLength)) }
+        for try await byte in bytes {
+            data.append(byte)
+            guard data.count <= Self.maxBytes else { throw FeedError.tooLarge }
+        }
         let feed = try FeedParser.parse(data)
         let http = response as? HTTPURLResponse
         let newValidators = FeedValidators(

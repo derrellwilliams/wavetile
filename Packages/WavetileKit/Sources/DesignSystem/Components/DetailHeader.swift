@@ -2,6 +2,7 @@ import SwiftUI
 
 /// The title block under a detail page's hero art (album, playlist, show, episode), so every
 /// page uses the same type: Stack Sans Notch title, text-face subtitle, body-size metadata.
+/// Compact titles (episodes) use the text face instead: they run long, and read more easily in it.
 public struct DetailHeader<Subtitle: View>: View {
     @Environment(\.theme) private var theme
     private let title: String
@@ -9,7 +10,7 @@ public struct DetailHeader<Subtitle: View>: View {
     private let compact: Bool
     private let subtitle: Subtitle
 
-    /// `compact` uses the smaller title size, for titles that run long (podcast episodes).
+    /// `compact` uses the smaller, text-face title, for titles that run long (podcast episodes).
     public init(_ title: String, metadata: String? = nil, compact: Bool = false, @ViewBuilder subtitle: () -> Subtitle) {
         self.title = title
         self.metadata = metadata
@@ -20,8 +21,12 @@ public struct DetailHeader<Subtitle: View>: View {
     public var body: some View {
         VStack(spacing: theme.spacing.xs) {
             Text(title)
-                .font(compact ? theme.typography.title : theme.typography.largeTitle)
-                .tracking(theme.typography.displayTracking)
+                .font(compact ? theme.typography.compactTitle : theme.typography.largeTitle)
+                // Only the display face is tightened; the text face keeps its own spacing.
+                .tracking(compact ? 0 : theme.typography.displayTracking)
+                // The text face has a shallower descent than the display face (5pt vs 10pt), so it
+                // gets the difference back as padding to sit as far from the subtitle as album titles do.
+                .padding(.bottom, compact ? theme.spacing.xs : 0)
                 .foregroundStyle(theme.palette.textPrimary)
                 .multilineTextAlignment(.center)
                 .accessibilityAddTraits(.isHeader)

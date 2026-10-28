@@ -53,6 +53,8 @@ public struct Theme: Sendable, Identifiable, Hashable {
         /// Larger reading text: the Now Playing artist, the About sheet, a detail page's artist or show.
         public var lead: Font
         public var code: Font
+        /// Long content titles in the text face (podcast episodes): a step above `headline`.
+        public var compactTitle: Font = BrandFont.font(.title2, size: 24, weight: .bold)
         /// Letter-spacing for large display titles: big type reads loose, so it's tightened.
         /// (Body text stays at 0; system fonts do this automatically, custom faces don't.)
         public var displayTracking: CGFloat = -0.5

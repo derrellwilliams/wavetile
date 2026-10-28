@@ -24,9 +24,9 @@ public enum BrandFont {
         }
     }()
 
-    /// Brand font that scales with Dynamic Type relative to `style`.
-    public static func font(_ style: Font.TextStyle, weight: Font.Weight = .regular, family: String = family) -> Font {
-        .custom(family, size: defaultSize(style), relativeTo: style).weight(weight)
+    /// Brand font that scales with Dynamic Type relative to `style`. `size` overrides the style's default size.
+    public static func font(_ style: Font.TextStyle, size: CGFloat? = nil, weight: Font.Weight = .regular, family: String = family) -> Font {
+        .custom(family, size: size ?? defaultSize(style), relativeTo: style).weight(weight)
     }
 
     /// Display face (titles) at a Dynamic Type style.

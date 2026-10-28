@@ -1,3 +1,5 @@
+import Nuke
+import NukeUI
 import SwiftUI
 
 /// A smaller alternative to `ArtworkHero`: the art as a centered square over a very abstract
@@ -24,8 +26,9 @@ public struct ArtworkSpotlight: View {
         ArtworkView(artwork, cornerRadius: theme.radius.small)
             .frame(width: size, height: size)
             .shadow(color: .black.opacity(0.35), radius: 20, y: 10)
-            // Clears the status bar and the navigation bar's buttons (the page runs under them).
-            .padding(.top, 112)
+            // Clears the status bar and the navigation bar's buttons (the page runs under them),
+            // with room to breathe below the grouped toolbar actions.
+            .padding(.top, 118)
             .padding(.bottom, gap)
             .frame(maxWidth: .infinity)
             // Extends below the view so the fade can be long without pushing the title down.
@@ -37,11 +40,8 @@ public struct ArtworkSpotlight: View {
         GeometryReader { proxy in
             // Oversized so the blur's soft edges fall outside the clip.
             let side = max(proxy.size.width, proxy.size.height) * 1.5
-            ArtworkView(artwork, cornerRadius: 0)
+            blurredArt
                 .frame(width: side, height: side)
-                // Heavy enough that the art reads only as its colors. Fixed radius, rendered once.
-                // Not `opaque: true`: at this radius that rendered solid black.
-                .blur(radius: 80)
                 .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
         }
         .clipped()
@@ -59,5 +59,22 @@ public struct ArtworkSpotlight: View {
             .frame(height: fade)
         }
         .accessibilityHidden(true)
+    }
+
+    /// Heavy enough that the art reads only as its colors. The blur is baked into a 64px copy
+    /// once (and cached), then scaled up, instead of blurring the full-size art live while the page scrolls.
+    @ViewBuilder private var blurredArt: some View {
+        switch artwork {
+        case let .url(url), let .unsized(url, _):
+            let size = CGSize(width: 64, height: 64)
+            let request = url.map {
+                ImageRequest(url: $0, processors: [.resize(size: size, unit: .pixels, contentMode: .aspectFill, crop: true), .gaussianBlur(radius: 8)])
+            }
+            LazyImage(request: request, transaction: Transaction(animation: theme.motion.snappy)) { state in
+                if let image = state.image { image.resizable().scaledToFill() }
+            }
+        case .placeholder:
+            ArtworkView(artwork, cornerRadius: 0).blur(radius: 80)
+        }
     }
 }

@@ -199,12 +199,12 @@ final class PodcastsStore {
     }
 
     func updateShow(_ show: ShowRecord, _ change: @escaping @Sendable (inout ShowRecord) -> Void) {
-        Task { try? await database.updateShow(id: show.id, change) }
+        write { try await self.database.updateShow(id: show.id, change) }
     }
 
     func markOpened(_ show: ShowRecord) {
         guard show.isFollowed else { return }
-        Task { try? await database.markOpened(showID: show.id) }
+        write { try await self.database.markOpened(showID: show.id) }
     }
 
     // MARK: - Playback
@@ -232,7 +232,7 @@ final class PodcastsStore {
         // The saved position is read when the item loads; a requested time wins over it.
         pendingStart = seconds.map { (item.id, $0) }
         player.play([queuedTrack(item)] + rest.map(queuedTrack))
-        Task { try? await database.dequeue(episodeID: item.id) }
+        write { try await self.database.dequeue(episodeID: item.id) }
     }
 
     @ObservationIgnored private var pendingStart: (id: String, seconds: Double)?
@@ -250,13 +250,13 @@ final class PodcastsStore {
     /// Saves progress from the player; handles finishing (auto-delete) and sync.
     func episodeProgress(_ track: QueuedTrack, position: Double, duration: Double) {
         let id = track.trackID
-        Task {
-            let finished = (try? await database.savePosition(episodeID: id, position: position, duration: duration)) ?? false
-            if finished, deletePlayedDownloads, let item = try? database.episodeNow(id: id), !item.episode.isSaved,
-               item.download != nil, player.current?.trackID != id {
-                try? await downloads?.remove(episodeID: id)
+        write {
+            let finished = try await self.database.savePosition(episodeID: id, position: position, duration: duration)
+            if finished, self.deletePlayedDownloads, let item = try? self.database.episodeNow(id: id), !item.episode.isSaved,
+               item.download != nil, self.player.current?.trackID != id {
+                try await self.downloads?.remove(episodeID: id)
             }
-            schedulePush()
+            self.schedulePush()
         }
     }
 
@@ -266,7 +266,7 @@ final class PodcastsStore {
         guard let track = player.current, track.isEpisode else { return }
         let id = track.trackID
         player.podcastRate = Float(rate(forEpisode: id))
-        Task { try? await database.dequeue(episodeID: id) }
+        write { try await self.database.dequeue(episodeID: id) }
     }
 
     func rate(forEpisode id: String) -> Double {
@@ -285,71 +285,97 @@ final class PodcastsStore {
     }
 
     func playNext(_ item: EpisodeItem) {
-        Task { try? await database.enqueue(episodeID: item.id, atFront: true) }
+        write { try await self.database.enqueue(episodeID: item.id, atFront: true) }
         if player.current?.isEpisode == true { player.playNext([queuedTrack(item)]) }
     }
 
     func playLast(_ item: EpisodeItem) {
-        Task { try? await database.enqueue(episodeID: item.id, atFront: false) }
+        write { try await self.database.enqueue(episodeID: item.id, atFront: false) }
         if player.current?.isEpisode == true { player.addToQueue([queuedTrack(item)]) }
     }
 
     func removeFromUpNext(_ id: String) {
-        Task { try? await database.dequeue(episodeID: id) }
+        write { try await self.database.dequeue(episodeID: id) }
     }
 
     /// Mirrors a reordered player queue (episodes only) to the stored Up Next.
     func syncQueueOrder() {
         guard player.current?.isEpisode == true else { return }
         let ids = player.queue.upNext.filter(\.isEpisode).map(\.trackID)
-        Task { try? await database.setQueue(ids) }
+        write { try await self.database.setQueue(ids) }
     }
 
     // MARK: - Episode state
 
     func setPlayed(_ ids: [String], _ played: Bool) {
-        Task {
-            try? await database.setPlayed(episodeIDs: ids, played)
-            if played, deletePlayedDownloads {
-                for id in ids where player.current?.trackID != id {
-                    if let item = try? database.episodeNow(id: id), item.download != nil, !item.episode.isSaved {
-                        try? await downloads?.remove(episodeID: id)
+        write {
+            try await self.database.setPlayed(episodeIDs: ids, played)
+            if played, self.deletePlayedDownloads {
+                for id in ids where self.player.current?.trackID != id {
+                    if let item = try? self.database.episodeNow(id: id), item.download != nil, !item.episode.isSaved {
+                        try await self.downloads?.remove(episodeID: id)
                     }
                 }
             }
-            schedulePush()
+            self.schedulePush()
         }
     }
 
     func markAllPlayed(_ show: ShowRecord) {
-        Task {
-            try? await database.markAllPlayed(showID: show.id)
-            schedulePush()
+        write {
+            try await self.database.markAllPlayed(showID: show.id)
+            self.schedulePush()
         }
     }
 
     func setSaved(_ id: String, _ saved: Bool) {
-        Task { try? await database.setSaved(episodeID: id, saved) }
+        write { try await self.database.setSaved(episodeID: id, saved) }
     }
 
     // MARK: - Downloads
 
     func download(_ item: EpisodeItem) {
         let cellular = allowCellular
-        Task { try? await downloads?.download(item.episode, automatic: false, allowCellular: cellular) }
+        logged { try await self.downloads?.download(item.episode, automatic: false, allowCellular: cellular) }
         ImageCaching.prefetch([item.artworkURL].compactMap(\.self))
     }
 
     func removeDownload(_ id: String) {
-        Task { try? await downloads?.remove(episodeID: id) }
+        logged { try await self.downloads?.remove(episodeID: id) }
     }
 
     func removeAllDownloads() {
-        Task { try? await downloads?.removeAll() }
+        logged { try await self.downloads?.removeAll() }
     }
 
     func localFile(episodeID: String) -> URL? {
         downloads?.localFile(episodeID: episodeID)
+    }
+
+    // MARK: - Writes
+
+    @ObservationIgnored private var lastWrite: Task<Void, Never>?
+
+    /// Database writes from taps and the player, run one at a time in the order they were made.
+    /// Separate tasks could reach the database out of order (Play Next then Remove could leave
+    /// an episode queued). Failures are logged instead of dropped.
+    private func write(_ caller: String = #function, _ work: @escaping () async throws -> Void) {
+        let previous = lastWrite
+        lastWrite = Task {
+            await previous?.value
+            await run(caller, work)
+        }
+    }
+
+    /// Unordered work (downloads can run long and shouldn't hold up the write queue), still logged.
+    private func logged(_ caller: String = #function, _ work: @escaping () async throws -> Void) {
+        Task { await run(caller, work) }
+    }
+
+    private func run(_ caller: String, _ work: () async throws -> Void) async {
+        do { try await work() } catch is CancellationError {} catch {
+            log.error("\(caller, privacy: .public) failed: \(String(describing: error))")
+        }
     }
 
     @ObservationIgnored private var chapterLoads: [String: Task<[Chapter], Never>] = [:]

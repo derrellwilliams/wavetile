@@ -78,8 +78,11 @@ struct PodcastsView: View {
 
     private func observe<T: Sendable>(_ observation: GRDBObservation<T>, update: (T) -> Void) async {
         do {
+            // The first load appears as-is; later changes animate.
+            var loaded = false
             for try await value in podcasts.observe(observation) {
-                withAnimation(theme.motion.smooth) { update(value) }
+                withAnimation(loaded ? theme.motion.smooth : nil) { update(value) }
+                loaded = true
             }
         } catch { Log.observationFailed(error) }
     }

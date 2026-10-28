@@ -14,11 +14,18 @@ public enum Transcript {
     /// Larger than any real transcript; a guard against hostile hosts.
     static let maxBytes = 5_000_000
 
-    public static func load(url: URL, type: String?) async throws -> [TranscriptParagraph] {
+    @concurrent public static func load(url: URL, type: String?) async throws -> [TranscriptParagraph] {
         guard let secure = PodcastNetwork.secure(url) else { throw FeedError.insecure }
-        let (data, response) = try await PodcastNetwork.session.data(from: secure)
+        let (bytes, response) = try await PodcastNetwork.session.bytes(from: secure)
         try PodcastNetwork.check(response)
-        guard data.count <= maxBytes else { throw FeedError.tooLarge }
+        // Refused up front when the host states a size, and cut off at the cap when it doesn't,
+        // so an oversized file is never held in memory.
+        guard response.expectedContentLength <= maxBytes else { throw FeedError.tooLarge }
+        var data = Data()
+        for try await byte in bytes {
+            data.append(byte)
+            guard data.count <= maxBytes else { throw FeedError.tooLarge }
+        }
         return parse(String(decoding: data, as: UTF8.self), type: type ?? "")
     }
 

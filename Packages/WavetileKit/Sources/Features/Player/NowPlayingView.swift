@@ -287,6 +287,8 @@ struct Scrubber: View {
                         }
                 )
                 .animation(theme.motion.snappy, value: dragProgress == nil)
+                // A tick each time the drag crosses into another chapter.
+                .sensoryFeedback(.selection, trigger: scrubbedChapter) { old, new in old != nil && new != nil }
             }
             .frame(height: 24)
 
@@ -309,6 +311,13 @@ struct Scrubber: View {
             @unknown default: break
             }
         }
+    }
+
+    /// The chapter under the finger while dragging; nil otherwise.
+    private var scrubbedChapter: Int? {
+        guard let dragProgress, chapterStarts.count > 1 else { return nil }
+        let time = dragProgress * player.duration
+        return chapterStarts.lastIndex { $0 <= time } ?? 0
     }
 }
 
