@@ -112,6 +112,6 @@ struct ProgressRing: View {
                 .rotationEffect(.degrees(-90))
                 .animation(theme.motion.smooth, value: progress)
         }
-        .accessibilityLabel("\(Int(progress * 100)) percent")
+        .accessibilityLabel("\(Int(progress * 100))%")
     }
 }

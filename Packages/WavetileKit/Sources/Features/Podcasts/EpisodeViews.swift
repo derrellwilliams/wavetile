@@ -168,7 +168,7 @@ extension DownloadIndicator {
     var episodeTitle: String {
         switch self {
         case .none: "Download"
-        case let .inProgress(progress): "Downloading, \(Int(progress * 100)) percent"
+        case let .inProgress(progress): "Downloading \(Int(progress * 100))%"
         case .done: "Downloaded"
         case .failed: "Download Failed, Retry"
         }
