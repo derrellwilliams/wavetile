@@ -35,7 +35,8 @@ Shelves are read from the local DB on init (first frame, works offline), then `l
 - Fonts: Familjen Grotesk for UI text and section headers; Stack Sans Notch for the wordmark and content titles (albums, artists, shows). No red in the brand.
 - Match the surrounding code's comment style; screens observe GRDB via `store.observe(...)`.
 - Swift 6: closures handed to MediaPlayer/AVFoundation must be built nonisolated.
-- Debug launch flags (`DebugFlags` in `MainTabView.swift`, compiled out of Release): `-freshHome` (Home as a new listener sees it), `-tab <name>`, `-openSettings`, `-openFirstAlbum [-albumIndex N] [-autoplay] [-openNowPlaying] [-autodownload]`, `-enablePodcasts`, `-followFeed <url>`, `-playLatestEpisode`, `-openLatestEpisode`.
+- CarPlay (`Features/CarPlay`, `App/CarPlaySceneDelegate.swift`) needs Apple's `com.apple.developer.carplay-audio` entitlement added to `App/Wavetile.entitlements` once granted; until then CarPlay doesn't list the app. Siri phrases live in `App/MusicIntents.swift`.
+- Debug launch flags (`DebugFlags` in `MainTabView.swift`, compiled out of Release): `-freshHome` (Home as a new listener sees it), `-tab <name>`, `-openSettings`, `-openFirstAlbum [-albumIndex N] [-autoplay] [-openNowPlaying] [-autodownload] [-openArtist]`, `-enablePodcasts`, `-followFeed <url>`, `-playLatestEpisode`, `-openLatestEpisode`.
 
 ## Git
 Commit and push only when asked; always land on `main`.

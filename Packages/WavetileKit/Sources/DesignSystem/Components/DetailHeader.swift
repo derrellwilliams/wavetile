@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The title block under a detail page's hero art (album, playlist, show, episode), so every
-/// page uses the same type: Stack Sans Notch title, text-face subtitle, footnote metadata.
+/// page uses the same type: Stack Sans Notch title, text-face subtitle, body-size metadata.
 public struct DetailHeader<Subtitle: View>: View {
     @Environment(\.theme) private var theme
     private let title: String
@@ -28,13 +28,15 @@ public struct DetailHeader<Subtitle: View>: View {
             subtitle
             if let metadata, !metadata.isEmpty {
                 Text(metadata)
-                    // One point up from caption (12pt), still scaling with Dynamic Type.
-                    .font(BrandFont.font(.footnote))
+                    // Body size, like the artist bio, so year and length read at a glance.
+                    .font(theme.typography.body)
                     .foregroundStyle(theme.palette.textSecondary)
                     .multilineTextAlignment(.center)
             }
         }
         .padding(.horizontal, theme.spacing.screenInset)
+        // The same break before the buttons as between the artist page's buttons and bio.
+        .padding(.bottom, theme.spacing.sm)
     }
 }
 
@@ -56,7 +58,7 @@ public struct DetailSubtitle: View {
 
     public var body: some View {
         Text(text)
-            .font(BrandFont.font(.title3, weight: .medium))
+            .font(theme.typography.lead.weight(.medium))
             .foregroundStyle(theme.palette.textPrimary)
             .multilineTextAlignment(.center)
     }

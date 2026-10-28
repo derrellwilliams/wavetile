@@ -16,6 +16,7 @@ struct PodcastsView: View {
     @State private var latest: [EpisodeItem] = []
     @State private var hasShows = true
     @State private var path = NavigationPath()
+    @Namespace private var zoom
     @State private var showSettings = false
     /// `-openLatestEpisode` fires once per launch, not on every refresh of the list.
     @State private var didOpenLatest = false
@@ -28,12 +29,9 @@ struct PodcastsView: View {
             page
                 .tabRootChrome {
                     AddPodcastMenu(showAddFeed: $showAddFeed, showImporter: $showImporter)
-                    Button { showSettings = true } label: {
-                        BarGroupIcon(glyph: .settings)
-                    }
-                    .accessibilityLabel("Podcast Settings")
+                    Button("Podcast Settings", glyph: .settings) { showSettings = true }
                 }
-                .podcastDestinations { path.append($0) }
+                .podcastDestinations(zoom: zoom) { path.append($0) }
         }
         .sheet(isPresented: $showSettings) {
             PodcastSettingsView()
@@ -111,7 +109,7 @@ struct PodcastsView: View {
                     Button("Add by Link") { showAddFeed = true }
                     Button("Import OPML") { showImporter = true }
                 }
-                .buttonStyle(.glass)
+                .buttonStyle(.tinted)
             }
             .frame(maxWidth: 280)
         }
@@ -132,9 +130,8 @@ struct AddPodcastMenu: View {
             Button("Add Show by Link", glyph: .feed) { showAddFeed = true }
             Button("Import OPML", glyph: .download) { showImporter = true }
         } label: {
-            BarGroupIcon(glyph: .add)
+            Label("Add Podcast", glyph: .add)
         }
-        .accessibilityLabel("Add Podcast")
     }
 }
 

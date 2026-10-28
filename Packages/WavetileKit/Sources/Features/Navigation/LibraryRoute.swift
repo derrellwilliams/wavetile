@@ -32,8 +32,9 @@ enum LibrarySection: String, CaseIterable, Hashable {
 }
 
 extension EnvironmentValues {
-    /// The current navigation stack's namespace for album zoom transitions.
-    @Entry var libraryZoom: Namespace.ID?
+    /// The current navigation stack's namespace for zooming a page out of its artwork tile
+    /// (albums, episodes, shows).
+    @Entry var zoomNamespace: Namespace.ID?
     /// Pushes a route on the current tab's stack (for menus and sheets, which can't hold a NavigationLink).
     @Entry var pushLibraryRoute: (LibraryRoute) -> Void = { _ in }
 }
@@ -48,11 +49,11 @@ extension View {
 
     /// For stacks with a `NavigationPath` (Search and Downloaded also hold podcast routes).
     func libraryDestinations(zoom: Namespace.ID, push: @escaping (LibraryRoute) -> Void) -> some View {
-        environment(\.libraryZoom, zoom)
+        environment(\.zoomNamespace, zoom)
             .environment(\.pushLibraryRoute, push)
             .navigationDestination(for: LibraryRoute.self) { route in
                 LibraryDestination(route: route, zoom: zoom)
-                    .environment(\.libraryZoom, zoom)
+                    .environment(\.zoomNamespace, zoom)
                     .environment(\.pushLibraryRoute, push)
             }
     }
@@ -99,7 +100,7 @@ struct AlbumLink: View {
     @Environment(LibraryStore.self) private var store
     @Environment(\.pushLibraryRoute) private var push
     @Environment(LibraryActions.self) private var actions
-    @Environment(\.libraryZoom) private var zoom
+    @Environment(\.zoomNamespace) private var zoom
     let album: AlbumSummary
     /// Disambiguates the same album appearing in several places on one screen.
     var context: String = ""
@@ -114,7 +115,7 @@ struct AlbumLink: View {
                 subtitle: album.artist,
                 artwork: store.artwork(itemID: album.id, tag: album.imageTag, maxPixelWidth: 480)
             )
-            .modifier(ZoomSource(id: route.sourceID, namespace: zoom))
+            .zoomSource(route.sourceID, in: zoom)
         }
         .buttonStyle(.pressable)
         .contextMenu {
@@ -130,6 +131,31 @@ struct AlbumLink: View {
                 Divider()
                 Button("Remove from Recently Played", glyph: .close, action: onRemoveFromRecents)
             }
+        }
+    }
+}
+
+extension View {
+    /// Marks an artwork tile as where the page it opens zooms out of.
+    func zoomSource(_ id: String, in namespace: Namespace.ID?) -> some View {
+        modifier(ZoomSource(id: id, namespace: namespace))
+    }
+
+    /// Zooms a pushed page out of the tile that opened it; a plain push when it wasn't a tile.
+    func zoomTransition(from id: String?, in namespace: Namespace.ID?) -> some View {
+        modifier(ZoomTransition(id: id, namespace: namespace))
+    }
+}
+
+private struct ZoomTransition: ViewModifier {
+    let id: String?
+    let namespace: Namespace.ID?
+
+    func body(content: Content) -> some View {
+        if let id, let namespace {
+            content.navigationTransition(.zoom(sourceID: id, in: namespace))
+        } else {
+            content
         }
     }
 }

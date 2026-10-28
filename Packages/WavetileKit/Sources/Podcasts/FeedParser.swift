@@ -8,6 +8,7 @@ public struct ParsedFeed: Sendable, Equatable {
     public var websiteURL: URL?
     public var isSerial: Bool
     public var episodes: [ParsedEpisode]
+    public var people: [PodcastPerson] = []
 }
 
 public struct ParsedEpisode: Sendable, Equatable {
@@ -25,6 +26,9 @@ public struct ParsedEpisode: Sendable, Equatable {
     public var number: Int?
     public var episodeType: String?
     public var chaptersURL: URL?
+    public var transcriptURL: URL?
+    public var transcriptType: String?
+    public var people: [PodcastPerson] = []
 }
 
 /// HTTP validators for conditional refreshes.
@@ -125,6 +129,35 @@ public enum FeedParser {
         return text.count > limit ? String(text.prefix(limit)) + "…" : text
     }
 
+    /// HTML to plain text that keeps paragraph breaks (blank lines), for transcripts.
+    static func plainParagraphs(_ html: String) -> String {
+        var text = html.replacingOccurrences(of: "<(/p|br\\s*/?|/div|/h[1-6])>", with: "\n\n", options: [.regularExpression, .caseInsensitive])
+        text = text.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+        return ShowNotes.decodeEntities(text)
+    }
+
+    /// Feeds can list a whole crew; more than this isn't useful on a phone.
+    static let maxPeople = 12
+
+    static func person(name: String, attributes: [String: String]) -> PodcastPerson? {
+        let name = ShowNotes.decodeEntities(name).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return nil }
+        return PodcastPerson(
+            name: String(name.prefix(80)),
+            role: (attributes["role"] ?? "host").lowercased(),
+            imageURL: webURL(attributes["img"]),
+            href: webURL(attributes["href"])
+        )
+    }
+
+    /// Timed formats first (they can seek), then the plainer ones.
+    static func preferredTranscript(_ transcripts: [(url: URL, type: String)]) -> (url: URL, type: String)? {
+        let order = ["text/vtt", "application/x-subrip", "application/srt", "application/json", "text/html", "text/plain"]
+        return transcripts
+            .filter { order.contains($0.type) }
+            .min { order.firstIndex(of: $0.type)! < order.firstIndex(of: $1.type)! }
+    }
+
     // MARK: - Delegate
 
     private final class Delegate: NSObject, XMLParserDelegate {
@@ -141,6 +174,9 @@ public enum FeedParser {
         private var website: URL?
         private var type = ""
         private var episodes: [ParsedEpisode] = []
+        private var channelPeople: [PodcastPerson] = []
+        /// A `podcast:person`'s attributes, held until its closing tag brings the name.
+        private var personAttributes: [String: String]?
 
         private var item: ItemFields?
 
@@ -160,6 +196,8 @@ public enum FeedParser {
             var number = ""
             var episodeType = ""
             var chapters: URL?
+            var transcripts: [(url: URL, type: String)] = []
+            var people: [PodcastPerson] = []
         }
 
         func feed() -> ParsedFeed {
@@ -171,7 +209,8 @@ public enum FeedParser {
                 artworkURL: artwork ?? imageURL,
                 websiteURL: website,
                 isSerial: type.lowercased() == "serial",
-                episodes: episodes
+                episodes: episodes,
+                people: channelPeople
             )
         }
 
@@ -194,6 +233,12 @@ public enum FeedParser {
                 if item != nil { item?.image = href } else if artwork == nil { artwork = href }
             case "podcast:chapters":
                 item?.chapters = FeedParser.webURL(attributes["url"])
+            case "podcast:transcript":
+                if let url = FeedParser.webURL(attributes["url"]) {
+                    item?.transcripts.append((url, (attributes["type"] ?? "").lowercased()))
+                }
+            case "podcast:person":
+                personAttributes = attributes
             default:
                 break
             }
@@ -217,6 +262,18 @@ public enum FeedParser {
             defer {
                 path.removeLast()
                 text = ""
+            }
+
+            if element == "podcast:person", let attributes = personAttributes {
+                personAttributes = nil
+                if let person = FeedParser.person(name: value, attributes: attributes) {
+                    if item != nil, path.contains("item") {
+                        if item!.people.count < FeedParser.maxPeople { item?.people.append(person) }
+                    } else if parent == "channel", channelPeople.count < FeedParser.maxPeople {
+                        channelPeople.append(person)
+                    }
+                }
+                return
             }
 
             if item != nil, path.contains("item") {
@@ -256,6 +313,7 @@ public enum FeedParser {
             guard let fields = item, let audio = fields.enclosureURL else { return }
             let notes = [fields.content, fields.description, fields.itunesSummary].first { !$0.isEmpty } ?? ""
             let summarySource = [fields.itunesSummary, fields.description, fields.content].first { !$0.isEmpty } ?? ""
+            let transcript = FeedParser.preferredTranscript(fields.transcripts)
             episodes.append(ParsedEpisode(
                 guid: fields.guid.isEmpty ? audio.absoluteString : fields.guid,
                 title: fields.title.isEmpty ? "Untitled Episode" : fields.title,
@@ -270,7 +328,10 @@ public enum FeedParser {
                 season: Int(fields.season),
                 number: Int(fields.number),
                 episodeType: fields.episodeType.isEmpty ? nil : fields.episodeType.lowercased(),
-                chaptersURL: fields.chapters
+                chaptersURL: fields.chapters,
+                transcriptURL: transcript?.url,
+                transcriptType: transcript?.type,
+                people: fields.people
             ))
         }
     }

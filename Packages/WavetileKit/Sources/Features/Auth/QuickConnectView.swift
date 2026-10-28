@@ -30,7 +30,7 @@ struct QuickConnectView: View {
                 Button("Sign in with password instead") {
                     model.path = [.password]
                 }
-                .font(theme.typography.itemSubtitle)
+                .buttonStyle(.text)
             }
             .padding(theme.spacing.screenInset)
             .frame(maxWidth: .infinity)
@@ -64,7 +64,7 @@ struct QuickConnectView: View {
             }
             .padding(theme.spacing.xl)
             .frame(maxWidth: .infinity)
-            .glassEffect(.regular, in: .rect(cornerRadius: theme.radius.card))
+            .background(theme.palette.surface, in: .rect(cornerRadius: theme.radius.card))
         } else if model.errorMessage == nil {
             LoadingMark(size: 48).padding(theme.spacing.xxl)
         }

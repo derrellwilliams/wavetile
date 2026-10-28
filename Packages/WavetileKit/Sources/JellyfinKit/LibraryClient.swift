@@ -27,14 +27,49 @@ public struct TrackSummary: Identifiable, Hashable, Sendable {
     public var trackNumber: Int?
     public var discNumber: Int?
     public var duration: Duration?
+    /// Loudness correction in dB, for volume levelling.
+    public var normalizationGain: Double?
 
-    public init(id: String, title: String, artist: String, trackNumber: Int? = nil, discNumber: Int? = nil, duration: Duration? = nil) {
+    public init(
+        id: String, title: String, artist: String, trackNumber: Int? = nil, discNumber: Int? = nil,
+        duration: Duration? = nil, normalizationGain: Double? = nil
+    ) {
         self.id = id
         self.title = title
         self.artist = artist
         self.trackNumber = trackNumber
         self.discNumber = discNumber
         self.duration = duration
+        self.normalizationGain = normalizationGain
+    }
+}
+
+/// A song from an Instant Mix, with its album so it can be queued with artwork.
+public struct MixTrack: Sendable {
+    public let track: TrackSummary
+    public let album: AlbumSummary?
+}
+
+/// The parts of an album or artist the library sync doesn't keep.
+public struct ItemDetails: Hashable, Sendable {
+    public var overview: String?
+    public var premiereDate: Date?
+
+    public init(overview: String? = nil, premiereDate: Date? = nil) {
+        self.overview = overview
+        self.premiereDate = premiereDate
+    }
+
+    /// Overviews can carry HTML from metadata providers; pages show plain text.
+    static func plainText(_ html: String) -> String? {
+        let text = html
+            .replacingOccurrences(of: "<br\\s*/?>", with: "\n", options: .regularExpression)
+            .replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .replacingOccurrences(of: "&quot;", with: "\"")
+            .replacingOccurrences(of: "&#39;", with: "'")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? nil : text
     }
 }
 
@@ -107,6 +142,29 @@ public struct LibraryClient: Sendable {
         return try await client.send(Paths.getItems(parameters: params)).value.items?.compactMap(TrackSummary.init(item:)) ?? []
     }
 
+    /// A description and release date for an album or artist page. Neither is synced, so pages
+    /// fetch them when they open.
+    public func details(itemID: String) async throws -> ItemDetails {
+        let item = try await client.send(Paths.getItem(itemID: itemID, userID: session.userID)).value
+        return ItemDetails(overview: item.overview.flatMap(ItemDetails.plainText), premiereDate: item.premiereDate)
+    }
+
+    /// Jellyfin's Instant Mix: songs that go with a song, album, artist or playlist (drawn from
+    /// shared genres). The app plays it as radio.
+    public func instantMix(itemID: String, limit: Int = 100) async throws -> [MixTrack] {
+        let params = Paths.GetInstantMixFromItemParameters(userID: session.userID, limit: limit)
+        let items = try await client.send(Paths.getInstantMixFromItem(itemID: itemID, parameters: params)).value.items ?? []
+        return items.compactMap { item in
+            TrackSummary(item: item).map { MixTrack(track: $0, album: AlbumSummary(track: item)) }
+        }
+    }
+
+    /// IDs of artists like this one, from the server's own library.
+    public func similarArtists(artistID: String, limit: Int = 12) async throws -> [String] {
+        let params = Paths.GetSimilarArtistsParameters(userID: session.userID, limit: limit)
+        return try await client.send(Paths.getSimilarArtists(itemID: artistID, parameters: params)).value.items?.compactMap(\.id) ?? []
+    }
+
     private func playedTracks(sortBy: ItemSortBy, limit: Int) async throws -> [BaseItemDto] {
         let params = Paths.GetItemsParameters(
             userID: session.userID,
@@ -162,7 +220,8 @@ extension TrackSummary {
             trackNumber: item.indexNumber,
             discNumber: item.parentIndexNumber,
             // Jellyfin ticks are 100ns.
-            duration: item.runTimeTicks.map { .milliseconds($0 / 10_000) }
+            duration: item.runTimeTicks.map { .milliseconds($0 / 10_000) },
+            normalizationGain: item.normalizationGain.map(Double.init)
         )
     }
 }

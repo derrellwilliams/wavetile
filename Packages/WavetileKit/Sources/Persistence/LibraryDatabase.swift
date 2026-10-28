@@ -171,6 +171,10 @@ public final class LibraryDatabase: Sendable {
             try db.create(index: "track_lastPlayed", on: "track", columns: ["lastPlayed"])
             try db.create(index: "track_playCount", on: "track", columns: ["playCount"])
         }
+        migrator.registerMigration("v5-track-normalization") { db in
+            // Filled in by the next sync, which re-reads every track.
+            try db.alter(table: "track") { t in t.add(column: "normalizationGain", .double) }
+        }
         return migrator
     }
 }

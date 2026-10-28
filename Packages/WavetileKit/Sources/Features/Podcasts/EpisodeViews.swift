@@ -90,21 +90,14 @@ struct EpisodePlayButton: View {
                 if item.episode.isInProgress && !isCurrent {
                     ProgressView(value: item.episode.progress)
                         .progressViewStyle(.linear)
-                        .tint(theme.palette.onAccent)
+                        .tint(theme.palette.accent)
                         .frame(width: 28)
                 }
                 Text(isCurrent ? liveStatus : EpisodeFormat.status(item.episode))
-                    .font(theme.typography.caption.weight(.semibold))
                     .monospacedDigit()
             }
-            .foregroundStyle(theme.palette.onAccent)
-            .padding(.horizontal, theme.spacing.md)
-            .frame(minHeight: 28)
-            .background(theme.palette.accent, in: .capsule)
-            .frame(minHeight: 44)
-            .contentShape(.rect)
         }
-        .buttonStyle(.pressable)
+        .buttonStyle(.tinted(.small))
         .accessibilityLabel(isPlaying ? "Pause" : "Play")
         .accessibilityValue(EpisodeFormat.status(item.episode))
         .sensoryFeedback(.impact(weight: .light), trigger: taps)
@@ -239,26 +232,17 @@ struct EpisodeMenu: View {
 struct EpisodeCard: View {
     @Environment(\.theme) private var theme
     @Environment(\.pushPodcastRoute) private var push
+    @Environment(\.zoomNamespace) private var zoom
     let item: EpisodeItem
+    /// Disambiguates the same episode on several shelves of one screen.
+    var context = ""
 
     var body: some View {
+        let sourceID = "\(context)-\(item.id)"
         // A button, not a tap gesture, so the card presses in under the finger like album tiles.
-        Button { push(.episode(id: item.id)) } label: {
+        Button { push(.episode(id: item.id, sourceID: sourceID)) } label: {
             VStack(alignment: .leading, spacing: theme.spacing.sm) {
                 ArtworkView(.unsized(item.artworkURL, maxPixelWidth: 840), cornerRadius: theme.radius.small)
-                    .overlay(alignment: .topLeading) {
-                        if let label {
-                            Text(label)
-                                .font(theme.typography.caption.weight(.bold))
-                                .textCase(.uppercase)
-                                // Inverse of the play pill: tan text on a dark capsule, so it reads on light art.
-                                .foregroundStyle(theme.palette.accent)
-                                .padding(.horizontal, theme.spacing.sm)
-                                .padding(.vertical, theme.spacing.xxs)
-                                .background(theme.palette.background, in: .capsule)
-                                .padding(theme.spacing.sm)
-                        }
-                    }
                 // Show and title read as one unit, so they sit closer than the rest of the card.
                 VStack(alignment: .leading, spacing: theme.spacing.xs) {
                     Text(item.show.title)
@@ -279,14 +263,10 @@ struct EpisodeCard: View {
                     .monospacedDigit()
             }
             .contentShape(.rect)
+            .zoomSource(sourceID, in: zoom)
         }
         .buttonStyle(.pressable)
         .contextMenu { EpisodeMenu(item: item) }
-    }
-
-    private var label: String? {
-        // Resume only; no NEW badge for now.
-        item.episode.isInProgress ? "Resume" : nil
     }
 }
 
@@ -302,13 +282,7 @@ struct ShowTile: View {
         AlbumTile(title: title, subtitle: subtitle, artwork: .unsized(artworkURL, maxPixelWidth: 480))
             .overlay(alignment: .topTrailing) {
                 if newCount > 0 {
-                    Text("\(newCount)")
-                        .font(theme.typography.caption.weight(.bold))
-                        .monospacedDigit()
-                        .foregroundStyle(theme.palette.onAccent)
-                        .padding(.horizontal, 7)
-                        .frame(minWidth: 22, minHeight: 22)
-                        .background(theme.palette.accent, in: .capsule)
+                    Badge("\(newCount)")
                         .padding(theme.spacing.xs)
                         .accessibilityLabel("\(newCount) new episodes")
                 }

@@ -35,7 +35,6 @@ public enum Glyph: String, CaseIterable, Sendable {
     case close = "x"
     case shuffle
     case sort = "sort-ascending"
-    case chevron = "caret-right"
     case `repeat`
     case repeatOne = "repeat-once"
     case queue
@@ -69,6 +68,7 @@ public enum Glyph: String, CaseIterable, Sendable {
     case history = "clock-counter-clockwise"
     case hidePlayed = "eye-slash"
     case wave = "hand-waving"
+    case radio
 
     /// 24pt template image; tints with `foregroundStyle`. Add `.resizable()` for other sizes.
     /// Decorative: VoiceOver skips it (otherwise it reads asset names like "magnifying-glass").
@@ -80,6 +80,11 @@ public enum Glyph: String, CaseIterable, Sendable {
     /// The glyph with an accessibility label, for icon-only controls.
     public func image(label: String) -> Image {
         Image(rawValue, bundle: .module, label: Text(label))
+    }
+
+    /// A template UIImage, for UIKit surfaces such as CarPlay (which tints it itself).
+    public var uiImage: UIImage? {
+        UIImage(named: rawValue, in: .module, with: nil)?.withRenderingMode(.alwaysTemplate)
     }
 
     /// The glyph with its color baked in, for places that recolor template images on their own

@@ -1,6 +1,7 @@
 import DesignSystem
 import Library
 import Persistence
+import Playback
 import SwiftUI
 
 /// App-wide "add to…" flows, so any row or page can open them without owning a sheet.
@@ -45,6 +46,24 @@ final class LibraryActions {
                 confirm("Added to Favorites")
             } catch {
                 errorMessage = "Couldn't update favorites. Check your connection."
+            }
+        }
+    }
+
+    /// Radio from a song, album or artist: plays Jellyfin's Instant Mix for it.
+    func startRadio(from itemID: String, store: LibraryStore, player: AudioPlayer) {
+        Task {
+            do {
+                let queue = try await store.api.instantMix(itemID: itemID).compactMap { mix in
+                    mix.album.map { QueuedTrack(mix.track, album: $0) }
+                }
+                guard !queue.isEmpty else {
+                    errorMessage = "Couldn't find songs to make a station from."
+                    return
+                }
+                player.play(queue)
+            } catch {
+                errorMessage = "Couldn't start radio. Check your connection."
             }
         }
     }
@@ -128,27 +147,40 @@ struct FavoriteButton: View {
     @Environment(LibraryStore.self) private var store
     @Environment(LibraryActions.self) private var actions
     let itemID: String
-    var size: CGFloat = 24
+    /// Nil in a navigation bar: a plain bar item, sized and tinted like its neighbours.
+    var size: CGFloat?
     @State private var isFavorite = false
 
     var body: some View {
-        GlyphButton(isFavorite ? "Unfavorite" : "Favorite", glyph: isFavorite ? .favoriteFilled : .favorite, size: size) {
-            let target = !isFavorite
-            Task {
-                do { try await store.editor.setFavorite(itemID: itemID, target) } catch {
-                    actions.errorMessage = "Couldn't update favorites. Check your connection."
-                }
+        button
+            .contentTransition(.symbolEffect(.replace))
+            .sensoryFeedback(.impact(weight: .light), trigger: isFavorite)
+            .task(id: itemID) {
+                do {
+                    for try await value in store.observe(store.database.isFavorite(itemID: itemID)) {
+                        withAnimation(theme.motion.snappy) { isFavorite = value }
+                    }
+                } catch { Log.observationFailed(error) }
             }
+    }
+
+    @ViewBuilder private var button: some View {
+        let title = isFavorite ? "Unfavorite" : "Favorite"
+        let glyph: Glyph = isFavorite ? .favoriteFilled : .favorite
+        if let size {
+            GlyphButton(title, glyph: glyph, size: size, action: toggle)
+                .foregroundStyle(theme.palette.accent)
+        } else {
+            Button(title, glyph: glyph, action: toggle)
         }
-        .foregroundStyle(theme.palette.accent)
-        .contentTransition(.symbolEffect(.replace))
-        .sensoryFeedback(.impact(weight: .light), trigger: isFavorite)
-        .task(id: itemID) {
-            do {
-                for try await value in store.observe(store.database.isFavorite(itemID: itemID)) {
-                    withAnimation(theme.motion.snappy) { isFavorite = value }
-                }
-            } catch { Log.observationFailed(error) }
+    }
+
+    private func toggle() {
+        let target = !isFavorite
+        Task {
+            do { try await store.editor.setFavorite(itemID: itemID, target) } catch {
+                actions.errorMessage = "Couldn't update favorites. Check your connection."
+            }
         }
     }
 }

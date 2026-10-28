@@ -117,6 +117,19 @@ public final class PodcastDatabase: Sendable {
         migrator.registerMigration("v2-episode-show-published") { db in
             try db.create(index: "episode_on_showID_publishedAt", on: "episode", columns: ["showID", "publishedAt"])
         }
+        migrator.registerMigration("v3-transcripts-people") { db in
+            try db.alter(table: "episode") { t in
+                t.add(column: "transcriptURL", .text)
+                t.add(column: "transcriptType", .text)
+                t.add(column: "people", .jsonText).notNull().defaults(to: "[]")
+            }
+            try db.alter(table: "show") { t in
+                t.add(column: "people", .jsonText).notNull().defaults(to: "[]")
+            }
+            // Unchanged feeds answer 304 and are never re-read; drop the validators so the next
+            // refresh fills the new fields in.
+            try db.execute(sql: "UPDATE show SET etag = NULL, lastModified = NULL")
+        }
         return migrator
     }
 }
@@ -393,6 +406,7 @@ public extension PodcastDatabase {
             show.artworkURL = feed.artworkURL ?? show.artworkURL
             show.websiteURL = feed.websiteURL
             show.isSerial = feed.isSerial
+            show.people = feed.people
             show.lastRefreshed = now
             if let validators {
                 show.etag = validators.etag
@@ -419,18 +433,25 @@ public extension PodcastDatabase {
                     existing.number = parsed.number
                     existing.episodeType = parsed.episodeType
                     existing.chaptersURL = parsed.chaptersURL
+                    existing.transcriptURL = parsed.transcriptURL
+                    existing.transcriptType = parsed.transcriptType
+                    existing.people = parsed.people
                     existing.generation = generation
                     try existing.update(db)
                 } else {
                     newIDs.append(id)
-                    try EpisodeRecord(
+                    var episode = EpisodeRecord(
                         id: id, showID: showID, guid: parsed.guid, title: parsed.title, summary: parsed.summary,
                         notesHTML: parsed.notesHTML, publishedAt: parsed.publishedAt, duration: parsed.duration,
                         audioURL: parsed.audioURL, mimeType: parsed.mimeType, byteLength: parsed.byteLength,
                         artworkURL: parsed.artworkURL, season: parsed.season, number: parsed.number,
                         episodeType: parsed.episodeType, chaptersURL: parsed.chaptersURL,
                         firstSeenAt: now, generation: generation
-                    ).insert(db)
+                    )
+                    episode.transcriptURL = parsed.transcriptURL
+                    episode.transcriptType = parsed.transcriptType
+                    episode.people = parsed.people
+                    try episode.insert(db)
                 }
             }
             try db.execute(sql: """

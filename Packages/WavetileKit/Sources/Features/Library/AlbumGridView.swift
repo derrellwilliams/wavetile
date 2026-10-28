@@ -69,6 +69,7 @@ struct AlbumGridView: View {
 
 /// Shown while the first sync hasn't produced anything yet.
 struct LibraryEmptyState: View {
+    @Environment(\.theme) private var theme
     @Environment(LibraryStore.self) private var store
 
     var body: some View {
@@ -76,8 +77,8 @@ struct LibraryEmptyState: View {
             VStack(spacing: 12) {
                 LoadingMark()
                 Text(store.statusText ?? "Syncing your library…")
-                    .font(BrandFont.font(.subheadline))
-                    .foregroundStyle(.secondary)
+                    .font(theme.typography.itemSubtitle)
+                    .foregroundStyle(theme.palette.textSecondary)
             }
         } else {
             EmptyState("Nothing Here", glyph: .album, message: "No matching items in your library.")

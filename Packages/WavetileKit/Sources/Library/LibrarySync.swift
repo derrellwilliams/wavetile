@@ -320,5 +320,6 @@ extension TrackRecord {
             container: item.container,
             generation: generation
         )
+        normalizationGain = item.normalizationGain.map(Double.init)
     }
 }

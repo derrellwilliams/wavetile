@@ -21,7 +21,9 @@
 		BF1F96350A129326F70095B0 /* WidgetShared in Frameworks */ = {isa = PBXBuildFile; productRef = 0C66071B4354454BDCFC6F65 /* WidgetShared */; };
 		BF226A6E41B4B60AE3190BD9 /* WavetileWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3808158EAA3BE89F777F6196 /* WavetileWidgets.swift */; };
 		BFE7CD2369681FAAE8091B79 /* SearchTypingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B3DBC04AB9BCCD7E614F3F9 /* SearchTypingTests.swift */; };
+		C37C6FD1DE652BA7C3E4902F /* CarPlaySceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F4851AEE1F70064747F7D4F /* CarPlaySceneDelegate.swift */; };
 		D5ADA51017B8CB7FBAD10D5A /* PlaybackIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6B16C4CDE18FD559173CA08 /* PlaybackIntents.swift */; };
+		D98A9C440C33FD757813F654 /* MusicIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = D885B860AC3826586D46546F /* MusicIntents.swift */; };
 		DACC04010B0BDCC0B58A22A6 /* DownloadLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2BEB7FC68820624FDFEB8CE /* DownloadLiveActivity.swift */; };
 		DB8A50C54CC4C62786185428 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8024A92BB845E32D58BE675C /* WidgetKit.framework */; };
 		EA900CA1C2FD43CE51EB5AB0 /* WavetileKit in Frameworks */ = {isa = PBXBuildFile; productRef = 5C739332FA7690D931D7AE66 /* WavetileKit */; };
@@ -65,6 +67,7 @@
 		1486760D06D1462A54B2382C /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		174498F652785AFB46720C5B /* SongsActionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongsActionsTests.swift; sourceTree = "<group>"; };
 		25966CED5BFCB0211FD41404 /* Wavetile.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Wavetile.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2F4851AEE1F70064747F7D4F /* CarPlaySceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlaySceneDelegate.swift; sourceTree = "<group>"; };
 		353AC9D25C695D5691A49C82 /* Wavetile.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Wavetile.entitlements; sourceTree = "<group>"; };
 		3808158EAA3BE89F777F6196 /* WavetileWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WavetileWidgets.swift; sourceTree = "<group>"; };
 		3D755AFA0A1F31315F004D72 /* WavetileUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = WavetileUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -84,6 +87,7 @@
 		C2BEB7FC68820624FDFEB8CE /* DownloadLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadLiveActivity.swift; sourceTree = "<group>"; };
 		C64E8E56C9DEE15869AD6949 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		D6B16C4CDE18FD559173CA08 /* PlaybackIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackIntents.swift; sourceTree = "<group>"; };
+		D885B860AC3826586D46546F /* MusicIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicIntents.swift; sourceTree = "<group>"; };
 		DC6B363657E0BEF76F29C617 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -161,7 +165,9 @@
 			isa = PBXGroup;
 			children = (
 				DC6B363657E0BEF76F29C617 /* Assets.xcassets */,
+				2F4851AEE1F70064747F7D4F /* CarPlaySceneDelegate.swift */,
 				C64E8E56C9DEE15869AD6949 /* Info.plist */,
+				D885B860AC3826586D46546F /* MusicIntents.swift */,
 				BC49F38495CF5B01CA0BBC54 /* PrivacyInfo.xcprivacy */,
 				353AC9D25C695D5691A49C82 /* Wavetile.entitlements */,
 				AE62EBD766A57ECC0F9E43CD /* WavetileApp.swift */,
@@ -334,6 +340,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C37C6FD1DE652BA7C3E4902F /* CarPlaySceneDelegate.swift in Sources */,
+				D98A9C440C33FD757813F654 /* MusicIntents.swift in Sources */,
 				F90A1A723AACCA0B621DB416 /* PlaybackIntents.swift in Sources */,
 				B6C7A4EF5A040F73222B5B28 /* WavetileApp.swift in Sources */,
 			);
@@ -587,7 +595,6 @@
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Wavetile;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -611,7 +618,6 @@
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Wavetile;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				LD_RUNPATH_SEARCH_PATHS = (

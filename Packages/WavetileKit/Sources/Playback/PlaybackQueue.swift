@@ -26,13 +26,16 @@ public struct QueuedTrack: Identifiable, Hashable, Sendable {
     public var albumImageTag: String?
     public var duration: Duration?
     public var podcast: PodcastMedia?
+    /// Loudness correction in dB; volume levelling turns loud songs down by it.
+    public var normalizationGain: Double?
 
     public var id: UUID { queueID }
     public var isEpisode: Bool { podcast != nil }
 
     public init(
         trackID: String, title: String, artist: String, albumTitle: String,
-        albumID: String?, albumImageTag: String? = nil, duration: Duration?, podcast: PodcastMedia? = nil
+        albumID: String?, albumImageTag: String? = nil, duration: Duration?, podcast: PodcastMedia? = nil,
+        normalizationGain: Double? = nil
     ) {
         self.queueID = UUID()
         self.trackID = trackID
@@ -43,12 +46,14 @@ public struct QueuedTrack: Identifiable, Hashable, Sendable {
         self.albumImageTag = albumImageTag
         self.duration = duration
         self.podcast = podcast
+        self.normalizationGain = normalizationGain
     }
 
     /// Same song, new queue entry.
     public func requeued() -> QueuedTrack {
         QueuedTrack(trackID: trackID, title: title, artist: artist, albumTitle: albumTitle,
-                    albumID: albumID, albumImageTag: albumImageTag, duration: duration, podcast: podcast)
+                    albumID: albumID, albumImageTag: albumImageTag, duration: duration, podcast: podcast,
+                    normalizationGain: normalizationGain)
     }
 }
 

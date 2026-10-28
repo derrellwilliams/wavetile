@@ -81,6 +81,8 @@ public struct TrackRecord: Codable, Hashable, Sendable, Identifiable, FetchableR
     public var lastPlayed: Date?
     public var dateAdded: Date?
     public var container: String?
+    /// Jellyfin's loudness correction in dB (server 10.9+), for volume levelling.
+    public var normalizationGain: Double?
     public var generation: Int
 
     public init(

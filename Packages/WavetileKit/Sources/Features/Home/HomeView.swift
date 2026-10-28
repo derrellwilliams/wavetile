@@ -93,7 +93,7 @@ struct HomeView: View {
             }
             .tabRootChrome()
             .libraryDestinations(zoom: zoom) { path.append($0) }
-            .podcastDestinations { path.append($0) }
+            .podcastDestinations(zoom: zoom) { path.append($0) }
             // On the always-present scroll view: a task on a shelf that isn't shown never runs.
             .task(id: podcasts.isEnabled) { await observePodcasts(podcasts.database.upNextShelf()) { podcastUpNext = $0 } }
             .markRefreshable {
@@ -113,6 +113,7 @@ struct HomeView: View {
                 if DebugFlags.openFirstAlbum, let shelf = model.shelves.first,
                    let album = shelf.albums.dropFirst(DebugFlags.albumIndex).first {
                     path = NavigationPath([LibraryRoute.album(AlbumRoute(album: album, sourceID: "\(shelf.kind.rawValue)-\(album.id)"))])
+                    if DebugFlags.openArtist, let artist = store.artistRoute(albumID: album.id) { path.append(artist) }
                 }
             }
         }
@@ -148,7 +149,7 @@ struct HomeView: View {
         } else if let error = model.errorMessage {
             EmptyState("Nothing Here Yet", glyph: .album, message: error) {
                 Button("Retry") { Task { await model.load() } }
-                    .buttonStyle(.glass)
+                    .buttonStyle(.tinted)
             }
         }
     }

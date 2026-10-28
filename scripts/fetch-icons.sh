@@ -14,12 +14,12 @@ ICONS=(
   waveform warning lock-open lock copy check
   play pause skip-forward skip-back
   gear-six sign-out palette hard-drives globe x
-  shuffle sort-ascending caret-right
+  shuffle sort-ascending
   repeat repeat-once queue caret-down speaker-hifi dots-three list-plus arrow-bend-down-right
   check-circle cloud-slash trash download-simple
   heart heart:fill squares-four plus pencil-simple user
   microphone arrow-counter-clockwise arrow-clockwise moon list-bullets bookmark-simple bookmark-simple:fill
-  rss upload-simple gauge export trend-up clock-counter-clockwise eye-slash hand-waving
+  rss upload-simple gauge export trend-up clock-counter-clockwise eye-slash hand-waving radio
 )
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

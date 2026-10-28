@@ -41,11 +41,17 @@ public final class AudioPlayer {
 
     public enum SleepTimer: Equatable, Sendable {
         case at(Date)
-        case endOfEpisode
+        case endOfItem
     }
 
     /// Pauses playback at a time, or when the current item finishes.
     public private(set) var sleepTimer: SleepTimer?
+
+    /// Turns loud songs down to Jellyfin's loudness target (like Sound Check), so tracks from
+    /// different albums play at a similar volume. Applies from the next song that loads.
+    public var levelsVolume = UserDefaults.standard.object(forKey: "levelsVolume") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(levelsVolume, forKey: "levelsVolume") }
+    }
 
     /// The rate the current item plays at when playing.
     public var effectiveRate: Float { current?.isEpisode == true ? podcastRate : 1 }
@@ -207,7 +213,7 @@ public final class AudioPlayer {
     /// Repeat-one replays in place and the end-of-episode sleep timer stops there; otherwise the
     /// queue player advances by itself.
     private func updateActionAtItemEnd() {
-        player.actionAtItemEnd = queue.repeatMode == .one || sleepTimer == .endOfEpisode ? .pause : .advance
+        player.actionAtItemEnd = queue.repeatMode == .one || sleepTimer == .endOfItem ? .pause : .advance
     }
 
     /// Stops playback and clears the queue (sign out).
@@ -279,7 +285,7 @@ public final class AudioPlayer {
     private func makeItem(for track: QueuedTrack) -> AVPlayerItem? {
         if let file = localFile?(track.trackID) {
             let item = AVPlayerItem(url: file)
-            if track.isEpisode { item.audioTimePitchAlgorithm = .timeDomain }
+            if track.isEpisode { item.audioTimePitchAlgorithm = .timeDomain } else { level(item, gain: track.normalizationGain) }
             entries[ObjectIdentifier(item)] = Entry(track: track, playSessionID: UUID().uuidString)
             observeStatus(of: item)
             return item
@@ -299,9 +305,25 @@ public final class AudioPlayer {
         let asset = AVURLAsset(url: request.url, options: ["AVURLAssetHTTPHeaderFieldsKey": request.headers])
         let item = AVPlayerItem(asset: asset)
         item.preferredForwardBufferDuration = 30
+        level(item, gain: track.normalizationGain)
         entries[ObjectIdentifier(item)] = Entry(track: track, playSessionID: request.playSessionID)
         observeStatus(of: item)
         return item
+    }
+
+    /// Volume levelling through the item's audio mix, so each song in a gapless run carries its
+    /// own level. Only turns down: boosting a quiet song past full scale would clip.
+    private func level(_ item: AVPlayerItem, gain: Double?) {
+        guard levelsVolume, let gain, gain < 0 else { return }
+        let volume = Float(pow(10, gain / 20))
+        Task {
+            guard let track = try? await item.asset.loadTracks(withMediaType: .audio).first else { return }
+            let parameters = AVMutableAudioMixInputParameters(track: track)
+            parameters.setVolume(volume, at: .zero)
+            let mix = AVMutableAudioMix()
+            mix.inputParameters = [parameters]
+            item.audioMix = mix
+        }
     }
 
     /// AVQueuePlayer moved to a new item on its own (gapless advance) or ran out of items.
@@ -396,7 +418,7 @@ public final class AudioPlayer {
         guard item === player.currentItem else { return }
         // End-of-episode sleep timer: the item paused at its end (actionAtItemEnd = .pause).
         // Stop, and cue up the next item without playing it.
-        if sleepTimer == .endOfEpisode {
+        if sleepTimer == .endOfItem {
             reportStopped()
             sleepTimer = nil
             isPlaying = false

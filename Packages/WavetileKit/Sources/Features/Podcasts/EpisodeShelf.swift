@@ -20,7 +20,7 @@ struct EpisodeShelf: View {
             ScrollView(.horizontal) {
                 LazyHStack(alignment: .top, spacing: theme.spacing.lg) {
                     ForEach(items) { item in
-                        EpisodeCard(item: item)
+                        EpisodeCard(item: item, context: title)
                             .frame(width: theme.artwork.shelfTileWidth)
                     }
                 }

@@ -34,11 +34,15 @@ public final class AppModel {
         didSet { UserDefaults.standard.set(theme.id, forKey: "themeID") }
     }
 
+    /// The app's model, for entry points that don't go through SwiftUI (CarPlay, Siri).
+    public private(set) static weak var current: AppModel?
+
     public init(deviceName: String, store: SessionStore = SessionStore()) {
         self.auth = AuthService(identity: .load(deviceName: deviceName))
         self.store = store
         let savedTheme = UserDefaults.standard.string(forKey: "themeID")
         self.theme = Theme.all.first { $0.id == savedTheme } ?? .dark
+        Self.current = self
     }
 
     /// Restores the saved session from the Keychain. Synchronous so the first frame is already correct.

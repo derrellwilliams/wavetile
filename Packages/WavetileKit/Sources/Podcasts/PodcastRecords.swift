@@ -2,6 +2,22 @@ import CryptoKit
 import Foundation
 import GRDB
 
+/// A host or guest named in a feed (Podcasting 2.0 `podcast:person`).
+public struct PodcastPerson: Codable, Hashable, Sendable {
+    public var name: String
+    /// Lowercased role from the feed: "host", "guest", "producer"…
+    public var role: String
+    public var imageURL: URL?
+    public var href: URL?
+
+    public init(name: String, role: String = "host", imageURL: URL? = nil, href: URL? = nil) {
+        self.name = name
+        self.role = role
+        self.imageURL = imageURL
+        self.href = href
+    }
+}
+
 /// A podcast the user follows, or one they're previewing from search (`followedAt == nil`).
 public struct ShowRecord: Codable, Hashable, Sendable, Identifiable, FetchableRecord, PersistableRecord {
     public static let databaseTableName = "show"
@@ -27,6 +43,8 @@ public struct ShowRecord: Codable, Hashable, Sendable, Identifiable, FetchableRe
     public var autoDownload: Bool
     public var oldestFirst: Bool?
     public var hidePlayed: Bool
+    /// The show's regular hosts; episodes can name their own.
+    public var people: [PodcastPerson] = []
 
     public var isFollowed: Bool { followedAt != nil }
     /// Show episodes oldest first: the user's choice, else serial shows go in order.
@@ -82,6 +100,11 @@ public struct EpisodeRecord: Codable, Hashable, Sendable, Identifiable, Fetchabl
     public var episodeType: String?
     /// Podcasting 2.0 JSON chapters.
     public var chaptersURL: URL?
+    /// Podcasting 2.0 transcript, the most readable format the feed offers, and its MIME type.
+    public var transcriptURL: URL?
+    public var transcriptType: String?
+    /// Hosts and guests named on this episode; empty means the show's hosts.
+    public var people: [PodcastPerson] = []
     /// Resume point in seconds; 0 when unplayed or finished.
     public var position: Double
     public var playedAt: Date?

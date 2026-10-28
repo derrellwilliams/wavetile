@@ -52,7 +52,6 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: Wavetile
-        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.music
@@ -79,6 +78,14 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         # Download progress Live Activity.
         NSSupportsLiveActivities: true
+        # SwiftUI provides the phone window; CarPlay gets its own template scene.
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: true
+          UISceneConfigurations:
+            CPTemplateApplicationSceneSessionRoleApplication:
+              - UISceneClassName: CPTemplateApplicationScene
+                UISceneConfigurationName: CarPlay
+                UISceneDelegateClassName: $(PRODUCT_MODULE_NAME).CarPlaySceneDelegate
         # Widget deep links (wavetile://album/<id>, wavetile://now-playing).
         CFBundleURLTypes:
           - CFBundleURLName: com.derrellwilliams.wavetile

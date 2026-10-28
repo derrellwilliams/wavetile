@@ -3,7 +3,8 @@ import Playback
 import Podcasts
 import SwiftUI
 
-/// A show's page: art, title, Follow, play latest, description, settings and episodes.
+/// A show's page: art, title, Follow, play latest, description, settings, episodes (with
+/// seasons and search) and similar shows.
 /// Shows reached from search load as previews until followed.
 struct ShowDetailView: View {
     @ObserveInjection var inject
@@ -16,8 +17,11 @@ struct ShowDetailView: View {
     @State private var errorMessage: String?
     @State private var isLoading = true
     @State private var isFollowing = false
-    @State private var expandedSummary = false
     @State private var confirmMarkAll = false
+    /// nil shows every season.
+    @State private var season: Int?
+    @State private var query = ""
+    @State private var similar: [DirectoryShow] = []
 
     private var showID: String { PodcastID.show(feedURL: route.feedURL) }
 
@@ -30,12 +34,18 @@ struct ShowDetailView: View {
                     header
                 }
                 content
+                if !similar.isEmpty {
+                    ShelfSection("You Might Also Like", items: similar) { show in
+                        SimilarShowLink(show: show)
+                    }
+                }
             }
             .padding(.bottom, theme.spacing.xxl)
         }
         // The blurred art runs under the navigation bar: no bar background or blur band.
         .detailPageChrome()
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) { followButton }
             if let show {
                 ToolbarItem(placement: .topBarTrailing) { settingsMenu(show) }
             }
@@ -45,6 +55,10 @@ struct ShowDetailView: View {
         }
         .refreshable { if let show { await podcasts.refresh(show) } }
         .task { await load() }
+        .task {
+            let found = (try? await podcasts.directory.similarShows(title: route.title, feedURL: route.feedURL)) ?? []
+            withAnimation(theme.motion.smooth) { similar = found }
+        }
         .task(id: show.map { "\($0.sortsOldestFirst)\($0.hidePlayed)" }) { await observeEpisodes() }
         .enableInjection()
     }
@@ -81,26 +95,17 @@ struct ShowDetailView: View {
                 }
             }
             VStack(spacing: theme.spacing.md) {
-                HStack(spacing: theme.spacing.sm) {
-                    PrimaryButton(playTitle) { if let item = playTarget { podcasts.play(item) } }
-                        .disabled(playTarget == nil)
-                    followButton
-                }
+                PrimaryButton(playTitle, glyph: .play) { if let item = playTarget { podcasts.play(item) } }
+                    .disabled(playTarget == nil)
                 if let summary = show?.summary, !summary.isEmpty {
-                    Text(summary)
-                        .font(theme.typography.itemSubtitle)
-                        .foregroundStyle(theme.palette.textSecondary)
-                        .lineLimit(expandedSummary ? nil : 3)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(.rect)
-                        .onTapGesture { withAnimation(theme.motion.smooth) { expandedSummary.toggle() } }
-                        .accessibilityHint(expandedSummary ? "" : "Shows the full description")
+                    ExpandableText(summary)
                 }
             }
             .padding(.horizontal, theme.spacing.screenInset)
         }
     }
 
+    /// In the toolbar, as in Apple Podcasts: + to follow, a check once following.
     private var followButton: some View {
         Button {
             guard let show else { return }
@@ -109,16 +114,8 @@ struct ShowDetailView: View {
             Task { await podcasts.setFollowed(show, target) }
         } label: {
             Label(isFollowing ? "Following" : "Follow", glyph: isFollowing ? .check : .add)
-                .font(.custom(BrandFont.family, size: 13, relativeTo: .footnote).weight(.semibold))
-                .textCase(.uppercase)
-                .labelStyle(.tintedIcon)
-                // Follow ↔ Following crossfades instead of swapping text mid-frame.
-                .contentTransition(.opacity)
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(theme.palette.accent, lineWidth: 1.5))
-                .contentShape(.rect(cornerRadius: 8))
+                .contentTransition(.symbolEffect(.replace))
         }
-        .buttonStyle(.pressable)
         .disabled(show == nil)
         .sensoryFeedback(.success, trigger: isFollowing) { _, new in new }
     }
@@ -141,9 +138,41 @@ struct ShowDetailView: View {
     private var metadata: String? {
         guard !episodes.isEmpty else { return nil }
         var parts = ["\(episodes.count) episode\(episodes.count == 1 ? "" : "s")"]
+        if let frequency { parts.append(frequency) }
         if show?.isSerial == true { parts.append("Series") }
         if let rate = show?.playbackRate, rate != 1 { parts.append("\(rate.formatted())× speed") }
         return parts.joined(separator: " · ")
+    }
+
+    /// How often new episodes arrive, from the gaps between the last ten. Nothing for shows
+    /// that have gone quiet or are too new to tell.
+    private var frequency: String? {
+        let dates = episodes.compactMap(\.episode.publishedAt).sorted(by: >).prefix(11)
+        guard dates.count >= 3, let latest = dates.first, latest.timeIntervalSinceNow > -60 * 86400 else { return nil }
+        let gaps = zip(dates, dates.dropFirst()).map { $0.timeIntervalSince($1) / 86400 }.sorted()
+        return switch gaps[gaps.count / 2] {
+        case ..<1.5: "Daily"
+        case ..<4.5: "Twice weekly"
+        case ..<10: "Weekly"
+        case ..<20: "Every two weeks"
+        case ..<45: "Monthly"
+        default: nil
+        }
+    }
+
+    /// Seasons, when the feed numbers more than one.
+    private var seasons: [Int] {
+        let numbers = Set(episodes.compactMap(\.episode.season))
+        return numbers.count > 1 ? numbers.sorted() : []
+    }
+
+    /// The list after the season picker and search.
+    private var visibleEpisodes: [EpisodeItem] {
+        let text = query.trimmingCharacters(in: .whitespaces)
+        return episodes.filter { item in
+            (season == nil || item.episode.season == season)
+                && (text.isEmpty || item.episode.title.localizedStandardContains(text) || item.episode.summary.localizedStandardContains(text))
+        }
     }
 
     @ViewBuilder private var content: some View {
@@ -156,7 +185,7 @@ struct ShowDetailView: View {
                     isLoading = true
                     Task { await load() }
                 }
-                .buttonStyle(.glass)
+                .buttonStyle(.tinted)
             }
         } else {
             LazyVStack(alignment: .leading, spacing: 0) {
@@ -171,10 +200,21 @@ struct ShowDetailView: View {
                             .font(theme.typography.caption.weight(.semibold))
                             .foregroundStyle(theme.palette.textSecondary)
                     }
+                    if !seasons.isEmpty { seasonMenu }
                 }
-                ForEach(episodes) { item in
+                if episodes.count >= 8 {
+                    EpisodeSearchField(text: $query)
+                        .padding(.top, theme.spacing.md)
+                }
+                ForEach(visibleEpisodes) { item in
                     EpisodeRow(item: item, showsArtwork: false)
                     Divider().overlay(theme.palette.separator)
+                }
+                if !episodes.isEmpty, visibleEpisodes.isEmpty {
+                    Text("No episodes match.")
+                        .font(theme.typography.itemSubtitle)
+                        .foregroundStyle(theme.palette.textSecondary)
+                        .padding(.vertical, theme.spacing.xl)
                 }
                 if episodes.isEmpty {
                     Text(show?.hidePlayed == true ? "You've played every episode." : "No episodes yet.")
@@ -185,6 +225,20 @@ struct ShowDetailView: View {
             }
             .padding(.horizontal, theme.spacing.screenInset)
         }
+    }
+
+    private var seasonMenu: some View {
+        Menu {
+            Picker("Season", selection: $season.animation(theme.motion.smooth)) {
+                Text("All Seasons").tag(Int?.none)
+                ForEach(seasons, id: \.self) { number in
+                    Text("Season \(number)").tag(Int?.some(number))
+                }
+            }
+        } label: {
+            Text(season.map { "Season \($0)" } ?? "All Seasons")
+        }
+        .buttonStyle(.tinted(.small))
     }
 
     private func settingsMenu(_ show: ShowRecord) -> some View {
@@ -238,9 +292,60 @@ struct ShowDetailView: View {
 }
 
 /// Every followed show, as a grid.
+/// A filter field for a show's episodes, matching titles and summaries.
+private struct EpisodeSearchField: View {
+    @Environment(\.theme) private var theme
+    @Binding var text: String
+
+    var body: some View {
+        HStack(spacing: theme.spacing.sm) {
+            Glyph.search.image
+                .resizable()
+                .frame(width: 16, height: 16)
+                .foregroundStyle(theme.palette.textSecondary)
+            TextField("Search Episodes", text: $text)
+                .font(theme.typography.body)
+                .submitLabel(.search)
+                .autocorrectionDisabled()
+            if !text.isEmpty {
+                GlyphButton("Clear Search", glyph: .close, size: 14) { text = "" }
+                    .foregroundStyle(theme.palette.textSecondary)
+            }
+        }
+        .padding(.horizontal, theme.spacing.md)
+        .frame(minHeight: 44)
+        .background(theme.palette.surface, in: .capsule)
+    }
+}
+
+/// A directory show in the "You Might Also Like" shelf; opens as a preview until followed.
+private struct SimilarShowLink: View {
+    @Environment(\.zoomNamespace) private var zoom
+    let show: DirectoryShow
+
+    private var sourceID: String { "similar-\(show.id)" }
+
+    var body: some View {
+        if let route {
+            NavigationLink(value: PodcastRoute.show(route)) {
+                ShowTile(title: show.title, subtitle: show.author, artworkURL: show.artworkURL)
+                    .zoomSource(sourceID, in: zoom)
+            }
+            .buttonStyle(.pressable)
+        }
+    }
+
+    private var route: ShowRoute? {
+        var route = ShowRoute(show)
+        route?.sourceID = sourceID
+        return route
+    }
+}
+
 struct AllShowsView: View {
     @Environment(\.theme) private var theme
     @Environment(PodcastsStore.self) private var podcasts
+    @Environment(\.zoomNamespace) private var zoom
     @State private var shows: [ShowSummary] = []
 
     var body: some View {
@@ -251,8 +356,9 @@ struct AllShowsView: View {
                 spacing: theme.spacing.xl
             ) {
                 ForEach(shows) { summary in
-                    NavigationLink(value: PodcastRoute.show(ShowRoute(summary.show))) {
+                    NavigationLink(value: PodcastRoute.show(zoomRoute(summary.show))) {
                         ShowTile(title: summary.show.title, subtitle: summary.show.author, artworkURL: summary.show.artworkURL, newCount: summary.newCount)
+                            .zoomSource("shows-\(summary.show.feedURL)", in: zoom)
                     }
                     .buttonStyle(.pressable)
                     .contextMenu {
@@ -277,5 +383,12 @@ struct AllShowsView: View {
                 for try await value in podcasts.observe(podcasts.database.followedShows()) { shows = value }
             } catch { Log.observationFailed(error) }
         }
+    }
+
+    /// The show's route, zooming out of its tile.
+    private func zoomRoute(_ show: ShowRecord) -> ShowRoute {
+        var route = ShowRoute(show)
+        route.sourceID = "shows-\(show.feedURL)"
+        return route
     }
 }

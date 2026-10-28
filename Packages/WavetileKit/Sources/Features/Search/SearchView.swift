@@ -49,7 +49,7 @@ struct SearchView: View {
             .navigationTitle("Search")
             .tabRootChrome()
             .libraryDestinations(zoom: zoom) { path.append($0) }
-            .podcastDestinations { path.append($0) }
+            .podcastDestinations(zoom: zoom) { path.append($0) }
             .sheet(item: $actionsTrack, onDismiss: actions.presentPending) { track in
                 SongActionsSheet(
                     track: track,

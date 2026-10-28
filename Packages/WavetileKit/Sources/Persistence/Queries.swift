@@ -52,6 +52,24 @@ public extension LibraryDatabase {
         }
     }
 
+    /// An artist's songs album by album, in the artist page's order (newest album first).
+    func tracks(artistID: String) throws -> [TrackRecord] {
+        try pool.read { db in
+            try TrackRecord.fetchAll(db, sql: """
+                SELECT track.* FROM track JOIN album ON album.id = track.albumID
+                WHERE album.artistID = ?
+                ORDER BY album.year DESC, album.sortTitle, track.discNumber, track.trackNumber, track.sortTitle
+                """, arguments: [artistID])
+        }
+    }
+
+    /// The synced artists among `ids`, in the order given.
+    func artists(ids: [String]) throws -> [ArtistRecord] {
+        let byID = try pool.read { try ArtistRecord.fetchAll($0, keys: ids) }
+            .reduce(into: [String: ArtistRecord]()) { $0[$1.id] = $1 }
+        return ids.compactMap { byID[$0] }
+    }
+
     func allTracks() -> ValueObservation<ValueReducers.Fetch<[TrackRecord]>> {
         ValueObservation.tracking { db in
             try TrackRecord.order(Column("sortTitle")).fetchAll(db)
@@ -266,5 +284,34 @@ public extension LibraryDatabase {
 
     func recentlyAddedAlbums(limit: Int = 24) throws -> [AlbumRecord] {
         try pool.read { try AlbumRecord.order(Column("dateAdded").desc).limit(limit).fetchAll($0) }
+    }
+}
+
+// MARK: - One-shot lists for CarPlay, which shows a snapshot rather than observing
+
+public extension LibraryDatabase {
+    func albumList(limit: Int) throws -> [AlbumRecord] {
+        try pool.read { try AlbumRecord.order(Column("sortTitle")).limit(limit).fetchAll($0) }
+    }
+
+    func albumList(artistID: String) throws -> [AlbumRecord] {
+        try pool.read { try AlbumRecord.filter(Column("artistID") == artistID).order(Column("year").desc, Column("sortTitle")).fetchAll($0) }
+    }
+
+    func artistList(limit: Int) throws -> [ArtistRecord] {
+        try pool.read { try ArtistRecord.order(Column("sortName")).limit(limit).fetchAll($0) }
+    }
+
+    func playlistList() throws -> [PlaylistRecord] {
+        try pool.read { try PlaylistRecord.order(Column("name")).fetchAll($0) }
+    }
+
+    /// Playlists whose name contains `text` (playlists aren't in the search index).
+    func playlists(matching text: String, limit: Int = 10) throws -> [PlaylistRecord] {
+        try pool.read { try PlaylistRecord.filter(Column("name").like("%\(text)%")).order(Column("name")).limit(limit).fetchAll($0) }
+    }
+
+    func favoriteArtistList(limit: Int) throws -> [ArtistRecord] {
+        try pool.read { try ArtistRecord.filter(Column("isFavorite") == true).order(Column("sortName")).limit(limit).fetchAll($0) }
     }
 }

@@ -22,12 +22,12 @@ public struct Theme: Sendable, Identifiable, Hashable {
     public struct Palette: Sendable, Equatable {
         /// Brand color: tint for controls, selection, progress.
         public var accent: Color
-        /// Solid fill for primary buttons (Play). Same as `accent` unless an artwork palette sets a more vivid one.
-        public var accentFill: Color?
-        /// Text/glyphs placed on an accent fill.
-        public var onAccent: Color = .white
-
-        public var resolvedAccentFill: Color { accentFill ?? accent }
+        /// The faint accent wash behind tinted buttons, and the deeper one while pressed.
+        public var tint: Color { accent.opacity(0.12) }
+        /// Switch "on" color. Neutral gray in both themes: a tan or near-black tint would hide
+        /// the knob or read as off.
+        public var toggle = Color(hex: 0x6E6E73)
+        public var tintPressed: Color { accent.opacity(0.2) }
         public var background: Color
         public var surface: Color
         public var textPrimary: Color
@@ -48,8 +48,10 @@ public struct Theme: Sendable, Identifiable, Hashable {
         public var itemTitle: Font
         public var itemSubtitle: Font
         public var caption: Font
-        public var nowPlayingTitle: Font
-        public var nowPlayingSubtitle: Font
+        /// Bold text-face heading: the Now Playing title, the welcome greeting, About sheet sections.
+        public var headline: Font
+        /// Larger reading text: the Now Playing artist, the About sheet, a detail page's artist or show.
+        public var lead: Font
         public var code: Font
         /// Letter-spacing for large display titles: big type reads loose, so it's tightened.
         /// (Body text stays at 0; system fonts do this automatically, custom faces don't.)
@@ -98,7 +100,6 @@ public extension Theme {
         name: "Dark",
         palette: .init(
             accent: Color(hex: 0xECE4D2),
-            onAccent: .black,
             background: Color(hex: 0x1A1A1A),
             surface: Color(hex: 0x262626),
             textPrimary: Color(hex: 0xECE4D2),
@@ -108,7 +109,7 @@ public extension Theme {
         ),
         typography: .init(
             // Logo: fixed size (a mark, not text). 30pt is the largest that sits cleanly in the 44pt bar.
-            wordmark: BrandFont.font(fixedSize: 30, weight: .bold, family: BrandFont.displayFamily),
+            wordmark: BrandFont.font(fixedSize: 32, weight: .bold, family: BrandFont.displayFamily),
             largeTitle: BrandFont.display(.largeTitle),
             title: BrandFont.display(.title2),
             sectionHeader: BrandFont.font(.title3, weight: .semibold),
@@ -116,8 +117,8 @@ public extension Theme {
             itemTitle: BrandFont.font(.subheadline, weight: .medium),
             itemSubtitle: BrandFont.font(.subheadline),
             caption: BrandFont.font(.caption),
-            nowPlayingTitle: BrandFont.font(.title2, weight: .bold),
-            nowPlayingSubtitle: BrandFont.font(.title3),
+            headline: BrandFont.font(.title2, weight: .bold),
+            lead: BrandFont.font(.title3),
             code: .system(.largeTitle, design: .monospaced).weight(.semibold)
         ),
         spacing: .init(),
@@ -134,7 +135,6 @@ public extension Theme {
         theme.id = "light"
         theme.name = "Light"
         theme.palette.accent = Color(hex: 0x1A1A1A)
-        theme.palette.onAccent = Color(hex: 0xECE4D2)
         theme.palette.background = Color(hex: 0xECE4D2)
         theme.palette.surface = Color(hex: 0xE0D7C3)
         theme.palette.textPrimary = Color(hex: 0x1A1A1A)

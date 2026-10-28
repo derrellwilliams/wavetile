@@ -12,7 +12,8 @@ extension QueuedTrack {
             artist: record.artistName,
             albumTitle: record.albumTitle,
             albumID: record.albumID,
-            duration: record.durationMs.map { .milliseconds($0) }
+            duration: record.durationMs.map { .milliseconds($0) },
+            normalizationGain: record.normalizationGain
         )
     }
 
@@ -24,7 +25,8 @@ extension QueuedTrack {
             albumTitle: album.title,
             albumID: album.id,
             albumImageTag: album.imageTag,
-            duration: track.duration
+            duration: track.duration,
+            normalizationGain: track.normalizationGain
         )
     }
 }
@@ -32,8 +34,10 @@ extension QueuedTrack {
 /// Makes a track row playable: tap plays the surrounding list from this row; long-press
 /// offers Play Next / Add to Queue. `tracks` is built lazily on tap, so long lists stay cheap.
 /// `onTap` replaces the default play (search plays the song's album and opens Now Playing);
-/// the long-press menu is the same.
+/// the long-press menu is the same. `showsMore` adds a trailing ⋯ with that menu, so the
+/// actions don't depend on discovering the long press.
 struct PlayableRow<Label: View>: View {
+    @Environment(\.theme) private var theme
     @Environment(AudioPlayer.self) private var player
     @Environment(DownloadsStore.self) private var downloads
     @Environment(Connectivity.self) private var connectivity
@@ -46,35 +50,52 @@ struct PlayableRow<Label: View>: View {
     var onTap: (() -> Void)?
     /// Adds Play / Go to Album / Go to Artist to the long press, matching the ⋯ sheet.
     var menu: SongMenu?
+    var showsMore = false
     @ViewBuilder let label: Label
     /// Haptic on the tap that starts playback, not on every track change (auto-advance included).
     @State private var taps = 0
 
     var body: some View {
-        tapAction
-            // Offline, only downloaded songs can play; dim the rest.
-            .disabled(!isAvailable)
-            .opacity(isAvailable ? 1 : 0.35)
-            .contextMenu {
-                if let menu {
-                    Button("Play", glyph: .play, action: menu.play)
-                    if let album = menu.album { Button("Go to Album", glyph: .album) { push(album) } }
-                    if let artist = menu.artist { Button("Go to Artist", glyph: .artist) { push(artist) } }
-                    Divider()
+        HStack(spacing: 0) {
+            tapAction
+                // Offline, only downloaded songs can play; dim the rest.
+                .disabled(!isAvailable)
+                .opacity(isAvailable ? 1 : 0.35)
+                .contextMenu { menuItems }
+            if showsMore {
+                Menu { menuItems } label: {
+                    Glyph.more.image
+                        .resizable()
+                        .frame(width: 20, height: 20)
+                        .foregroundStyle(theme.palette.textSecondary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(.rect)
                 }
-                Button("Play Next", glyph: .playNext) {
-                    if let track = tracks()[safe: index] { player.playNext([track.requeued()]) }
-                }
-                Button("Add to Queue", glyph: .queue) {
-                    if let track = tracks()[safe: index] { player.addToQueue([track.requeued()]) }
-                }
-                Divider()
-                Button("Add to Playlist", glyph: .addToQueue) { actions.addToPlaylist([trackID]) }
-                Button("Favorite", glyph: .favorite) {
-                    actions.favorite(trackID, store: store)
-                }
+                .accessibilityLabel("More")
             }
-            .sensoryFeedback(.selection, trigger: taps)
+        }
+        .sensoryFeedback(.selection, trigger: taps)
+    }
+
+    @ViewBuilder private var menuItems: some View {
+        if let menu {
+            Button("Play", glyph: .play, action: menu.play)
+            if let album = menu.album { Button("Go to Album", glyph: .album) { push(album) } }
+            if let artist = menu.artist { Button("Go to Artist", glyph: .artist) { push(artist) } }
+            Divider()
+        }
+        Button("Play Next", glyph: .playNext) {
+            if let track = tracks()[safe: index] { player.playNext([track.requeued()]) }
+        }
+        Button("Add to Queue", glyph: .queue) {
+            if let track = tracks()[safe: index] { player.addToQueue([track.requeued()]) }
+        }
+        Button("Start Radio", glyph: .radio) { actions.startRadio(from: trackID, store: store, player: player) }
+        Divider()
+        Button("Add to Playlist", glyph: .addToQueue) { actions.addToPlaylist([trackID]) }
+        Button("Favorite", glyph: .favorite) {
+            actions.favorite(trackID, store: store)
+        }
     }
 
     private var tapAction: some View {

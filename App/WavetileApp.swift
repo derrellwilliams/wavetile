@@ -15,6 +15,8 @@ struct WavetileApp: App {
         model.restore()
         model.registerBackgroundTasks()
         _app = State(initialValue: model)
+        // Teaches Siri the current library names for "Play <name> in Wavetile".
+        WavetileShortcuts.updateAppShortcutParameters()
     }
 
     var body: some Scene {

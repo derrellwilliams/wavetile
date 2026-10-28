@@ -1,5 +1,5 @@
 {
-  "images" : [ { "filename" : "caret-right.svg", "idiom" : "universal" } ],
+  "images" : [ { "filename" : "radio.svg", "idiom" : "universal" } ],
   "info" : { "author" : "xcode", "version" : 1 },
   "properties" : { "preserves-vector-representation" : true, "template-rendering-intent" : "template" }
 }

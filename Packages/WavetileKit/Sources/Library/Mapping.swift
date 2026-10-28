@@ -18,7 +18,8 @@ public extension TrackRecord {
             artist: artistName,
             trackNumber: trackNumber,
             discNumber: discNumber,
-            duration: durationMs.map { .milliseconds($0) }
+            duration: durationMs.map { .milliseconds($0) },
+            normalizationGain: normalizationGain
         )
     }
 }

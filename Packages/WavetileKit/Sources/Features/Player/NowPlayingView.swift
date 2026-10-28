@@ -71,10 +71,10 @@ struct NowPlayingView: View {
             HStack(alignment: .center, spacing: theme.spacing.md) {
                 VStack(alignment: .leading, spacing: theme.spacing.xs) {
                     Text(player.current?.title ?? "")
-                        .font(theme.typography.nowPlayingTitle)
+                        .font(theme.typography.headline)
                         .foregroundStyle(theme.palette.textPrimary)
                     Text((isEpisode ? player.current?.albumTitle : player.current?.artist) ?? "")
-                        .font(theme.typography.nowPlayingSubtitle)
+                        .font(theme.typography.lead)
                         .foregroundStyle(theme.palette.textPrimary)
                     if let chapter = currentChapter {
                         Text(chapter.title)
@@ -231,6 +231,8 @@ struct NowPlayingView: View {
                 .foregroundStyle(player.queue.isShuffled ? theme.palette.accent : theme.palette.textSecondary)
                 .accessibilityValue(player.queue.isShuffled ? "On" : "Off")
             Spacer()
+            SleepTimerMenu()
+            Spacer()
             AirPlayButton()
             Spacer()
             Button("Repeat", glyph: player.queue.repeatMode == .one ? .repeatOne : .repeat) { player.cycleRepeat() }
@@ -315,11 +317,13 @@ struct Scrubber: View {
 struct AirPlayButton: View {
     @Environment(\.theme) private var theme
     var iconSize: CGFloat = 28
+    /// Square tap area; nil in a navigation bar, which sizes its own items.
+    var tapSize: CGFloat? = 44
 
     var body: some View {
         RoutePicker(tint: UIColor(theme.palette.accent))
             .frame(width: iconSize, height: iconSize)
-            .frame(width: 44, height: 44)
+            .frame(width: tapSize, height: tapSize)
             .accessibilityElement(children: .contain)
             .accessibilityLabel("AirPlay")
     }
@@ -370,14 +374,14 @@ struct SkipButton: View {
     }
 }
 
-/// Sleep timer: minutes or the end of the episode. The moon fills with the accent when set.
+/// Sleep timer: minutes or the end of the episode (or song). The moon fills with the accent when set.
 struct SleepTimerMenu: View {
     @Environment(\.theme) private var theme
     @Environment(AudioPlayer.self) private var player
 
     var body: some View {
         Menu {
-            Button("End of Episode") { player.setSleepTimer(.endOfEpisode) }
+            Button(player.current?.isEpisode == false ? "End of Song" : "End of Episode") { player.setSleepTimer(.endOfItem) }
             ForEach([5, 15, 30, 45, 60], id: \.self) { minutes in
                 Button("\(minutes) Minutes") { player.setSleepTimer(.at(.now + Double(minutes) * 60)) }
             }
@@ -408,25 +412,38 @@ struct SaveEpisodeButton: View {
     @Environment(\.theme) private var theme
     @Environment(PodcastsStore.self) private var podcasts
     let episodeID: String
-    var size: CGFloat = 24
+    /// Nil in a navigation bar: a plain bar item, sized and tinted like its neighbours.
+    var size: CGFloat?
     @State private var isSaved = false
 
     var body: some View {
-        GlyphButton(isSaved ? "Unsave Episode" : "Save Episode", glyph: isSaved ? .saved : .save, size: size) {
-            // Same frame as the tap, so the icon swap answers the touch immediately.
-            withAnimation(theme.motion.snappy) { isSaved.toggle() }
-            podcasts.setSaved(episodeID, isSaved)
+        button
+            .sensoryFeedback(.selection, trigger: isSaved)
+            .task(id: episodeID) {
+                do {
+                    for try await item in podcasts.observe(podcasts.database.episode(id: episodeID)) {
+                        let saved = item?.episode.isSaved ?? false
+                        if saved != isSaved { withAnimation(theme.motion.snappy) { isSaved = saved } }
+                    }
+                } catch { Log.observationFailed(error) }
+            }
+    }
+
+    @ViewBuilder private var button: some View {
+        let title = isSaved ? "Unsave Episode" : "Save Episode"
+        let glyph: Glyph = isSaved ? .saved : .save
+        if let size {
+            GlyphButton(title, glyph: glyph, size: size, action: toggle)
+                .foregroundStyle(theme.palette.accent)
+        } else {
+            Button(title, glyph: glyph, action: toggle)
         }
-        .foregroundStyle(theme.palette.accent)
-        .sensoryFeedback(.selection, trigger: isSaved)
-        .task(id: episodeID) {
-            do {
-                for try await item in podcasts.observe(podcasts.database.episode(id: episodeID)) {
-                    let saved = item?.episode.isSaved ?? false
-                    if saved != isSaved { withAnimation(theme.motion.snappy) { isSaved = saved } }
-                }
-            } catch { Log.observationFailed(error) }
-        }
+    }
+
+    private func toggle() {
+        // Same frame as the tap, so the icon swap answers the touch immediately.
+        withAnimation(theme.motion.snappy) { isSaved.toggle() }
+        podcasts.setSaved(episodeID, isSaved)
     }
 }
 

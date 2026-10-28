@@ -41,13 +41,12 @@ struct DownloadedView: View {
                 Menu {
                     Button("Remove All Downloads", glyph: .trash, role: .destructive) { confirmRemoveAll = true }
                 } label: {
-                    BarGroupIcon(glyph: .more)
+                    Label("More", glyph: .more)
                 }
-                .accessibilityLabel("More")
                 .disabled(showsPodcasts ? episodes.isEmpty : collections.isEmpty)
             }
             .libraryDestinations(zoom: zoom) { path.append($0) }
-            .podcastDestinations { path.append($0) }
+            .podcastDestinations(zoom: zoom) { path.append($0) }
             .task {
                 do {
                     for try await value in library.observe(library.database.downloadedCollections()) {

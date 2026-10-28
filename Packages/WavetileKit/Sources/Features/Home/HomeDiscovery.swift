@@ -16,12 +16,12 @@ struct WelcomeCard: View {
         VStack(alignment: .leading, spacing: theme.spacing.xs) {
             HStack(spacing: theme.spacing.sm) {
                 hand
-                Text("Hi, \(userName)!")
-                    .font(BrandFont.font(.title, weight: .bold))
+                Text("Hi, \(greetingName)!")
+                    .font(theme.typography.headline)
                     .foregroundStyle(theme.palette.textPrimary)
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Hi, \(userName)!")
+            .accessibilityLabel("Hi, \(greetingName)!")
             .accessibilityAddTraits(.isHeader)
             VStack(alignment: .leading, spacing: theme.spacing.sm) {
                 Text("You have \(songCount) in your library. Start listening and Wavetile tunes itself to your taste.")
@@ -30,7 +30,8 @@ struct WelcomeCard: View {
                     Text("Into podcasts? Turn them on from your profile.")
                 }
             }
-            .font(theme.typography.itemSubtitle)
+            // The artist bio's style: body size, secondary color.
+            .font(theme.typography.body)
             .foregroundStyle(theme.palette.textSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -70,6 +71,11 @@ struct WelcomeCard: View {
             }
     }
 
+    /// The username with its first letter capitalized ("slimscrawny" → "Slimscrawny"); the rest is left as typed.
+    private var greetingName: String {
+        userName.prefix(1).uppercased() + userName.dropFirst()
+    }
+
     private var songCount: String {
         "\(stats.tracks.formatted()) song\(stats.tracks == 1 ? "" : "s")"
     }
@@ -102,8 +108,12 @@ struct ArtistSpotlightShelf: View {
     var body: some View {
         ShelfSection(items: spotlight.albums) {
             HStack(spacing: theme.spacing.md) {
-                ArtworkView(store.artwork(itemID: spotlight.artistID, tag: spotlight.imageTag, maxPixelWidth: 192))
-                    .frame(width: 56, height: 56)
+                // As tall as the two lines beside it, at any text size.
+                Color.clear
+                    .aspectRatio(1, contentMode: .fit)
+                    .overlay {
+                        ArtworkView(store.artwork(itemID: spotlight.artistID, tag: spotlight.imageTag, maxPixelWidth: 192))
+                    }
                     .clipShape(.circle)
                 VStack(alignment: .leading, spacing: theme.spacing.xxs) {
                     Text("Artist Spotlight")
@@ -116,6 +126,7 @@ struct ArtistSpotlightShelf: View {
                         .lineLimit(1)
                 }
             }
+            .fixedSize(horizontal: false, vertical: true)
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isHeader)
         } tile: { album in

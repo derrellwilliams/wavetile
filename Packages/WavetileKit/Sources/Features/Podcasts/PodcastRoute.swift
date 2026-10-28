@@ -5,7 +5,8 @@ import SwiftUI
 /// Every podcast destination, shared by the Home, Podcasts, Search and Downloaded stacks.
 enum PodcastRoute: Hashable {
     case show(ShowRoute)
-    case episode(id: String)
+    /// `sourceID` is set when opened from an artwork tile, so the page zooms out of it.
+    case episode(id: String, sourceID: String? = nil)
     case list(EpisodeList)
     case shows
 }
@@ -16,6 +17,8 @@ struct ShowRoute: Hashable {
     var title: String
     var author: String
     var artworkURL: URL?
+    /// Set when opened from an artwork tile, so the page zooms out of it.
+    var sourceID: String?
 
     init(feedURL: URL, title: String, author: String, artworkURL: URL?) {
         self.feedURL = feedURL
@@ -65,11 +68,14 @@ extension EnvironmentValues {
 
 extension View {
     /// Registers `PodcastRoute` destinations on a tab's root screen. `push` appends to the
-    /// stack's path so menus anywhere in it can navigate.
-    func podcastDestinations(push: @escaping (PodcastRoute) -> Void) -> some View {
-        environment(\.pushPodcastRoute, push)
+    /// stack's path so menus anywhere in it can navigate. `zoom` is shared with pushed screens
+    /// so episode and show tiles zoom into their pages, like album tiles.
+    func podcastDestinations(zoom: Namespace.ID, push: @escaping (PodcastRoute) -> Void) -> some View {
+        environment(\.zoomNamespace, zoom)
+            .environment(\.pushPodcastRoute, push)
             .navigationDestination(for: PodcastRoute.self) { route in
-                PodcastDestination(route: route)
+                PodcastDestination(route: route, zoom: zoom)
+                    .environment(\.zoomNamespace, zoom)
                     .environment(\.pushPodcastRoute, push)
             }
     }
@@ -77,13 +83,16 @@ extension View {
 
 private struct PodcastDestination: View {
     let route: PodcastRoute
+    let zoom: Namespace.ID
 
     var body: some View {
         switch route {
         case let .show(show):
             ShowDetailView(route: show)
-        case let .episode(id):
+                .zoomTransition(from: show.sourceID, in: zoom)
+        case let .episode(id, sourceID):
             EpisodeDetailView(episodeID: id)
+                .zoomTransition(from: sourceID, in: zoom)
         case let .list(list):
             EpisodeListView(list: list)
         case .shows:

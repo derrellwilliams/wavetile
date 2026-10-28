@@ -75,10 +75,6 @@ struct PodcastDownloadsList: View {
                                 .foregroundStyle(theme.palette.textPrimary)
                                 .lineLimit(1)
                             Spacer(minLength: 0)
-                            Glyph.chevron.image
-                                .resizable()
-                                .frame(width: 14, height: 14)
-                                .foregroundStyle(theme.palette.textSecondary)
                         }
                         .contentShape(.rect)
                     }

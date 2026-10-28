@@ -1,5 +1,6 @@
 import Foundation
 import Nuke
+import UIKit
 
 /// Image pipeline with a persistent on-disk cache, so artwork for downloaded music shows offline
 /// and scrolling never re-downloads art. Call once at launch, before any image loads.
@@ -11,6 +12,11 @@ public enum ImageCaching {
         )
         configuration.isProgressiveDecodingEnabled = false
         ImagePipeline.shared = ImagePipeline(configuration: configuration)
+    }
+
+    /// One image, from the cache when it's there (CarPlay list artwork).
+    public static func image(for url: URL) async -> UIImage? {
+        try? await ImagePipeline.shared.image(for: url)
     }
 
     /// Prefetchers in flight; each is released when it finishes (deallocating one cancels its work).

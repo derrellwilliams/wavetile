@@ -138,8 +138,7 @@ struct SettingsToggle: View {
                     .foregroundStyle(theme.palette.textPrimary)
             }
         }
-        // A tan tint would hide the light knob; neutral gray keeps the on state readable.
-        .tint(Color(hex: 0x6E6E73))
+        .tint(theme.palette.toggle)
         .padding(.horizontal, theme.spacing.lg)
         .padding(.vertical, theme.spacing.sm)
     }

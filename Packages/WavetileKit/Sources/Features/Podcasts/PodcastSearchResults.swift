@@ -98,7 +98,7 @@ struct PodcastSearchResults: View {
         if trimmed.isEmpty {
             EmptyState("Search Podcasts", glyph: .podcasts, message: "Find shows on Apple Podcasts, or search the shows you follow.") {
                 Button("Add by Link") { showAddFeed = true }
-                    .buttonStyle(.glass)
+                    .buttonStyle(.tinted)
             }
         } else if !isSearching, local.isEmpty, directory.isEmpty, pastedFeed == nil {
             EmptyState("No Results", glyph: .search, message: directoryError ?? "No podcasts match “\(trimmed)”.")

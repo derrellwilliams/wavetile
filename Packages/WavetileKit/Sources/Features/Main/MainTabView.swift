@@ -223,66 +223,13 @@ extension MainTabView {
     }
 }
 
-/// Profile button: a 36pt clear-glass circle with the tan Phosphor user glyph. A full 44pt
-/// toolbar disc read heavy on the flat background; the tap area stays at the 44pt minimum.
+/// Profile button at top left. A plain bar item, so it gets the same system glass and icon
+/// size as the buttons on pushed screens.
 struct ProfileButton: View {
     @Environment(\.openProfile) private var openProfile
 
     var body: some View {
-        Button(action: openProfile) {
-            GlassCircleIcon(glyph: .user)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Profile and Settings")
-    }
-}
-
-/// Tab-root bar icon: a tan glyph in a 36pt clear-glass circle with a 44pt tap area.
-/// Use with `.sharedBackgroundVisibility(.hidden)` so the bar doesn't add its own glass.
-struct GlassCircleIcon: View {
-    @Environment(\.theme) private var theme
-    let glyph: Glyph
-
-    var body: some View {
-        glyph.image
-            .resizable()
-            .frame(width: 20, height: 20)
-            .foregroundStyle(theme.palette.accent)
-            .frame(width: 36, height: 36)
-            .glassEffect(.clear.interactive(), in: .circle)
-            .frame(width: 44, height: 44)
-            .contentShape(.rect)
-    }
-}
-
-/// Top-right group: the AirPlay speaker picker plus any screen-specific buttons, sharing one
-/// clear-glass capsule (a circle when AirPlay is alone), per the HIG's grouping of related bar items.
-struct TrailingBarGroup<Extra: View>: View {
-    @ViewBuilder let extra: Extra
-
-    var body: some View {
-        HStack(spacing: 0) {
-            AirPlayButton(iconSize: 22)
-                .frame(width: 36, height: 36)
-            extra
-        }
-        .glassEffect(.clear.interactive(), in: .capsule)
-        .frame(height: 44)
-    }
-}
-
-/// A tan glyph sized to sit inside `TrailingBarGroup`'s capsule.
-struct BarGroupIcon: View {
-    @Environment(\.theme) private var theme
-    let glyph: Glyph
-
-    var body: some View {
-        glyph.image
-            .resizable()
-            .frame(width: 20, height: 20)
-            .foregroundStyle(theme.palette.accent)
-            .frame(width: 40, height: 36)
-            .contentShape(.rect)
+        Button("Profile and Settings", glyph: .user, action: openProfile)
     }
 }
 
@@ -303,7 +250,7 @@ extension View {
     /// Chrome for a tab's root screen, applied to the content *inside* its `NavigationStack`:
     /// the profile button at top left (opens the drawer), and root reporting so the drawer's
     /// edge swipe only works at the root, never fighting the system back gesture.
-    /// `trailing` adds screen buttons next to AirPlay in the top-right capsule.
+    /// `trailing` adds screen buttons (plain `Label`s) next to AirPlay in the top-right capsule.
     func tabRootChrome() -> some View {
         modifier(TabRootChrome { EmptyView() })
     }
@@ -326,13 +273,15 @@ private struct TabRootChrome<Trailing: View>: ViewModifier {
                 ToolbarItem(placement: .topBarLeading) {
                     ProfileButton()
                 }
-                // The button brings its own glass; don't wrap it in the bar's.
-                .sharedBackgroundVisibility(.hidden)
-                ToolbarItem(placement: .topBarTrailing) {
-                    TrailingBarGroup { trailing }
+                // AirPlay and the screen's buttons share one capsule of the bar's glass,
+                // like the trailing buttons on pushed screens.
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    AirPlayButton(iconSize: 24, tapSize: nil)
+                    trailing
                 }
-                .sharedBackgroundVisibility(.hidden)
             }
+            // Keeps the scrolled-up title at the leading edge on every tab, not centered on some.
+            .toolbarRole(.browser)
             // Pushing a screen makes the root disappear; returning makes it reappear.
             .onAppear { reporter.report(true) }
             .onDisappear { reporter.report(false) }
@@ -360,6 +309,8 @@ enum DebugFlags {
     static let openLatestEpisode = ProcessInfo.processInfo.arguments.contains("-openLatestEpisode")
     /// `-freshHome` shows Home as a new listener sees it: no play history or podcast Up Next.
     static let freshHome = ProcessInfo.processInfo.arguments.contains("-freshHome")
+    /// `-openArtist` (with `-openFirstAlbum`) goes on to that album's artist page.
+    static let openArtist = ProcessInfo.processInfo.arguments.contains("-openArtist")
     #else
     static let freshHome = false
     static let openSettings = false
@@ -373,5 +324,6 @@ enum DebugFlags {
     static let followFeed: URL? = nil
     static let playLatestEpisode = false
     static let openLatestEpisode = false
+    static let openArtist = false
     #endif
 }

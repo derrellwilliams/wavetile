@@ -49,6 +49,7 @@ struct SongActionsSheet: View {
                     Divider().overlay(theme.palette.separator)
                     action("Play Next", glyph: .playNext) { player.playNext([QueuedTrack(track).requeued()]) }
                     action("Add to Queue", glyph: .queue) { player.addToQueue([QueuedTrack(track).requeued()]) }
+                    action("Start Radio", glyph: .radio) { actions.startRadio(from: track.id, store: store, player: player) }
                     Divider().overlay(theme.palette.separator)
                     action("Add to Playlist", glyph: .addToQueue) {
                         // Opens from the presenter's onDismiss, the moment this sheet is gone.

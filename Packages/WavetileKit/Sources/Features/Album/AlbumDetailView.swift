@@ -1,5 +1,6 @@
 import DesignSystem
 import JellyfinKit
+import Persistence
 import Playback
 import PreviewSupport
 import SwiftUI
@@ -10,7 +11,11 @@ struct AlbumDetailView: View {
     @Environment(AudioPlayer.self) private var player
     @Environment(DownloadsStore.self) private var downloads
     @Environment(LibraryActions.self) private var actions
+    @Environment(LibraryStore.self) private var store
     @State var model: AlbumDetailModel
+    /// The release date, fetched when the page opens (it isn't synced).
+    @State private var details: ItemDetails?
+    @State private var moreByArtist: [AlbumRecord] = []
 
     var body: some View {
         ScrollView {
@@ -18,8 +23,15 @@ struct AlbumDetailView: View {
                 VStack(spacing: theme.spacing.md) {
                     ArtworkHero(artwork: model.artwork)
                     header
+                    playButtons
                 }
                 trackList
+                releaseDate
+                if !moreByArtist.isEmpty {
+                    ShelfSection("More by \(model.album.artist)", items: moreByArtist) { album in
+                        AlbumLink(album: album.summary, context: "more-by")
+                    }
+                }
             }
             .padding(.bottom, theme.spacing.xxl)
         }
@@ -45,10 +57,23 @@ struct AlbumDetailView: View {
                         .disabled(model.tracks.isEmpty)
                     Button("Add to Queue", glyph: .queue) { player.addToQueue(queue()) }
                         .disabled(model.tracks.isEmpty)
+                    Button("Start Radio", glyph: .radio) { actions.startRadio(from: model.album.id, store: store, player: player) }
                 } label: {
                     Label("More", glyph: .more)
                 }
             }
+        }
+        .task {
+            let loaded = try? await store.api.details(itemID: model.album.id)
+            withAnimation(theme.motion.smooth) { details = loaded }
+        }
+        .task {
+            guard let artistID = model.artistID else { return }
+            do {
+                for try await albums in store.observe(store.database.albums(artistID: artistID)) {
+                    moreByArtist = albums.filter { $0.id != model.album.id }
+                }
+            } catch { Log.observationFailed(error) }
         }
         .task {
             await model.load()
@@ -62,15 +87,38 @@ struct AlbumDetailView: View {
         DetailHeader(model.album.title, metadata: metadata) { artistName }
     }
 
+    /// Play and Shuffle side by side, as in Apple Music.
+    private var playButtons: some View {
+        HStack(spacing: theme.spacing.md) {
+            PrimaryButton("Play", glyph: .play) { player.play(queue()) }
+            PrimaryButton("Shuffle", glyph: .shuffle) { player.play(queue(), shuffled: true) }
+        }
+        .disabled(model.tracks.isEmpty)
+        .padding(.horizontal, theme.spacing.screenInset)
+    }
+
     /// Taps through to the artist when the album's artist is known locally.
     @ViewBuilder private var artistName: some View {
-        let label = DetailSubtitle(model.album.artist)
         if let artistID = model.artistID {
-            NavigationLink(value: LibraryRoute.artist(id: artistID, name: model.album.artist)) { label }
+            NavigationLink(value: LibraryRoute.artist(id: artistID, name: model.album.artist)) {
+                DetailSubtitle(model.album.artist)
+            }
                 .buttonStyle(.plain)
                 .accessibilityHint("Shows the artist")
         } else {
-            label
+            DetailSubtitle(model.album.artist)
+        }
+    }
+
+    /// The full release date, as Apple Music shows under the track list.
+    @ViewBuilder private var releaseDate: some View {
+        if let date = details?.premiereDate {
+            // Jellyfin stores release dates at midnight UTC; local time would show the day before.
+            Text(date.formatted(Date.FormatStyle(date: .long, time: .omitted, timeZone: .gmt)))
+                .font(theme.typography.itemSubtitle)
+                .foregroundStyle(theme.palette.textSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, theme.spacing.screenInset)
         }
     }
 
@@ -94,7 +142,7 @@ struct AlbumDetailView: View {
         } else if let error = model.errorMessage {
             EmptyState("Something Went Wrong", glyph: .warning, message: error) {
                 Button("Retry") { Task { await model.load() } }
-                    .buttonStyle(.glass)
+                    .buttonStyle(.tinted)
             }
         } else {
             LazyVStack(alignment: .leading, spacing: 0) {
@@ -108,7 +156,7 @@ struct AlbumDetailView: View {
                             .padding(.bottom, theme.spacing.xs)
                     }
                     ForEach(disc.tracks) { track in
-                        PlayableRow(trackID: track.id, index: model.tracks.firstIndex(of: track) ?? 0, tracks: queue) {
+                        PlayableRow(trackID: track.id, index: model.tracks.firstIndex(of: track) ?? 0, tracks: queue, showsMore: true) {
                             TrackRow(
                                 title: track.title,
                                 subtitle: track.artist == model.album.artist ? nil : track.artist,
@@ -117,9 +165,11 @@ struct AlbumDetailView: View {
                                 isPlaying: player.current?.trackID == track.id,
                                 isDownloaded: downloads.isDownloaded(track.id)
                             )
-                            .padding(.horizontal, theme.spacing.screenInset)
+                            .padding(.leading, theme.spacing.screenInset)
                             .padding(.vertical, theme.spacing.md)
                         }
+                        // The ⋯ tap area is wider than its glyph; this lines the glyph up with the inset.
+                        .padding(.trailing, theme.spacing.screenInset - 12)
                         if track.id != disc.tracks.last?.id {
                             Divider()
                                 .overlay(theme.palette.separator)

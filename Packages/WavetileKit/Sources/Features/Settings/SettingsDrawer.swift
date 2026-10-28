@@ -1,6 +1,7 @@
 import DesignSystem
 import Downloads
 import JellyfinKit
+import Playback
 import PreviewSupport
 import SwiftUI
 
@@ -15,6 +16,7 @@ struct SettingsDrawer: View {
     @State private var confirmSignOut = false
     @State private var confirmRemoveDownloads = false
     @Environment(DownloadsStore.self) private var downloads
+    @Environment(AudioPlayer.self) private var player
 
     var body: some View {
         ScrollView {
@@ -43,6 +45,12 @@ struct SettingsDrawer: View {
                     }
                 }
 
+                SettingsSection(title: "Playback") {
+                    @Bindable var player = player
+                    // Uses Jellyfin's per-song loudness analysis (server 10.9 or later).
+                    SettingsToggle(.waveform, "Volume Levelling", isOn: $player.levelsVolume)
+                }
+
                 PodcastSettingsSection()
 
                 downloadsSection
@@ -51,9 +59,8 @@ struct SettingsDrawer: View {
                     confirmSignOut = true
                 } label: {
                     Label("Sign Out", glyph: .signOut)
-                        .font(theme.typography.body.weight(.semibold))
-                        .labelStyle(.tintedIcon)
                 }
+                .buttonStyle(.text)
                 .confirmationDialog("Sign out of \(session.serverName)?", isPresented: $confirmSignOut, titleVisibility: .visible) {
                     Button("Sign Out", role: .destructive) {
                         Task { await app.signOut() }
@@ -86,8 +93,7 @@ struct SettingsDrawer: View {
                     Text("Use Cellular Data").font(theme.typography.body)
                 }
             }
-            // A white tint would hide the white knob; neutral gray keeps the on state readable.
-            .tint(Color(hex: 0x6E6E73))
+            .tint(theme.palette.toggle)
             .padding(.horizontal, theme.spacing.lg)
             .padding(.vertical, theme.spacing.sm)
             SettingsRow(.downloads, "Storage Used", value: ByteCountFormatter.string(fromByteCount: downloads.totalBytes, countStyle: .file))
