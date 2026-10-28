@@ -91,7 +91,7 @@ struct HomeView: View {
                         .accessibilityAddTraits(.isHeader)
                 }
             }
-            .tabRootChrome()
+            .tabRootChrome(centersTitle: true)
             .libraryDestinations(zoom: zoom) { path.append($0) }
             .podcastDestinations(zoom: zoom) { path.append($0) }
             // On the always-present scroll view: a task on a shelf that isn't shown never runs.

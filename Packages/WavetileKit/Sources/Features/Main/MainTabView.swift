@@ -251,8 +251,9 @@ extension View {
     /// the profile button at top left (opens the drawer), and root reporting so the drawer's
     /// edge swipe only works at the root, never fighting the system back gesture.
     /// `trailing` adds screen buttons (plain `Label`s) next to AirPlay in the top-right capsule.
-    func tabRootChrome() -> some View {
-        modifier(TabRootChrome { EmptyView() })
+    /// `centersTitle` keeps the title centered (Home's wordmark); other tabs keep theirs leading.
+    func tabRootChrome(centersTitle: Bool = false) -> some View {
+        modifier(TabRootChrome(centersTitle: centersTitle) { EmptyView() })
     }
 
     func tabRootChrome<Trailing: View>(@ViewBuilder trailing: () -> Trailing) -> some View {
@@ -262,10 +263,14 @@ extension View {
 
 private struct TabRootChrome<Trailing: View>: ViewModifier {
     @Environment(\.tabRootReporter) private var reporter
+    var centersTitle = false
     let trailing: Trailing
 
     init(trailing: Trailing) { self.trailing = trailing }
-    init(@ViewBuilder trailing: () -> Trailing) { self.trailing = trailing() }
+    init(centersTitle: Bool = false, @ViewBuilder trailing: () -> Trailing) {
+        self.centersTitle = centersTitle
+        self.trailing = trailing()
+    }
 
     func body(content: Content) -> some View {
         content
@@ -281,7 +286,7 @@ private struct TabRootChrome<Trailing: View>: ViewModifier {
                 }
             }
             // Keeps the scrolled-up title at the leading edge on every tab, not centered on some.
-            .toolbarRole(.browser)
+            .toolbarRole(centersTitle ? .automatic : .browser)
             // Pushing a screen makes the root disappear; returning makes it reappear.
             .onAppear { reporter.report(true) }
             .onDisappear { reporter.report(false) }
