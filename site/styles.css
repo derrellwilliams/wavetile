@@ -227,6 +227,7 @@ a.button:active, .top__nav a:active { scale: 0.96; background: #111111; transiti
 .guide__head > * { grid-column: 1 / span 9; }
 .guide .title { font-size: clamp(44px, 7vw, 104px); line-height: 0.95; letter-spacing: -0.035em; margin: 0; text-wrap: balance; }
 .guide .meta { grid-column: 1 / span 6; margin: 8px 0 0; font-size: clamp(18px, 1.6vw, 22px); line-height: 1.45; color: var(--ink); max-width: 44ch; text-wrap: pretty; }
+.guide__head .guide__action { grid-column: 1 / -1; margin: 12px 0 0; }
 .guide__head .guide__intro { grid-column: 7 / -1; align-self: end; max-width: 52ch; margin: 0; color: var(--ink-2); }
 .guide__row {
   display: grid; grid-template-columns: subgrid; align-items: baseline;
