@@ -30,7 +30,7 @@
 - Website: https://wavetile.com/
 - Why Wavetile (how it compares to other Jellyfin apps): https://wavetile.com/why-wavetile
 - Podcasts with Jellyfin: https://wavetile.com/jellyfin-podcasts
-- Getting started: https://wavetile.com/getting-started
+- Download (join the TestFlight beta, then set up): https://wavetile.com/getting-started
 - Support: https://wavetile.com/support
 - Privacy policy: https://wavetile.com/privacy
 - Source and issues: https://github.com/derrellwilliams/wavetile

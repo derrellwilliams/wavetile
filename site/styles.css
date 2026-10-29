@@ -32,7 +32,8 @@
   --line: rgb(255 255 255 / 0.12);
 
   --text: "Familjen Grotesk", ui-sans-serif, system-ui, sans-serif;
-  --display: "Stack Sans Notch", "Familjen Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --display: "Stack Sans Notch", "Familjen Grotesk", ui-sans-serif, system-ui, sans-serif; /* wordmark only */
+  --headline: "Stack Sans Headline", "Familjen Grotesk", ui-sans-serif, system-ui, sans-serif;
   --frame: clamp(12px, 2.2vw, 28px);
   --inset: clamp(20px, 4vw, 40px);
   /* Critically damped, like Motion.smooth: no overshoot. */
@@ -59,9 +60,36 @@ h1, h2, p { margin: 0; }
 .link { text-underline-offset: 4px; text-decoration-color: var(--ink-3); font-weight: 600; }
 .link:hover { text-decoration-color: var(--ink); }
 
-/* Wordmark centered on the top edge of the first panel. */
-.top { position: relative; z-index: 1; display: flex; justify-content: center; padding-top: clamp(28px, 3.5vw, 40px); margin-bottom: -16px; }
-.brand { text-decoration: none; }
+/* Wordmark on the left, sitting on the top edge of the first panel; guide links on the right. */
+.top {
+  position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 12px 24px; padding: clamp(28px, 3.5vw, 40px) calc(var(--frame) + var(--inset)) 0; margin-bottom: -16px;
+}
+.brand { display: inline-block; text-decoration: none; transition: opacity 240ms var(--ease), scale 240ms var(--ease); }
+@media (hover: hover) { .brand:hover { opacity: 0.75; } }
+.brand:active { opacity: 0.6; scale: 0.97; transition-duration: 80ms; }
+@media (prefers-reduced-motion: reduce) { .brand:active { scale: none; } }
+/* Small pills in the beta button's style. */
+.top__nav { display: flex; flex-wrap: wrap; gap: 8px; font: 700 14px/1 var(--text); }
+.top__nav a {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 16px 0 13px; border-radius: 999px;
+  background: #222222; color: var(--ink-2); text-decoration: none;
+  transition: background-color 240ms var(--ease), color 240ms var(--ease), scale 240ms var(--ease);
+}
+.top__nav a:focus-visible { background: #171717; color: var(--ink); }
+.top__nav a[aria-current="page"] { background: #171717; color: #FFFFFF; }
+/* Phones: the links float in a bar at the bottom of the screen, clear of the home indicator. */
+@media (max-width: 640px) {
+  .top { justify-content: center; }
+  .top__nav {
+    position: fixed; z-index: 10; left: 50%; translate: -50% 0; bottom: calc(12px + env(safe-area-inset-bottom));
+    flex-wrap: nowrap; padding: 6px; border-radius: 999px;
+    background: rgb(34 34 34 / 0.8); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08), 0 12px 32px -12px rgb(0 0 0 / 0.7);
+  }
+  .top__nav a { background: transparent; padding: 0 12px 0 10px; }
+  body { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+}
 
 .panel { margin: 0 var(--frame); background: var(--bg); }
 
@@ -70,15 +98,17 @@ h1, h2, p { margin: 0; }
   display: grid; place-items: center; align-content: center; gap: 36px; text-align: center;
   min-height: clamp(360px, 40vw, 500px); padding: 64px var(--inset);
 }
+/* Desktop: sit the headline a little above center, clear of the phones rising into the box. */
+@media (min-width: 900px) { .hero { padding-block: 40px 88px; } }
 .headline {
-  font-family: "Stack Sans Headline", var(--display); font-weight: 400;
-  font-size: clamp(28px, 2.9vw, 37px); line-height: 1.2; color: #FFFFFF;
+  font-family: var(--headline); font-weight: 700;
+  font-size: clamp(28px, 2.9vw, 37px); line-height: 1.2; color: var(--ink);
   text-wrap: balance; max-width: 22ch;
 }
 @media (min-width: 900px) { .headline { max-width: none; } }
 .button {
   display: inline-flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 30px; border-radius: 999px;
-  background: #171717; font: 400 18px/1 var(--text); color: #FFFFFF; text-decoration: none;
+  background: #222222; font: 400 18px/1 var(--text); color: var(--ink); text-decoration: none;
 }
 
 /* Screens: a slow marquee that loops. Spacing is margin on each image (not gap), so one
@@ -87,9 +117,9 @@ h1, h2, p { margin: 0; }
 .marquee { display: flex; width: max-content; animation: marquee 84s linear infinite; }
 .marquee__copy { display: contents; }
 .screens:hover .marquee { animation-play-state: paused; }
-/* Desktop: the phones rise 90px into the hero, below its centered content. */
+/* Desktop: the phones rise 100px into the hero, below its centered content. */
 @media (min-width: 900px) {
-  .screens { position: relative; margin-top: -90px; padding-top: 0; }
+  .screens { position: relative; margin-top: -100px; padding-top: 0; }
 }
 /* A simple phone: dark bezel, rounded corners, a Dynamic Island over the status bar. */
 .device {
@@ -131,15 +161,29 @@ h1, h2, p { margin: 0; }
 .icon[data-icon="cloud-slash"] { --icon: url("/assets/icons/cloud-slash.svg"); }
 .icon[data-icon="lock"] { --icon: url("/assets/icons/lock.svg"); }
 .icon[data-icon="arrow-right"] { --icon: url("/assets/icons/arrow-right.svg"); }
+.icon[data-icon="info"] { --icon: url("/assets/icons/info.svg"); }
+.icon[data-icon="download-simple"] { --icon: url("/assets/icons/download-simple.svg"); }
+.top__nav .icon { width: 16px; height: 16px; }
 .button .icon { width: 20px; height: 20px; }
 /* Hover: the button lifts a shade and the arrow nudges toward where it leads. */
-.button { transition: background-color 240ms var(--ease); }
+.button { transition: background-color 240ms var(--ease), scale 240ms var(--ease); }
 /* The hero button also fades in on scroll; keep both transitions. */
-.js .button.reveal { transition: opacity 800ms var(--ease), translate 800ms var(--ease), background-color 240ms var(--ease); }
+.js .button.reveal { transition: opacity 800ms var(--ease), translate 800ms var(--ease), background-color 240ms var(--ease), scale 240ms var(--ease); }
 .button .icon { transition: translate 240ms var(--ease); }
-a.button:hover, a.button:focus-visible { background: #222222; }
-a.button:hover .icon, a.button:focus-visible .icon { translate: 4px 0; }
-@media (prefers-reduced-motion: reduce) { .button .icon { transition: none; } }
+a.button:focus-visible { background: #171717; }
+a.button:focus-visible .icon { translate: 4px 0; }
+/* Hover only where there's a pointer, so a tap on a phone doesn't leave the hover look stuck. */
+@media (hover: hover) {
+  a.button:hover { background: #171717; }
+  a.button:hover .icon { translate: 4px 0; }
+  .top__nav a:hover { background: #171717; color: var(--ink); }
+}
+/* Pressed: a quick press-in that springs back on release. */
+a.button:active, .top__nav a:active { scale: 0.96; background: #111111; transition-duration: 80ms; }
+@media (prefers-reduced-motion: reduce) {
+  .button .icon { transition: none; }
+  a.button:active, .top__nav a:active { scale: none; }
+}
 @media (max-width: 900px) { .features { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 520px) { .features { grid-template-columns: 1fr; } }
 
@@ -152,7 +196,6 @@ a.button:hover .icon, a.button:focus-visible .icon { translate: 4px 0; }
 .footer__mark { width: 28px; height: 28px; color: #6B6862; /* ink-3 over the page, as a solid so overlapping strokes don't stack */ margin-bottom: 10px; }
 .footer__mark svg { display: block; width: 100%; height: 100%; }
 .footer nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 28px; font-size: 15px; }
-.footer__guides { margin-bottom: 4px; }
 .footer nav a { color: var(--ink-2); text-decoration: none; transition: color 200ms; }
 .footer nav a:hover { color: var(--ink); }
 .footer p { max-width: 46em; }
@@ -160,9 +203,9 @@ a.button:hover .icon, a.button:focus-visible .icon { translate: 4px 0; }
 /* Privacy and support pages */
 .page { margin: 0 var(--frame); background: var(--bg); padding: clamp(56px, 7vw, 88px) var(--inset); }
 .page > * { max-width: 680px; margin-inline: auto; }
-.page h1 { font-family: var(--display); font-weight: 600; font-size: clamp(34px, 4.4vw, 52px); letter-spacing: -0.03em; line-height: 1.05; margin-bottom: 12px; }
+.page h1 { font-family: var(--headline); font-weight: 600; font-size: clamp(34px, 4.4vw, 52px); letter-spacing: -0.03em; line-height: 1.05; margin-bottom: 12px; }
 .page .meta { color: var(--ink-3); font-size: 15px; margin-bottom: 32px; }
-.page h2 { font-family: var(--display); font-weight: 600; font-size: 24px; letter-spacing: -0.02em; margin-top: 40px; margin-bottom: 10px; }
+.page h2 { font-family: var(--headline); font-weight: 600; font-size: 24px; letter-spacing: -0.02em; margin-top: 40px; margin-bottom: 10px; }
 .page p, .page li { color: var(--ink-2); }
 .page p + p { margin-top: 12px; }
 .page ul { padding-left: 20px; }
@@ -171,6 +214,43 @@ a.button:hover .icon, a.button:focus-visible .icon { translate: 4px 0; }
 .page strong { color: var(--ink); font-weight: 600; }
 .page .cta-line { margin-top: 48px; }
 .page .button { text-decoration: none; }
+
+/* Guides (Why, Podcasts, Download): a 12-column Swiss grid across the full panel. A large title
+   up top, then ruled rows of number, heading and text. Text columns stop at ~62ch. */
+.guide {
+  --cols: 12; --gap: clamp(16px, 2vw, 28px);
+  display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); column-gap: var(--gap);
+  padding-block: clamp(56px, 8vw, 120px) clamp(56px, 7vw, 96px);
+}
+.guide > * { max-width: none; margin-inline: 0; grid-column: 1 / -1; }
+.guide__head { display: grid; grid-template-columns: subgrid; row-gap: 20px; padding-bottom: clamp(48px, 7vw, 96px); }
+.guide__head > * { grid-column: 1 / span 9; }
+.guide .title { font-size: clamp(44px, 7vw, 104px); line-height: 0.95; letter-spacing: -0.035em; margin: 0; text-wrap: balance; }
+.guide .meta { grid-column: 1 / span 6; margin: 8px 0 0; font-size: clamp(18px, 1.6vw, 22px); line-height: 1.45; color: var(--ink); max-width: 44ch; text-wrap: pretty; }
+.guide__head .guide__intro { grid-column: 7 / -1; align-self: end; max-width: 52ch; margin: 0; color: var(--ink-2); }
+.guide__row {
+  display: grid; grid-template-columns: subgrid; align-items: baseline;
+  padding-block: clamp(24px, 3vw, 40px); border-top: 1px solid rgb(236 228 210 / 0.12);
+}
+.guide__num { grid-column: 1; font: 700 14px/1 var(--text); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.guide h2 { grid-column: 2 / span 4; margin: 0; font-size: clamp(22px, 2vw, 28px); line-height: 1.15; text-wrap: balance; }
+.guide__body { grid-column: 7 / -1; max-width: 62ch; }
+.guide__body > :first-child { margin-top: 0; }
+.guide__cta { grid-column: 7 / -1; padding-top: clamp(32px, 4vw, 48px); border-top: 1px solid rgb(236 228 210 / 0.12); }
+/* Tablet: heading and text share the row, the number sits above the heading. */
+@media (max-width: 1100px) {
+  .guide__head > *, .guide .meta { grid-column: 1 / -1; }
+  .guide__head .guide__intro { grid-column: 1 / span 9; }
+  .guide__num { grid-column: 1 / span 4; grid-row: 1; margin-bottom: 12px; }
+  .guide h2 { grid-column: 1 / span 4; grid-row: 2; }
+  .guide__body { grid-column: 6 / -1; grid-row: 1 / span 2; align-self: start; }
+  .guide__cta { grid-column: 6 / -1; }
+}
+/* Phones: one column. */
+@media (max-width: 700px) {
+  .guide__row > *, .guide__head .guide__intro, .guide__cta { grid-column: 1 / -1; grid-row: auto; }
+  .guide h2 { margin-bottom: 12px; }
+}
 
 /* Fade up on scroll; only hidden once JS is running, so nothing goes missing without it. */
 .js .reveal { opacity: 0; translate: 0 12px; transition: opacity 800ms var(--ease), translate 800ms var(--ease); }

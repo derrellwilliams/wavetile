@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Getting started with Wavetile · Jellyfin music on iPhone</title>
-<meta name="description" content="Set up Wavetile in a few minutes: sign in to your Jellyfin server or use Quick Connect, sync your library, download music for offline and turn on podcasts.">
+<title>Download Wavetile · Jellyfin music on iPhone</title>
+<meta name="description" content="Join the Wavetile beta on TestFlight, then sign in to your Jellyfin server or use Quick Connect, sync your library, download music for offline and turn on podcasts.">
 <link rel="canonical" href="https://wavetile.com/getting-started">
 <meta name="theme-color" content="#1A1A1A">
 <meta name="color-scheme" content="dark">
 <meta property="og:site_name" content="Wavetile">
-<meta property="og:title" content="Getting started with Wavetile · Jellyfin music on iPhone">
-<meta property="og:description" content="Set up Wavetile in a few minutes: sign in to your Jellyfin server or use Quick Connect, sync your library, download music for offline and turn on podcasts.">
+<meta property="og:title" content="Download Wavetile · Jellyfin music on iPhone">
+<meta property="og:description" content="Join the Wavetile beta on TestFlight, then sign in to your Jellyfin server or use Quick Connect, sync your library, download music for offline and turn on podcasts.">
 <meta property="og:image" content="https://wavetile.com/og.jpg">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -21,40 +21,79 @@
 <body>
 <header class="top">
   <a class="brand" href="/" aria-label="Wavetile home"><span class="wordmark">Wavetile</span></a>
+  <nav class="top__nav" aria-label="Guides">
+    <a href="/why-wavetile"><span class="icon" data-icon="info" aria-hidden="true"></span>Why</a>
+    <a href="/jellyfin-podcasts"><span class="icon" data-icon="microphone" aria-hidden="true"></span>Podcasts</a>
+    <a href="/getting-started" aria-current="page"><span class="icon" data-icon="download-simple" aria-hidden="true"></span>Download</a>
+  </nav>
 </header>
-<main id="main" class="page">
-  <h1 class="title">Getting started</h1>
-  <p class="meta">From sign-in to your first offline album in a few minutes.</p>
-
-  <h2>1. What you need</h2>
-  <p>An iPhone on iOS 26.1 or later, and a Jellyfin server with a music library. It can be your own server or one someone shares with you.</p>
-
-  <h2>2. Sign in</h2>
-  <p>Enter your server's address, such as <strong>https://music.example.com</strong>, with your username and password. Or use <strong>Quick Connect</strong>: start it in Wavetile and approve the code from Jellyfin on a device where you're already signed in.</p>
-  <p>Servers reachable from the internet need https. Plain http works only on your home network, so your password and token never cross the internet unencrypted.</p>
-
-  <h2>3. Let the library sync</h2>
-  <p>The first sync copies your library's details (not the music files) to your iPhone. After that, Home and search are instant and work offline. Pull down on Home to refresh.</p>
-
-  <h2>4. Download for offline</h2>
-  <p>Tap the download button on an album or playlist. Pick the quality in Settings → Downloads: MP3 256 kbps to save space, or Original for the file as it is on your server. Downloads continue in the background, with progress on the Lock Screen.</p>
-
-  <h2>5. Turn on podcasts</h2>
-  <p>Open Settings and turn on <strong>Show Podcasts</strong>. Search for shows or import your OPML file. <a class="link" href="/jellyfin-podcasts">More about podcasts</a></p>
-
-  <h2>6. Add widgets</h2>
-  <p>Touch and hold your Home Screen, tap Edit → Add Widget, and choose Wavetile for Now Playing or Recently Played.</p>
-
-  <p>Stuck? See <a class="link" href="/support">Support</a>.</p>
-  <p class="cta-line"><a class="button" href="/">Get Wavetile</a></p>
+<main id="main" class="page guide">
+  <header class="guide__head">
+    <h1 class="title">Download Wavetile</h1>
+    <p class="meta">Wavetile is in public beta on TestFlight, Apple's app for testing new apps. From install to your first offline album in a few minutes.</p>
+  </header>
+  <section class="guide__row">
+    <span class="guide__num" aria-hidden="true">01</span>
+    <h2>What you need</h2>
+    <div class="guide__body">
+      <p>An iPhone on iOS 26.1 or later, and a Jellyfin server with a music library. It can be your own server or one someone shares with you.</p>
+    </div>
+  </section>
+  <section class="guide__row">
+    <span class="guide__num" aria-hidden="true">02</span>
+    <h2>Join the beta</h2>
+    <div class="guide__body">
+      <p>Install <strong>TestFlight</strong> from the App Store. Then open the <a class="link" href="https://testflight.apple.com/join/pk9dyfMq">Wavetile beta link</a> on your iPhone, tap <strong>Accept</strong>, then <strong>Install</strong>. Wavetile appears on your Home Screen like any other app.</p>
+      <p>New builds show up in TestFlight; turn on automatic updates there to get them as they land. Each build works for 90 days, and a newer one is always out before then.</p>
+    </div>
+  </section>
+  <section class="guide__row">
+    <span class="guide__num" aria-hidden="true">03</span>
+    <h2>Sign in</h2>
+    <div class="guide__body">
+      <p>Enter your server's address, such as <strong>https://music.example.com</strong>, with your username and password. Or use <strong>Quick Connect</strong>: start it in Wavetile and approve the code from Jellyfin on a device where you're already signed in.</p>
+      <p>Servers reachable from the internet need https. Plain http works only on your home network, so your password and token never cross the internet unencrypted.</p>
+    </div>
+  </section>
+  <section class="guide__row">
+    <span class="guide__num" aria-hidden="true">04</span>
+    <h2>Let the library sync</h2>
+    <div class="guide__body">
+      <p>The first sync copies your library's details (not the music files) to your iPhone. After that, Home and search are instant and work offline. Pull down on Home to refresh.</p>
+    </div>
+  </section>
+  <section class="guide__row">
+    <span class="guide__num" aria-hidden="true">05</span>
+    <h2>Download for offline</h2>
+    <div class="guide__body">
+      <p>Tap the download button on an album or playlist. Pick the quality in Settings → Downloads: MP3 256 kbps to save space, or Original for the file as it is on your server. Downloads continue in the background, with progress on the Lock Screen.</p>
+    </div>
+  </section>
+  <section class="guide__row">
+    <span class="guide__num" aria-hidden="true">06</span>
+    <h2>Turn on podcasts</h2>
+    <div class="guide__body">
+      <p>Open Settings and turn on <strong>Show Podcasts</strong>. Search for shows or import your OPML file. <a class="link" href="/jellyfin-podcasts">More about podcasts</a></p>
+    </div>
+  </section>
+  <section class="guide__row">
+    <span class="guide__num" aria-hidden="true">07</span>
+    <h2>Add widgets</h2>
+    <div class="guide__body">
+      <p>Touch and hold your Home Screen, tap Edit → Add Widget, and choose Wavetile for Now Playing or Recently Played.</p>
+    </div>
+  </section>
+  <section class="guide__row">
+    <span class="guide__num" aria-hidden="true"></span>
+    <h2>Send feedback</h2>
+    <div class="guide__body">
+      <p>Take a screenshot in Wavetile and tap <strong>Share Beta Feedback</strong>, or open Wavetile in TestFlight and tap <strong>Send Beta Feedback</strong>. Crashes are reported to the developer through TestFlight if you allow it. Stuck? See <a class="link" href="/support">Support</a>.</p>
+    </div>
+  </section>
+  <div class="guide__cta"><a class="button" href="https://testflight.apple.com/join/pk9dyfMq">Join the beta<span class="icon" data-icon="arrow-right" aria-hidden="true"></span></a></div>
 </main>
 <footer class="footer">
   <span class="footer__mark" data-mark aria-hidden="true"></span>
-  <nav class="footer__guides" aria-label="Guides">
-    <a href="/why-wavetile">Why Wavetile</a>
-    <a href="/jellyfin-podcasts">Podcasts with Jellyfin</a>
-    <a href="/getting-started">Getting started</a>
-  </nav>
   <nav aria-label="Footer">
     <a href="mailto:realslimscrawny@gmail.com">Contact</a>
     <a href="/support">Support</a>

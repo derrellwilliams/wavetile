@@ -21,44 +21,69 @@
 <body>
 <header class="top">
   <a class="brand" href="/" aria-label="Wavetile home"><span class="wordmark">Wavetile</span></a>
+  <nav class="top__nav" aria-label="Guides">
+    <a href="/why-wavetile" aria-current="page"><span class="icon" data-icon="info" aria-hidden="true"></span>Why</a>
+    <a href="/jellyfin-podcasts"><span class="icon" data-icon="microphone" aria-hidden="true"></span>Podcasts</a>
+    <a href="/getting-started"><span class="icon" data-icon="download-simple" aria-hidden="true"></span>Download</a>
+  </nav>
 </header>
-<main id="main" class="page">
-  <h1 class="title">Why Wavetile</h1>
-  <p class="meta">A Jellyfin music app for iPhone, with podcasts built in.</p>
-
-  <p>If your music lives on a Jellyfin server, Wavetile gives you one app for your library and your podcasts, designed for iPhone.</p>
-
-  <h2>Podcasts next to your music</h2>
-  <p>Podcasts get their own tab, and <strong>Up Next in Podcasts</strong> sits on Home beside Recently Played. Search the directory, import OPML from your old app, and get chapters, transcripts and downloads. Subscriptions and progress sync through your Jellyfin account. <a class="link" href="/jellyfin-podcasts">How podcasts work</a></p>
-
-  <h2>Instant, even with huge libraries</h2>
-  <p>Wavetile keeps a local copy of your library on your iPhone, so Home, search and sorting don't wait on the server. It's tested with 50,000 tracks, and you can browse with no connection at all.</p>
-
-  <h2>Made for listening</h2>
-  <ul>
-    <li>Gapless playback for live albums and mixes</li>
-    <li>Start Radio: Jellyfin Instant Mix from any song, album or artist</li>
-    <li>Downloads as 256 kbps MP3 or the original file, such as FLAC</li>
-    <li>Sleep timer, AirPlay, Lock Screen and Control Center controls</li>
-  </ul>
-
-  <h2>Native to iPhone</h2>
-  <p>Built in SwiftUI for iOS 26: Now Playing and Recently Played widgets, a Live Activity for downloads, and Siri. CarPlay is built and waiting on Apple's approval.</p>
-
-  <h2>Private by default</h2>
-  <p>No account, no analytics, no tracking. Your sign-in token stays in the iOS Keychain, and plain http is only allowed for servers on your home network. <a class="link" href="/privacy">Privacy policy</a></p>
-
-  <h2>Other Jellyfin music apps</h2>
-  <p>Jellyfin has several good iPhone clients, including Finamp, Jellify and Manet. Choose Wavetile if you want your podcasts in the same app as your music, a library that's instant and works offline, and an app that collects nothing.</p>
-  <p class="cta-line"><a class="button" href="/">Get Wavetile</a></p>
+<main id="main" class="page guide">
+  <header class="guide__head">
+    <h1 class="title">Why Wavetile</h1>
+    <p class="meta">A Jellyfin music app for iPhone, with podcasts built in.</p>
+    <p class="guide__intro">If your music lives on a Jellyfin server, Wavetile gives you one app for your library and your podcasts, designed for iPhone.</p>
+  </header>
+  <section class="guide__row">
+    <span class="guide__num" aria-hidden="true">01</span>
+    <h2>Podcasts next to your music</h2>
+    <div class="guide__body">
+      <p>Podcasts get their own tab, and <strong>Up Next in Podcasts</strong> sits on Home beside Recently Played. Search the directory, import OPML from your old app, and get chapters, transcripts and downloads. Subscriptions and progress sync through your Jellyfin account. <a class="link" href="/jellyfin-podcasts">How podcasts work</a></p>
+    </div>
+  </section>
+  <section class="guide__row">
+    <span class="guide__num" aria-hidden="true">02</span>
+    <h2>Instant, even with huge libraries</h2>
+    <div class="guide__body">
+      <p>Wavetile keeps a local copy of your library on your iPhone, so Home, search and sorting don't wait on the server. It's tested with 50,000 tracks, and you can browse with no connection at all.</p>
+    </div>
+  </section>
+  <section class="guide__row">
+    <span class="guide__num" aria-hidden="true">03</span>
+    <h2>Made for listening</h2>
+    <div class="guide__body">
+      <ul>
+        <li>Gapless playback for live albums and mixes</li>
+        <li>Start Radio: Jellyfin Instant Mix from any song, album or artist</li>
+        <li>Downloads as 256 kbps MP3 or the original file, such as FLAC</li>
+        <li>Sleep timer, AirPlay, Lock Screen and Control Center controls</li>
+      </ul>
+    </div>
+  </section>
+  <section class="guide__row">
+    <span class="guide__num" aria-hidden="true">04</span>
+    <h2>Native to iPhone</h2>
+    <div class="guide__body">
+      <p>Built in SwiftUI for iOS 26: Now Playing and Recently Played widgets, a Live Activity for downloads, and Siri. CarPlay is built and waiting on Apple's approval.</p>
+    </div>
+  </section>
+  <section class="guide__row">
+    <span class="guide__num" aria-hidden="true">05</span>
+    <h2>Private by default</h2>
+    <div class="guide__body">
+      <p>No account, no analytics, no tracking. Your sign-in token stays in the iOS Keychain, and plain http is only allowed for servers on your home network. <a class="link" href="/privacy">Privacy policy</a></p>
+    </div>
+  </section>
+  <section class="guide__row">
+    <span class="guide__num" aria-hidden="true">06</span>
+    <h2>Other Jellyfin music apps</h2>
+    <div class="guide__body">
+      <p>Jellyfin has several good iPhone clients, including Finamp, Jellify and Manet. Choose Wavetile if you want your podcasts in the same app as your music, a library that's instant and works offline, and an app that collects nothing.</p>
+    </div>
+  </section>
+  <div class="guide__cta"><a class="button" href="/">Get Wavetile</a></div>
 </main>
 <footer class="footer">
   <span class="footer__mark" data-mark aria-hidden="true"></span>
-  <nav class="footer__guides" aria-label="Guides">
-    <a href="/why-wavetile">Why Wavetile</a>
-    <a href="/jellyfin-podcasts">Podcasts with Jellyfin</a>
-    <a href="/getting-started">Getting started</a>
-  </nav>
   <nav aria-label="Footer">
     <a href="mailto:realslimscrawny@gmail.com">Contact</a>
     <a href="/support">Support</a>

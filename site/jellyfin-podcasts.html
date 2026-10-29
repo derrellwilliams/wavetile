@@ -21,42 +21,59 @@
 <body>
 <header class="top">
   <a class="brand" href="/" aria-label="Wavetile home"><span class="wordmark">Wavetile</span></a>
+  <nav class="top__nav" aria-label="Guides">
+    <a href="/why-wavetile"><span class="icon" data-icon="info" aria-hidden="true"></span>Why</a>
+    <a href="/jellyfin-podcasts" aria-current="page"><span class="icon" data-icon="microphone" aria-hidden="true"></span>Podcasts</a>
+    <a href="/getting-started"><span class="icon" data-icon="download-simple" aria-hidden="true"></span>Download</a>
+  </nav>
 </header>
-<main id="main" class="page">
-  <h1 class="title">Podcasts with Jellyfin, on iPhone</h1>
-  <p class="meta">Wavetile adds a full podcast player to your Jellyfin setup.</p>
-
-  <p>Your music comes from your Jellyfin server and your podcasts come from their own feeds, but you listen to both in one app. Your subscriptions and progress follow your Jellyfin account to any iPhone you sign in on.</p>
-
-  <h2>Find shows</h2>
-  <ul>
-    <li>Search the podcast directory or browse top shows</li>
-    <li>Paste any RSS feed URL</li>
-    <li>Import an OPML file from your current podcast app, or export one to leave</li>
-  </ul>
-
-  <h2>Listen</h2>
-  <ul>
-    <li>Continue Listening, Latest Episodes, and Up Next on Home</li>
-    <li>Chapters, and Podcasting 2.0 transcripts you can tap to jump to that moment</li>
-    <li>Playback speed, sleep timer and episode downloads for offline</li>
-  </ul>
-
-  <h2>Synced through Jellyfin</h2>
-  <p>Subscriptions, playback positions and played episodes are saved to your Jellyfin user's preferences, so there's no extra account or sync service. Sign in on a new iPhone and your shows are there.</p>
-  <p>Only feed URLs, episode IDs and timestamps are stored. Private feeds (with a token or password in the URL) stay on your device. Anyone who can sign in as your Jellyfin user, including server admins, can read these preferences.</p>
-
-  <h2>Turn it on</h2>
-  <p>Podcasts are off by default. In Wavetile, open Settings and turn on <strong>Show Podcasts</strong>. <a class="link" href="/getting-started">Getting started</a></p>
-  <p class="cta-line"><a class="button" href="/">Get Wavetile</a></p>
+<main id="main" class="page guide">
+  <header class="guide__head">
+    <h1 class="title">Podcasts with Jellyfin, on iPhone</h1>
+    <p class="meta">Wavetile adds a full podcast player to your Jellyfin setup.</p>
+    <p class="guide__intro">Your music comes from your Jellyfin server and your podcasts come from their own feeds, but you listen to both in one app. Your subscriptions and progress follow your Jellyfin account to any iPhone you sign in on.</p>
+  </header>
+  <section class="guide__row">
+    <span class="guide__num" aria-hidden="true">01</span>
+    <h2>Find shows</h2>
+    <div class="guide__body">
+      <ul>
+        <li>Search the podcast directory or browse top shows</li>
+        <li>Paste any RSS feed URL</li>
+        <li>Import an OPML file from your current podcast app, or export one to leave</li>
+      </ul>
+    </div>
+  </section>
+  <section class="guide__row">
+    <span class="guide__num" aria-hidden="true">02</span>
+    <h2>Listen</h2>
+    <div class="guide__body">
+      <ul>
+        <li>Continue Listening, Latest Episodes, and Up Next on Home</li>
+        <li>Chapters, and Podcasting 2.0 transcripts you can tap to jump to that moment</li>
+        <li>Playback speed, sleep timer and episode downloads for offline</li>
+      </ul>
+    </div>
+  </section>
+  <section class="guide__row">
+    <span class="guide__num" aria-hidden="true">03</span>
+    <h2>Synced through Jellyfin</h2>
+    <div class="guide__body">
+      <p>Subscriptions, playback positions and played episodes are saved to your Jellyfin user's preferences, so there's no extra account or sync service. Sign in on a new iPhone and your shows are there.</p>
+      <p>Only feed URLs, episode IDs and timestamps are stored. Private feeds (with a token or password in the URL) stay on your device. Anyone who can sign in as your Jellyfin user, including server admins, can read these preferences.</p>
+    </div>
+  </section>
+  <section class="guide__row">
+    <span class="guide__num" aria-hidden="true">04</span>
+    <h2>Turn it on</h2>
+    <div class="guide__body">
+      <p>Podcasts are off by default. In Wavetile, open Settings and turn on <strong>Show Podcasts</strong>. <a class="link" href="/getting-started">Download and set up</a></p>
+    </div>
+  </section>
+  <div class="guide__cta"><a class="button" href="/">Get Wavetile</a></div>
 </main>
 <footer class="footer">
   <span class="footer__mark" data-mark aria-hidden="true"></span>
-  <nav class="footer__guides" aria-label="Guides">
-    <a href="/why-wavetile">Why Wavetile</a>
-    <a href="/jellyfin-podcasts">Podcasts with Jellyfin</a>
-    <a href="/getting-started">Getting started</a>
-  </nav>
   <nav aria-label="Footer">
     <a href="mailto:realslimscrawny@gmail.com">Contact</a>
     <a href="/support">Support</a>

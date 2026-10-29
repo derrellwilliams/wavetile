@@ -1,6 +1,8 @@
 // Loaded in <head> (not deferred) so the .js class is set before first paint and revealed
 // content never flashes.
 document.documentElement.classList.add("js");
+// iOS Safari only shows :active (the pressed state) once a page listens for touches.
+document.addEventListener("touchstart", () => {}, { passive: true });
 
 document.addEventListener("DOMContentLoaded", () => {
   const reveals = document.querySelectorAll(".reveal");
