@@ -92,6 +92,41 @@ Jellyfin users find clients in a few places, and LLMs learn from the same ones. 
 | A unique feature, live in a public release | Podcasts built in. Strongest once it's on the App Store |
 | Follow the community standards and branding guidelines | No "Jellyfin" in the app name, no Jellyfin logo shape in the icon |
 
+**Draft entry** for the end of `thirdPartyClients` in `src/data/clients.ts` (fill in the App Store ID at launch; their style is one line of plain description, no marketing):
+
+```ts
+  {
+    id: 'wavetile',
+    name: 'Wavetile',
+    description:
+      'A native iPhone music player with a full podcast player built in: gapless playback, offline downloads and podcast subscriptions synced through Jellyfin.',
+    clientType: ClientType.ThirdParty,
+    deviceTypes: [DeviceType.Mobile],
+    platforms: [Platform.IOS],
+    primaryLinks: [
+      {
+        id: 'app-store',
+        name: 'App Store',
+        url: 'https://apps.apple.com/app/idXXXXXXXXXX'
+      }
+    ],
+    secondaryLinks: [
+      {
+        id: 'github',
+        name: 'GitHub',
+        url: 'https://github.com/derrellwilliams/wavetile'
+      },
+      {
+        id: 'website',
+        name: 'Website',
+        url: 'https://wavetile.com'
+      }
+    ]
+  }
+```
+
+PR description: what Wavetile is, the unique feature (podcasts alongside music, synced through Jellyfin preferences), the license, and evidence of user interest (testers, ratings, community threads). Expect to be asked about each requirement.
+
 **Before opening any listing PR:** the repo should be ready for a maintainer's quick look (license, a user-facing README with the beta link and screenshots, topics). Say "(beta)" in descriptions so people expect a few rough edges. Ship the newest TestFlight build first.
 
 ## Launch channels
