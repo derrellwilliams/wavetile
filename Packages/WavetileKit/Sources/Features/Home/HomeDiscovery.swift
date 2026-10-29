@@ -106,31 +106,20 @@ struct PlaylistLink: View {
 /// and on pull to refresh.
 struct ArtistSpotlightShelf: View {
     @Environment(\.theme) private var theme
-    @Environment(LibraryStore.self) private var store
     let spotlight: HomeModel.Spotlight
 
     var body: some View {
         ShelfSection(items: spotlight.albums) {
-            HStack(spacing: theme.spacing.md) {
-                // As tall as the two lines beside it, at any text size.
-                Color.clear
-                    .aspectRatio(1, contentMode: .fit)
-                    .overlay {
-                        ArtworkView(store.artwork(itemID: spotlight.artistID, tag: spotlight.imageTag, maxPixelWidth: 192))
-                    }
-                    .clipShape(.circle)
-                VStack(alignment: .leading, spacing: theme.spacing.xxs) {
-                    Text("Artist Spotlight")
-                        .font(theme.typography.caption.weight(.semibold))
-                        .textCase(.uppercase)
-                        .foregroundStyle(theme.palette.accent)
-                    Text(spotlight.name)
-                        .font(theme.typography.sectionHeader)
-                        .foregroundStyle(theme.palette.textPrimary)
-                        .lineLimit(1)
-                }
+            VStack(alignment: .leading, spacing: theme.spacing.xxs) {
+                Text("Artist Spotlight")
+                    .font(theme.typography.caption.weight(.semibold))
+                    .textCase(.uppercase)
+                    .foregroundStyle(theme.palette.accent)
+                Text(spotlight.name)
+                    .font(theme.typography.sectionHeader)
+                    .foregroundStyle(theme.palette.textPrimary)
+                    .lineLimit(1)
             }
-            .fixedSize(horizontal: false, vertical: true)
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isHeader)
         } tile: { album in

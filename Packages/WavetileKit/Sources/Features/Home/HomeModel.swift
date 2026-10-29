@@ -33,7 +33,6 @@ final class HomeModel {
     struct Spotlight {
         let artistID: String
         let name: String
-        let imageTag: String?
         let albums: [AlbumSummary]
     }
 
@@ -127,7 +126,7 @@ final class HomeModel {
         playlists = (try? database.playlistsByName()) ?? []
         rediscover = ((try? database.randomAlbums()) ?? []).map(\.summary)
         spotlight = (try? database.spotlightArtist()).flatMap { found in
-            found.map { Spotlight(artistID: $0.artist.id, name: $0.artist.name, imageTag: $0.artist.imageTag, albums: $0.albums.map(\.summary)) }
+            found.map { Spotlight(artistID: $0.artist.id, name: $0.artist.name, albums: $0.albums.map(\.summary)) }
         }
     }
 
