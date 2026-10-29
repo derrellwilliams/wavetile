@@ -23,4 +23,4 @@ Clean URLs (`/privacy`) only work on Vercel. Locally, use `/privacy.html`.
 - Update `lastmod` in `sitemap.xml` whenever a page changes.
 
 ## Screenshots
-`assets/screens/*.webp` are 924×2000 phone captures and `assets/art/` holds album thumbnails cropped from them. Before launch, replace these with captures from a demo library with licensed or public-domain artwork (see `docs/LAUNCH.md`).
+`assets/screens/*.webp` are 924×2000 phone captures. Before launch, replace these with captures from a demo library with licensed or public-domain artwork (see `docs/LAUNCH.md`).

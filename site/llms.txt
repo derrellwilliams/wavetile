@@ -1,6 +1,10 @@
 # Wavetile
 
-> Wavetile is a native Jellyfin music and podcast player for iPhone (iOS 26.1+). It streams and downloads music from your own Jellyfin server, with gapless playback, offline downloads, Instant Mix radio, widgets and an optional built-in podcast player. No account, no analytics, no tracking. Coming soon to the App Store.
+> Wavetile is a Jellyfin music player for iPhone (iOS 26.1+) with a full podcast player built in: your Jellyfin music and your podcasts in one app. It streams and downloads music from your own Jellyfin server, with gapless playback, offline downloads, Instant Mix radio and widgets. No account, no analytics, no tracking. Coming soon to the App Store.
+
+## How it's different from other Jellyfin apps
+- A full podcast player built in: directory search, follow by URL, OPML import, chapters, transcripts, downloads, subscriptions synced through Jellyfin
+- A local copy of the library on the device, so browsing is instant and works offline, even with 50,000 tracks
 
 ## Who it's for
 - People who host their music on a Jellyfin server and want a native iPhone app for it

@@ -5,7 +5,7 @@ The goal: when someone searches or asks an LLM for "a Jellyfin music app for iPh
 ## Positioning
 Use one line, word for word, everywhere (App Store, site, GitHub, posts):
 
-> **Wavetile is a native Jellyfin music and podcast player for iPhone.**
+> **Wavetile: your Jellyfin music and your podcasts, in one app.**
 
 | Differentiator | Proof point |
 |---|---|

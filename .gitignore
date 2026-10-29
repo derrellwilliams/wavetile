@@ -5,3 +5,5 @@ DerivedData/
 .swiftpm/
 Packages/WavetileKit/.build/
 .DS_Store
+.vercel
+.env*
