@@ -6,11 +6,11 @@ The goal: when someone searches or asks an LLM for "a Jellyfin music app for iPh
 | Area | State |
 |---|---|
 | wavetile.com | Live on Vercel (`site/`, auto-deploys on push), DNS on Cloudflare (DNS only), HTTPS |
-| Pages | Home, Why Wavetile, Podcasts with Jellyfin, Getting started, Support, Privacy |
+| Pages | Home, Why Wavetile, Podcasts with Jellyfin, Download, Support, Privacy |
 | TestFlight | Build 202610281900 approved for the external "public beta" group; public link https://testflight.apple.com/join/pk9dyfMq |
 | App Review login | Jellyfin's public demo: `https://demo.jellyfin.org/stable`, user `demo`, blank password (any typed password fails) |
 | Contact | realslimscrawny@gmail.com (site, support and privacy pages) |
-| Next | Recruit testers (r/jellyfin, r/selfhosted), collect feedback |
+| Next | Request the CarPlay entitlement; ship a new TestFlight build; get listed on jellyfin.org; recruit testers (r/jellyfin, r/selfhosted) |
 
 ## Positioning
 Use one line, word for word, everywhere (App Store, site, GitHub, posts):
@@ -30,7 +30,7 @@ Spell the name **Wavetile**: one word, capital W only. "Wave tile" brings up flo
 ## App Store (ASO)
 | Field | Limit | Draft |
 |---|---|---|
-| Name | 30 | `Wavetile: Jellyfin Music` |
+| Name | 30 | `Wavetile Music` (current App Store Connect name). Keep "Jellyfin" out of the name: Jellyfin's [branding guidelines](https://jellyfin.org/docs/general/contributing/branding/) ask third-party apps not to use it, which would block the jellyfin.org listing. Reference it in the subtitle and description instead |
 | Subtitle | 30 | `Music & podcasts for Jellyfin` |
 | Keywords | 100 | `selfhosted,offline,gapless,player,flac,audio,library,radio,carplay,widget,opml,homelab,nas,stream` |
 | Category | | Music (primary), Entertainment (secondary) |
@@ -52,7 +52,7 @@ Keyword rules: separate with commas and no spaces, and don't repeat words that a
 | Item | Notes |
 |---|---|
 | Home page `<title>` | `Wavetile: Jellyfin Music & Podcast Player for iPhone` |
-| Pages | Live: Home, Why Wavetile (`/why-wavetile`), Podcasts with Jellyfin (`/jellyfin-podcasts`), Getting started (`/getting-started`), Support, Privacy. Linked from every footer. Later: Changelog, Press |
+| Pages | Live: Home, Why Wavetile (`/why-wavetile`), Podcasts with Jellyfin (`/jellyfin-podcasts`), Download (`/getting-started`), Support, Privacy. Guides linked from the header nav on every page. Later: Changelog, Press |
 | Structured data | `MobileApplication` JSON-LD (live). At launch add `offers`, `downloadUrl`, and rating once reviews exist |
 | Smart App Banner | `<meta name="apple-itunes-app" content="app-id=…">` |
 | Compare | `/why-wavetile` covers "X vs Y" searches honestly: it names Finamp, Jellify and Manet as good options and says when to pick Wavetile. Don't claim features of other apps without checking them |
@@ -65,13 +65,34 @@ LLMs recommend what is written about consistently in many places they trust.
 1. **Don't block AI crawlers.** Cloudflare can block AI bots (AI Crawl Control / managed robots.txt). Allow GPTBot, OAI-SearchBot, ClaudeBot, PerplexityBot and Google-Extended on wavetile.com.
 2. **`/llms.txt`**: a plain-text summary of what Wavetile is, who it's for, its features, the App Store link and FAQs.
 3. **Answer questions the way people ask them**, in the first sentence: the guide pages do this ("Podcasts with Jellyfin, on iPhone", "Getting started"). The home page stays short by design.
-4. **Get listed on third-party sites** (this matters most):
-   - jellyfin.org clients page (PR to the jellyfin.org repo)
-   - awesome-jellyfin and awesome-selfhosted lists (PRs)
-   - Roundup sites: jellywatch.app, appshunter, AlternativeTo (add Wavetile as an alternative to Finamp, etc.)
-   - r/jellyfin, r/selfhosted, r/iosapps, the Jellyfin forum
+4. **Get listed on third-party sites** (this matters most). See [Getting listed](#getting-listed).
 5. **GitHub**: put the positioning line in the repo description, add topics (`jellyfin`, `ios`, `music-player`, `podcast`, `swiftui`, `selfhosted`), and link the App Store and site.
 6. **Check it monthly**: ask ChatGPT, Claude, Perplexity and Gemini "best Jellyfin music app for iPhone" and log the results.
+
+## Getting listed
+Jellyfin users find clients in a few places, and LLMs learn from the same ones. Community places (forum, Reddit, awesome-jellyfin) work during the beta; jellyfin.org has strict rules and comes later.
+
+| Where | How | When |
+|---|---|---|
+| jellyfin.org/downloads/clients | PR to `jellyfin/jellyfin.org`: add an entry to `src/data/clients.ts` in the third-party list (`ClientType.ThirdParty`, `DeviceType.Mobile`, `Platform.IOS`) with App Store, GitHub and website links. Must meet the [requirements for inclusion](https://jellyfin.org/docs/general/clients/#requirements-for-inclusion-in-clients-list), below | **After launch**, once the requirements are met |
+| awesome-jellyfin | PR adding a line under Clients | Beta |
+| Jellyfin forum (third-party clients), r/jellyfin, r/selfhosted | A post with screenshots, the TestFlight link and what you want feedback on | Beta (recruit testers), again at launch |
+| selfh.st (apps directory and weekly newsletter) | Submit on their site | Launch |
+| AlternativeTo | Add Wavetile as an alternative to Finamp, Manet and others | Launch |
+| r/iosapps, roundup sites (jellywatch.app, appshunter) | Post or submit | Launch |
+| ~~awesome-selfhosted~~ | Skip: it lists self-hostable server software, not client apps | — |
+
+**jellyfin.org requirements** (all must be met; the Jellyfin team decides, and client PRs often wait months for review):
+
+| Requirement | Wavetile (2026-10-29) |
+|---|---|
+| Server URL configurable, Jellyfin as a first-class citizen | Met |
+| Free and open source under an FSF-listed license | Met: MPL-2.0 since 2026-10-29 |
+| Traction: 1 year of active development, or significant user interest as judged by the team | **Not met:** development started 2026-10-23. Build the user-interest case: TestFlight and App Store numbers, forum and Reddit threads, GitHub stars |
+| A unique feature, live in a public release | Podcasts built in. Strongest once it's on the App Store |
+| Follow the community standards and branding guidelines | No "Jellyfin" in the app name, no Jellyfin logo shape in the icon |
+
+**Before opening any listing PR:** the repo should be ready for a maintainer's quick look (license, a user-facing README with the beta link and screenshots, topics). Say "(beta)" in descriptions so people expect a few rough edges. Ship the newest TestFlight build first.
 
 ## Launch channels
 | Channel | When | Angle |
@@ -104,10 +125,11 @@ LLMs recommend what is written about consistently in many places they trust.
 - [x] App Review login (Jellyfin public demo; replace with your own demo server if it becomes unreliable)
 - [x] Beta approved → Public Link on → "Join the beta" button on the site
 - [ ] Google Search Console + Bing Webmaster Tools verified, sitemap submitted
-- [ ] GitHub: homepage → wavetile.com, topics added
+- [x] GitHub: homepage → wavetile.com, topics added
 - [ ] Re-shoot screenshots (site and App Store) with licensed or public-domain artwork
 - [ ] App Store name, subtitle, keywords, screenshots, privacy label
-- [ ] Listing PRs open (jellyfin.org, awesome-jellyfin, awesome-selfhosted)
+- [x] Repo ready for listing PRs: MPL-2.0 license, README for users (beta link, site, support), topics (2026-10-29)
+- [ ] Listing PRs open (jellyfin.org, awesome-jellyfin)
 - [ ] Launch posts drafted; press kit up
 - [ ] `vercel logout` on this Mac when deploys are done
 

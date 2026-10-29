@@ -1,6 +1,10 @@
 # Wavetile
 
-A native iOS 26+ music player for Jellyfin, with an optional podcast layer
+**Your Jellyfin music and your podcasts, in one app.** Wavetile is a native iPhone client for Jellyfin (iOS 26.1+) with a full podcast player built in.
+
+**Public beta:** [join on TestFlight](https://testflight.apple.com/join/pk9dyfMq) · [wavetile.com](https://wavetile.com) · [download and setup guide](https://wavetile.com/getting-started) · [support](https://wavetile.com/support)
+
+You need an iPhone on iOS 26.1 or later and a Jellyfin server with a music library. Wavetile collects no data: no account, no analytics, no tracking ([privacy policy](https://wavetile.com/privacy)). Bug reports and feature ideas are welcome in [Issues](https://github.com/derrellwilliams/wavetile/issues).
 
 <img width="3241" height="1488" alt="wavetile" src="https://github.com/user-attachments/assets/4cfb75fe-5376-4a5d-8e44-516eff4793bf" />
 
@@ -49,3 +53,13 @@ open Wavetile.xcodeproj
 | `…/WidgetShared` | Lightweight types shared with the widget extension |
 | `…/PreviewSupport` | Fixtures for previews |
 | `…/Features` | Screens and view models, one folder per area |
+
+## License
+Wavetile is free and open source under the [Mozilla Public License 2.0](LICENSE).
+
+Not covered by that license:
+- Fonts: Familjen Grotesk, Stack Sans Notch and Stack Sans Headline are under the SIL Open Font License (license files sit next to the fonts).
+- Icons: [Phosphor](https://phosphoricons.com) (MIT).
+- Album and podcast artwork in screenshots belongs to its owners.
+
+Built with [jellyfin-sdk-swift](https://github.com/jellyfin/jellyfin-sdk-swift), [GRDB](https://github.com/groue/GRDB.swift), [Nuke](https://github.com/kean/Nuke) and [Inject](https://github.com/krzysztofzablocki/Inject). Wavetile is an independent app, not affiliated with the Jellyfin project.
