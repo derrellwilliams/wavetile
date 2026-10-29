@@ -161,7 +161,7 @@ struct AlbumDetailView: View {
                                 title: track.title,
                                 subtitle: track.artist == model.album.artist ? nil : track.artist,
                                 duration: track.duration,
-                                leading: .number(track.trackNumber),
+                                leading: .number(model.number(for: track, in: disc.tracks)),
                                 isPlaying: player.current?.trackID == track.id,
                                 isDownloaded: downloads.isDownloaded(track.id)
                             )

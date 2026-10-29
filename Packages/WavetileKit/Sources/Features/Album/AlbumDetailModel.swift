@@ -50,6 +50,11 @@ final class AlbumDetailModel {
         return grouped.keys.sorted { ($0 ?? 0) < ($1 ?? 0) }.map { ($0, grouped[$0] ?? []) }
     }
 
+    /// The tagged track number, else the track's position on its disc (untagged files sort by filename).
+    func number(for track: TrackSummary, in disc: [TrackSummary]) -> Int? {
+        track.trackNumber ?? disc.firstIndex(of: track).map { $0 + 1 }
+    }
+
     /// Hero art spans the screen width (~440pt × 3x).
     var artwork: ArtworkSource {
         guard let store else { return Fixtures.artwork(for: album) }
