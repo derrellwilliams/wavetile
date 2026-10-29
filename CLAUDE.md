@@ -42,7 +42,7 @@ Shelves are read from the local DB on init (first frame, works offline), then `l
 - Song/album/artist actions (favorite, add to playlist, Start Radio = Jellyfin Instant Mix replacing the queue) live in `Features/Library/LibraryActions.swift`.
 - Plain HTTP only to LAN hosts; `NSAllowsArbitraryLoadsInMedia` is for podcast audio only. Keep the token off cleartext.
 - Swift 6: closures handed to MediaPlayer/AVFoundation must be built nonisolated.
-- CarPlay (`Features/CarPlay`, `App/CarPlaySceneDelegate.swift`) needs Apple's `com.apple.developer.carplay-audio` entitlement added to `App/Wavetile.entitlements` once granted; until then CarPlay doesn't list the app. Siri phrases live in `App/MusicIntents.swift`.
+- CarPlay (`Features/CarPlay`, `App/CarPlaySceneDelegate.swift`) needs Apple's `com.apple.developer.carplay-audio` entitlement added to `App/Wavetile.entitlements` once granted; until then CarPlay doesn't list the app on a device. Simulator builds use `App/Wavetile-Simulator.entitlements`, which already has it, so the CarPlay simulator (I/O → External Displays → CarPlay) works now. Siri phrases live in `App/MusicIntents.swift`.
 - Debug launch flags (`DebugFlags` in `MainTabView.swift`, compiled out of Release): `-freshHome` (Home as a new listener sees it), `-tab <name>`, `-openSettings`, `-openFirstAlbum [-albumIndex N] [-autoplay] [-openNowPlaying] [-autodownload] [-openArtist]`, `-enablePodcasts`, `-followFeed <url>`, `-playLatestEpisode`, `-openLatestEpisode`.
 
 ## Git
