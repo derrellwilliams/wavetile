@@ -2,15 +2,15 @@
 
 The goal: when someone searches or asks an LLM for "a Jellyfin music app for iPhone", Wavetile is in the answer.
 
-## Status (2026-10-28)
+## Status (2026-10-29)
 | Area | State |
 |---|---|
 | wavetile.com | Live on Vercel (`site/`, auto-deploys on push), DNS on Cloudflare (DNS only), HTTPS |
 | Pages | Home, Why Wavetile, Podcasts with Jellyfin, Getting started, Support, Privacy |
-| TestFlight | Build 202610281900 in Beta App Review for the external "public beta" group |
+| TestFlight | Build 202610281900 approved for the external "public beta" group; public link https://testflight.apple.com/join/pk9dyfMq |
 | App Review login | Jellyfin's public demo: `https://demo.jellyfin.org/stable`, user `demo`, blank password (any typed password fails) |
 | Contact | realslimscrawny@gmail.com (site, support and privacy pages) |
-| Next | Once the beta is approved: enable the Public Link and make the hero button "Join the beta" |
+| Next | Recruit testers (r/jellyfin, r/selfhosted), collect feedback |
 
 ## Positioning
 Use one line, word for word, everywhere (App Store, site, GitHub, posts):
@@ -102,7 +102,7 @@ LLMs recommend what is written about consistently in many places they trust.
 - [x] Site live: home, guide pages, Privacy, Support, `llms.txt`, JSON-LD, sitemap
 - [x] AI crawlers allowed (`robots.txt`; Cloudflare is DNS only, so its bot rules don't apply)
 - [x] App Review login (Jellyfin public demo; replace with your own demo server if it becomes unreliable)
-- [ ] Beta approved → Public Link on → "Join the beta" button on the site
+- [x] Beta approved → Public Link on → "Join the beta" button on the site
 - [ ] Google Search Console + Bing Webmaster Tools verified, sitemap submitted
 - [ ] GitHub: homepage → wavetile.com, topics added
 - [ ] Re-shoot screenshots (site and App Store) with licensed or public-domain artwork

@@ -77,8 +77,8 @@ h1, h2, p { margin: 0; }
 }
 @media (min-width: 900px) { .headline { max-width: none; } }
 .button {
-  display: inline-flex; align-items: center; min-height: 52px; padding: 0 30px; border-radius: 999px;
-  background: #171717; font: 400 18px/1 var(--text); color: #FFFFFF;
+  display: inline-flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 30px; border-radius: 999px;
+  background: #171717; font: 400 18px/1 var(--text); color: #FFFFFF; text-decoration: none;
 }
 
 /* Screens: a slow marquee that loops. Spacing is margin on each image (not gap), so one
@@ -86,6 +86,11 @@ h1, h2, p { margin: 0; }
 .screens { overflow: hidden; padding: clamp(40px, 4.4vw, 56px) 0; }
 .marquee { display: flex; width: max-content; animation: marquee 84s linear infinite; }
 .marquee__copy { display: contents; }
+.screens:hover .marquee { animation-play-state: paused; }
+/* Desktop: the phones rise 90px into the hero, below its centered content. */
+@media (min-width: 900px) {
+  .screens { position: relative; margin-top: -90px; padding-top: 0; }
+}
 /* A simple phone: dark bezel, rounded corners, a Dynamic Island over the status bar. */
 .device {
   --h: clamp(420px, 42vw, 560px);
@@ -125,6 +130,16 @@ h1, h2, p { margin: 0; }
 .icon[data-icon="gauge"] { --icon: url("/assets/icons/gauge.svg"); }
 .icon[data-icon="cloud-slash"] { --icon: url("/assets/icons/cloud-slash.svg"); }
 .icon[data-icon="lock"] { --icon: url("/assets/icons/lock.svg"); }
+.icon[data-icon="arrow-right"] { --icon: url("/assets/icons/arrow-right.svg"); }
+.button .icon { width: 20px; height: 20px; }
+/* Hover: the button lifts a shade and the arrow nudges toward where it leads. */
+.button { transition: background-color 240ms var(--ease); }
+/* The hero button also fades in on scroll; keep both transitions. */
+.js .button.reveal { transition: opacity 800ms var(--ease), translate 800ms var(--ease), background-color 240ms var(--ease); }
+.button .icon { transition: translate 240ms var(--ease); }
+a.button:hover, a.button:focus-visible { background: #222222; }
+a.button:hover .icon, a.button:focus-visible .icon { translate: 4px 0; }
+@media (prefers-reduced-motion: reduce) { .button .icon { transition: none; } }
 @media (max-width: 900px) { .features { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 520px) { .features { grid-template-columns: 1fr; } }
 
