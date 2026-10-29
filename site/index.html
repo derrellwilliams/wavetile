@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Wavetile: Jellyfin Music &amp; Podcast Player for iPhone</title>
-<meta name="description" content="Wavetile is a Jellyfin music player for iPhone with a full podcast player built in. Instant with huge libraries, works offline, and private: no account, no analytics, no tracking.">
+<meta name="description" content="A Jellyfin music player for iPhone with a full podcast player built in. Instant with huge libraries, works offline, and collects no data.">
 <link rel="canonical" href="https://wavetile.com/">
 <meta name="theme-color" content="#1A1A1A">
 <meta name="color-scheme" content="dark">
@@ -26,9 +26,9 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
-<link rel="preload" href="/assets/fonts/StackSansNotch.ttf" as="font" type="font/ttf" crossorigin>
-<link rel="preload" href="/assets/fonts/FamiljenGrotesk.ttf" as="font" type="font/ttf" crossorigin>
-<link rel="preload" href="/assets/fonts/StackSansHeadline.ttf" as="font" type="font/ttf" crossorigin>
+<link rel="preload" href="/assets/fonts/StackSansNotch.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/fonts/FamiljenGrotesk.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/fonts/StackSansHeadline.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/styles.css">
 <script src="/main.js"></script>
 
@@ -76,7 +76,6 @@
 
 <main>
   <section class="hero panel">
-    <span class="hero__mark" data-mark aria-hidden="true"></span>
     <h1 class="headline reveal">Your Jellyfin music and your podcasts, in one app.</h1>
     <!-- At launch: make this a link to the App Store listing. -->
     <span class="button reveal" role="img" aria-label="Coming soon to the App Store">Coming soon to the App Store</span>
@@ -124,8 +123,13 @@
 
 <footer class="footer">
   <span class="footer__mark" data-mark aria-hidden="true"></span>
+  <nav class="footer__guides" aria-label="Guides">
+    <a href="/why-wavetile">Why Wavetile</a>
+    <a href="/jellyfin-podcasts">Podcasts with Jellyfin</a>
+    <a href="/getting-started">Getting started</a>
+  </nav>
   <nav aria-label="Footer">
-    <a href="mailto:support@wavetile.com">Contact</a>
+    <a href="mailto:realslimscrawny@gmail.com">Contact</a>
     <a href="/support">Support</a>
     <a href="/privacy">Privacy</a>
     <a href="https://github.com/derrellwilliams/wavetile" rel="noopener">GitHub</a>
