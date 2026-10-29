@@ -249,7 +249,7 @@ a.button:active, .top__nav a:active { scale: 0.96; background: #111111; transiti
 /* Phones: one column. */
 @media (max-width: 700px) {
   .guide__row > *, .guide__head .guide__intro, .guide__cta { grid-column: 1 / -1; grid-row: auto; }
-  .guide h2 { margin-bottom: 12px; }
+  .guide h2 { grid-column: 1 / -1; margin-bottom: 12px; }
 }
 
 /* Fade up on scroll; only hidden once JS is running, so nothing goes missing without it. */
