@@ -13,9 +13,18 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: "Stack Sans Headline";
+  src: url("/assets/fonts/StackSansHeadline.ttf") format("truetype");
+  font-weight: 200 700;
+  font-display: swap;
+}
+
 :root {
+  /* Page is the app's surface; panels are its background, inset like cards. */
+  --page: #262626;
   --bg: #1A1A1A;
-  --surface: #262626;
+  --surface: #2E2E2E;
   --surface-2: #2E2E2E;
   --ink: #ECE4D2;
   --ink-2: rgb(236 228 210 / 0.6);
@@ -24,7 +33,8 @@
 
   --text: "Familjen Grotesk", ui-sans-serif, system-ui, sans-serif;
   --display: "Stack Sans Notch", "Familjen Grotesk", ui-sans-serif, system-ui, sans-serif;
-  --inset: clamp(16px, 5vw, 48px);
+  --frame: clamp(12px, 2.2vw, 28px);
+  --inset: clamp(20px, 4vw, 40px);
   /* Critically damped, like Motion.smooth: no overshoot. */
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -33,132 +43,126 @@
 html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0;
-  background: var(--bg);
+  background: var(--page);
   color: var(--ink);
   font: 400 17px/1.55 var(--text);
   -webkit-font-smoothing: antialiased;
 }
 img { display: block; max-width: 100%; height: auto; }
 a { color: inherit; }
-h1, h2, p, figure { margin: 0; }
+h1, h2, p { margin: 0; }
 ::selection { background: var(--ink); color: var(--bg); }
 :focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 6px; }
 
-.display {
-  font-family: var(--display); font-weight: 700;
-  font-size: clamp(40px, 6.4vw, 80px); line-height: 1; letter-spacing: -0.035em;
-  text-wrap: balance;
-}
-.section-title { font-family: var(--display); font-weight: 700; font-size: clamp(28px, 3.6vw, 40px); letter-spacing: -0.03em; }
-.lead { font-size: clamp(18px, 1.6vw, 21px); color: var(--ink-2); text-wrap: pretty; max-width: 32em; }
-.eyebrow { font-size: 13px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-2); }
-.wordmark { font-family: var(--display); font-weight: 700; font-size: 22px; letter-spacing: -0.02em; }
+/* Values from the Figma mockup. */
+.wordmark { font-family: var(--display); font-weight: 700; font-size: 32px; line-height: 1; color: #EFE4D0; }
 .link { text-underline-offset: 4px; text-decoration-color: var(--ink-3); font-weight: 600; }
 .link:hover { text-decoration-color: var(--ink); }
 
-/* The app's cube mark, masked so it takes the text color. */
-.mark {
-  display: inline-block; width: 26px; height: 26px; flex: none; background: currentColor;
-  -webkit-mask: url("/favicon.svg") center / contain no-repeat; mask: url("/favicon.svg") center / contain no-repeat;
-}
+/* Wordmark centered on the top edge of the first panel. */
+.top { position: relative; z-index: 1; display: flex; justify-content: center; padding-top: clamp(28px, 3.5vw, 40px); margin-bottom: -16px; }
+.brand { text-decoration: none; }
 
-.nav {
-  display: flex; align-items: center; justify-content: space-between;
-  max-width: 1200px; margin: 0 auto; padding: 18px var(--inset);
-}
-.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
-
-.pill {
-  display: inline-flex; align-items: center; min-height: 36px; padding: 0 16px; border-radius: 999px;
-  background: var(--surface); font: 600 14px/1 var(--text); text-decoration: none;
-  transition: background 200ms, transform 120ms var(--ease);
-}
-.pill:hover { background: var(--surface-2); }
-.pill:active { transform: scale(0.96); }
+.panel { margin: 0 var(--frame); background: var(--bg); }
 
 /* Hero */
 .hero {
-  display: grid; justify-items: center; gap: 20px; text-align: center;
-  max-width: 960px; margin: 0 auto; padding: clamp(40px, 8vw, 96px) var(--inset) 0;
+  position: relative; overflow: hidden;
+  display: grid; place-items: center; align-content: center; gap: 36px; text-align: center;
+  min-height: clamp(360px, 40vw, 500px); padding: 64px var(--inset);
 }
-.cta { display: flex; align-items: center; gap: 14px; margin-top: 12px; }
-.store {
-  display: inline-flex; align-items: center; gap: 12px;
-  min-height: 56px; padding: 0 22px 0 18px; border-radius: 14px;
-  background: var(--ink); color: var(--bg);
-  font: 700 20px/1 var(--text); letter-spacing: -0.01em; text-align: left;
+/* The mark, large and barely lighter than the panel, turning slowly behind the headline. */
+.hero__mark {
+  position: absolute; left: 50%; top: 50%; translate: -50% -50%;
+  height: 92%; aspect-ratio: 1; color: #1D1D1D; pointer-events: none;
 }
-.store small { display: block; font-size: 12px; font-weight: 500; letter-spacing: 0; margin-bottom: 3px; opacity: 0.7; }
-.store__mark {
-  width: 24px; height: 24px; background: currentColor;
-  -webkit-mask: url("/assets/icons/download-simple.svg") center / contain no-repeat;
-  mask: url("/assets/icons/download-simple.svg") center / contain no-repeat;
+.hero__mark svg { display: block; width: 100%; height: 100%; }
+.hero > :not(.hero__mark) { position: relative; }
+.headline {
+  font-family: "Stack Sans Headline", var(--display); font-weight: 400;
+  font-size: clamp(28px, 2.9vw, 37px); line-height: 1.2; color: #FFFFFF;
+  text-wrap: balance; max-width: 22ch;
 }
-.qr {
-  display: grid; place-items: center; width: 56px; height: 56px; border-radius: 14px;
-  border: 1.5px dashed var(--ink-3); color: var(--ink-2);
-}
-.qr .mark { width: 22px; height: 22px; }
-@media (max-width: 720px) { .qr { display: none; } } /* Scanning is for desktop visitors. */
-
-/* Three screens with captions; the podcast one leads, raised in the middle. */
-.screens {
-  display: grid; grid-template-columns: repeat(3, 1fr); align-items: start; gap: clamp(20px, 4vw, 56px);
-  max-width: 1100px; margin: 0 auto; padding: clamp(56px, 8vw, 96px) var(--inset) 0;
-}
-.screen { display: grid; gap: 24px; }
-.screen img {
-  width: 100%; aspect-ratio: 924 / 2000; border-radius: 13% / 6%;
-  box-shadow: 0 0 0 8px #0E0E0E, 0 0 0 9px rgb(255 255 255 / 0.08), 0 40px 80px -24px rgb(0 0 0 / 0.75);
-}
-.screen--lead { transform: translateY(-32px); }
-.screen h2 { font-family: var(--display); font-weight: 700; font-size: 22px; letter-spacing: -0.02em; line-height: 1.15; margin-bottom: 6px; }
-.screen p { color: var(--ink-2); font-size: 16px; }
-@media (max-width: 760px) {
-  .screens { grid-template-columns: 1fr; max-width: 360px; gap: 64px; }
-  .screen--lead { transform: none; order: -1; }
+@media (min-width: 900px) { .headline { max-width: none; } }
+.button {
+  display: inline-flex; align-items: center; min-height: 52px; padding: 0 30px; border-radius: 999px;
+  background: #171717; font: 400 18px/1 var(--text); color: #FFFFFF;
 }
 
-/* FAQ */
-.faq { max-width: 760px; margin: 0 auto; padding: clamp(96px, 12vw, 144px) var(--inset) 0; }
-.faq h2 { margin-bottom: 20px; }
-.faq details { border-bottom: 1px solid var(--line); }
-.faq summary {
-  list-style: none; cursor: pointer;
-  display: flex; justify-content: space-between; align-items: center; gap: 24px;
-  padding: 20px 0; font-size: 18px; font-weight: 600;
+/* Screens: a slow marquee that loops. Spacing is margin on each image (not gap), so one
+   set is exactly half the track and translating -50% lands back on the start. */
+.screens { overflow: hidden; padding: clamp(40px, 4.4vw, 56px) 0; }
+.marquee { display: flex; width: max-content; animation: marquee 84s linear infinite; }
+.marquee__copy { display: contents; }
+/* A simple phone: dark bezel, rounded corners, a Dynamic Island over the status bar. */
+.device {
+  --h: clamp(420px, 42vw, 560px);
+  position: relative; flex: none;
+  height: var(--h); aspect-ratio: 924 / 2000;
+  box-sizing: content-box; padding: calc(var(--h) * 0.014);
+  margin-right: clamp(24px, 4.2vw, 56px);
+  border-radius: calc(var(--h) * 0.075);
+  background: #0B0B0B;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.10), 0 30px 60px -30px rgb(0 0 0 / 0.8);
 }
-.faq summary::-webkit-details-marker { display: none; }
-.faq summary::after {
-  content: ""; flex: none; width: 16px; height: 16px; background: var(--ink-2);
-  -webkit-mask: url("/assets/icons/plus.svg") center / contain no-repeat;
-  mask: url("/assets/icons/plus.svg") center / contain no-repeat;
-  transition: transform 300ms var(--ease);
+.device img { width: 100%; height: 100%; object-fit: cover; border-radius: calc(var(--h) * 0.062); }
+.device::after {
+  content: ""; position: absolute; left: 50%; translate: -50% 0;
+  top: calc(var(--h) * 0.028); width: 30%; height: calc(var(--h) * 0.022);
+  border-radius: 999px; background: #000;
 }
-.faq details[open] summary::after { transform: rotate(45deg); }
-.faq details p { color: var(--ink-2); padding-bottom: 20px; }
+@keyframes marquee { to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) {
+  .marquee { animation: none; }
+  .screens { overflow-x: auto; scrollbar-width: none; padding-inline: var(--frame); }
+  .marquee__copy { display: none; }
+}
+
+/* Features: four short points, an icon above each. */
+.features {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: clamp(28px, 4vw, 56px);
+  padding: clamp(64px, 7vw, 100px) clamp(28px, 3.2vw, 40px);
+}
+.feature { display: grid; align-content: start; gap: 18px; }
+.feature p { font-size: 16px; line-height: 1.4; color: #EDE8DC; max-width: 265px; text-wrap: pretty; }
+.icon {
+  width: 28px; height: 28px; background: currentColor;
+  -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat;
+}
+.icon[data-icon="microphone"] { --icon: url("/assets/icons/microphone.svg"); }
+.icon[data-icon="gauge"] { --icon: url("/assets/icons/gauge.svg"); }
+.icon[data-icon="cloud-slash"] { --icon: url("/assets/icons/cloud-slash.svg"); }
+.icon[data-icon="lock"] { --icon: url("/assets/icons/lock.svg"); }
+@media (max-width: 900px) { .features { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 520px) { .features { grid-template-columns: 1fr; } }
 
 /* Footer */
 .footer {
-  max-width: 1200px; margin: clamp(96px, 12vw, 144px) auto 0; padding: 32px var(--inset) 48px;
-  display: grid; gap: 12px; color: var(--ink-3); font-size: 13px;
+  display: grid; gap: 14px; justify-items: center; text-align: center;
+  padding: clamp(48px, 6vw, 72px) var(--inset) 56px;
+  color: var(--ink-3); font-size: 13px;
 }
-.footer nav { display: flex; gap: 24px; font-size: 15px; }
-.footer nav a { color: var(--ink-2); text-decoration: none; }
+.footer__mark { width: 28px; height: 28px; color: #6B6862; /* ink-3 over the page, as a solid so overlapping strokes don't stack */ margin-bottom: 10px; }
+.footer__mark svg { display: block; width: 100%; height: 100%; }
+.footer nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 28px; font-size: 15px; }
+.footer nav a { color: var(--ink-2); text-decoration: none; transition: color 200ms; }
 .footer nav a:hover { color: var(--ink); }
+.footer p { max-width: 46em; }
 
 /* Privacy and support pages */
-.page { max-width: 720px; margin: 0 auto; padding: clamp(40px, 6vw, 72px) var(--inset) 0; }
-.page h1 { margin-bottom: 12px; font-size: clamp(36px, 5vw, 56px); }
+.page { margin: 0 var(--frame); background: var(--bg); padding: clamp(56px, 7vw, 88px) var(--inset); }
+.page > * { max-width: 680px; margin-inline: auto; }
+.page h1 { font-family: var(--display); font-weight: 600; font-size: clamp(34px, 4.4vw, 52px); letter-spacing: -0.03em; line-height: 1.05; margin-bottom: 12px; }
 .page .meta { color: var(--ink-3); font-size: 15px; margin-bottom: 32px; }
-.page h2 { font-family: var(--display); font-weight: 700; font-size: 24px; letter-spacing: -0.02em; margin: 40px 0 10px; }
+.page h2 { font-family: var(--display); font-weight: 600; font-size: 24px; letter-spacing: -0.02em; margin-top: 40px; margin-bottom: 10px; }
 .page p, .page li { color: var(--ink-2); }
 .page p + p { margin-top: 12px; }
-.page ul { padding-left: 20px; margin: 12px 0 0; }
+.page ul { padding-left: 20px; }
+.page ul { margin-top: 12px; margin-bottom: 0; }
 .page li + li { margin-top: 8px; }
 .page strong { color: var(--ink); font-weight: 600; }
 
 /* Fade up on scroll; only hidden once JS is running, so nothing goes missing without it. */
-.js .reveal { opacity: 0; translate: 0 16px; transition: opacity 800ms var(--ease), translate 800ms var(--ease); }
+.js .reveal { opacity: 0; translate: 0 12px; transition: opacity 800ms var(--ease), translate 800ms var(--ease); }
 .js .reveal.is-in { opacity: 1; translate: none; }
 @media (prefers-reduced-motion: reduce) { .js .reveal { opacity: 1; translate: none; transition: none; } }

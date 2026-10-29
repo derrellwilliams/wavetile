@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Wavetile: Jellyfin Music &amp; Podcast Player for iPhone</title>
-<meta name="description" content="Wavetile is a Jellyfin music player for iPhone with a full podcast player built in. Gapless, offline, fast with huge libraries, and private: no account, no tracking.">
+<meta name="description" content="Wavetile is a Jellyfin music player for iPhone with a full podcast player built in. Instant with huge libraries, works offline, and private: no account, no analytics, no tracking.">
 <link rel="canonical" href="https://wavetile.com/">
 <meta name="theme-color" content="#1A1A1A">
 <meta name="color-scheme" content="dark">
@@ -28,6 +28,7 @@
 <link rel="manifest" href="/site.webmanifest">
 <link rel="preload" href="/assets/fonts/StackSansNotch.ttf" as="font" type="font/ttf" crossorigin>
 <link rel="preload" href="/assets/fonts/FamiljenGrotesk.ttf" as="font" type="font/ttf" crossorigin>
+<link rel="preload" href="/assets/fonts/StackSansHeadline.ttf" as="font" type="font/ttf" crossorigin>
 <link rel="stylesheet" href="/styles.css">
 <script src="/main.js"></script>
 
@@ -47,7 +48,10 @@
       "image": "https://wavetile.com/og.jpg",
       "screenshot": [
         "https://wavetile.com/assets/screens/home.webp",
+        "https://wavetile.com/assets/screens/artist.webp",
+        "https://wavetile.com/assets/screens/album.webp",
         "https://wavetile.com/assets/screens/podcasts.webp",
+        "https://wavetile.com/assets/screens/show.webp",
         "https://wavetile.com/assets/screens/nowplaying.webp"
       ],
       "featureList": "Jellyfin music streaming, Built-in podcast player, Gapless playback, Offline downloads, Instant Mix radio, Chapters and transcripts, OPML import, Home Screen widgets, Live Activity, Siri, Quick Connect sign-in",
@@ -60,79 +64,73 @@
       "name": "Wavetile",
       "url": "https://wavetile.com/",
       "logo": "https://wavetile.com/assets/icon-512.png"
-    },
-    {
-      "@type": "FAQPage",
-      "mainEntity": [
-        { "@type": "Question", "name": "What is Wavetile?", "acceptedAnswer": { "@type": "Answer", "text": "Wavetile is a Jellyfin music player for iPhone with a full podcast player built in. It streams and downloads the music on your Jellyfin server, and plays your podcasts in the same app." } },
-        { "@type": "Question", "name": "How is Wavetile different from other Jellyfin apps?", "acceptedAnswer": { "@type": "Answer", "text": "Wavetile adds podcasts to your Jellyfin music, with directory search, OPML import, chapters, transcripts and subscriptions synced through your server. It also keeps a local copy of your library, so browsing is instant and works offline, even with 50,000 tracks." } },
-        { "@type": "Question", "name": "Does Wavetile work offline?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. You can browse your library with no connection and download albums, playlists and podcast episodes, as 256 kbps MP3 or the original file such as FLAC." } },
-        { "@type": "Question", "name": "Does Wavetile collect my data?", "acceptedAnswer": { "@type": "Answer", "text": "No. There's no account, no analytics and no tracking. Wavetile talks to your Jellyfin server, and to podcast feeds and Apple's podcast directory if you use podcasts." } },
-        { "@type": "Question", "name": "What do I need to use Wavetile?", "acceptedAnswer": { "@type": "Answer", "text": "An iPhone on iOS 26.1 or later and a Jellyfin server with music. Sign in with your server address or Quick Connect." } },
-        { "@type": "Question", "name": "When is Wavetile available?", "acceptedAnswer": { "@type": "Answer", "text": "Wavetile is coming soon to the App Store for iPhone." } }
-      ]
     }
   ]
 }
 </script>
 </head>
 <body>
-<header class="nav">
-  <a class="brand" href="/" aria-label="Wavetile home">
-    <span class="mark" aria-hidden="true"></span>
-    <span class="wordmark">Wavetile</span>
-  </a>
-  <a class="pill pill--small" href="https://github.com/derrellwilliams/wavetile" rel="noopener">GitHub</a>
+<header class="top">
+  <a class="brand" href="/" aria-label="Wavetile home"><span class="wordmark">Wavetile</span></a>
 </header>
 
 <main>
-  <section class="hero">
-    <p class="eyebrow reveal">For Jellyfin · iPhone</p>
-    <h1 class="display reveal">Your Jellyfin music and your podcasts, in one app.</h1>
-    <p class="lead reveal">Wavetile is a fast, beautiful Jellyfin player with a full podcast app built in. Gapless, offline, private.</p>
-    <div class="cta reveal">
-      <span class="store" role="img" aria-label="Coming soon to the App Store">
-        <span class="store__mark" aria-hidden="true"></span>
-        <span><small>Coming soon to the</small>App Store</span>
+  <section class="hero panel">
+    <span class="hero__mark" data-mark aria-hidden="true"></span>
+    <h1 class="headline reveal">Your Jellyfin music and your podcasts, in one app.</h1>
+    <!-- At launch: make this a link to the App Store listing. -->
+    <span class="button reveal" role="img" aria-label="Coming soon to the App Store">Coming soon to the App Store</span>
+  </section>
+
+  <section class="screens" aria-label="Screens">
+    <!-- Two identical sets: the track slides left by one set, then loops seamlessly. -->
+    <div class="marquee">
+      <span class="device"><img src="/assets/screens/home.webp" width="924" height="2000" alt="Wavetile Home: Recently Played, Up Next in Podcasts and Most Played"></span>
+      <span class="device"><img src="/assets/screens/artist.webp" width="924" height="2000" alt="Artist page for Junip with Play, Shuffle and albums"></span>
+      <span class="device"><img src="/assets/screens/album.webp" width="924" height="2000" alt="Album page for Admiral Fell Promises with download button and track list"></span>
+      <span class="device"><img src="/assets/screens/podcasts.webp" width="924" height="2000" alt="Podcasts tab with Continue Listening and Latest Episodes"></span>
+      <span class="device"><img src="/assets/screens/show.webp" width="924" height="2000" alt="This American Life show page with Play Latest"></span>
+      <span class="device"><img src="/assets/screens/nowplaying.webp" width="924" height="2000" alt="Now Playing: Dance Now by JID and Kenny Mason"></span>
+      <span class="marquee__copy" aria-hidden="true">
+      <span class="device"><img src="/assets/screens/home.webp" width="924" height="2000" alt=""></span>
+      <span class="device"><img src="/assets/screens/artist.webp" width="924" height="2000" alt=""></span>
+      <span class="device"><img src="/assets/screens/album.webp" width="924" height="2000" alt=""></span>
+      <span class="device"><img src="/assets/screens/podcasts.webp" width="924" height="2000" alt=""></span>
+      <span class="device"><img src="/assets/screens/show.webp" width="924" height="2000" alt=""></span>
+      <span class="device"><img src="/assets/screens/nowplaying.webp" width="924" height="2000" alt=""></span>
       </span>
-      <!-- At launch: link the badge to the listing and replace this with an SVG QR code. -->
-      <span class="qr" role="img" aria-label="QR code coming at launch"><span class="mark" aria-hidden="true"></span></span>
     </div>
   </section>
 
-  <section class="screens" aria-label="Features">
-    <figure class="screen reveal">
-      <img src="/assets/screens/home.webp" width="924" height="2000" alt="Wavetile Home: Recently Played albums and Up Next in Podcasts" fetchpriority="high">
-      <figcaption><h2>Your whole library, instantly</h2><p>A local copy of your Jellyfin library makes browsing instant, even offline and with 50,000 tracks.</p></figcaption>
-    </figure>
-    <figure class="screen screen--lead reveal">
-      <img src="/assets/screens/podcasts.webp" width="924" height="2000" alt="Podcasts tab with Continue Listening and Latest Episodes">
-      <figcaption><h2>Podcasts, built in</h2><p>Search the directory or import OPML. Chapters, transcripts and downloads, synced through Jellyfin.</p></figcaption>
-    </figure>
-    <figure class="screen reveal">
-      <img src="/assets/screens/nowplaying.webp" width="924" height="2000" alt="Now Playing screen with playback controls" loading="lazy">
-      <figcaption><h2>Gapless and private</h2><p>Gapless playback, Instant Mix radio and FLAC downloads. No account, no tracking.</p></figcaption>
-    </figure>
-  </section>
-
-  <section class="faq" aria-labelledby="faq-title">
-    <h2 id="faq-title" class="section-title">Questions</h2>
-    <details><summary>What is Wavetile?</summary><p>Wavetile is a Jellyfin music player for iPhone with a full podcast player built in. It streams and downloads the music on your Jellyfin server, and plays your podcasts in the same app.</p></details>
-    <details><summary>How is Wavetile different from other Jellyfin apps?</summary><p>Wavetile adds podcasts to your Jellyfin music, with directory search, OPML import, chapters, transcripts and subscriptions synced through your server. It also keeps a local copy of your library, so browsing is instant and works offline, even with 50,000 tracks.</p></details>
-    <details><summary>Does Wavetile work offline?</summary><p>Yes. You can browse your library with no connection and download albums, playlists and podcast episodes, as 256 kbps MP3 or the original file such as FLAC.</p></details>
-    <details><summary>Does Wavetile collect my data?</summary><p>No. There's no account, no analytics and no tracking. Wavetile talks to your Jellyfin server, and to podcast feeds and Apple's podcast directory if you use podcasts. <a class="link" href="/privacy">Privacy policy</a></p></details>
-    <details><summary>What do I need to use Wavetile?</summary><p>An iPhone on iOS 26.1 or later and a Jellyfin server with music. Sign in with your server address or Quick Connect.</p></details>
-    <details><summary>When is Wavetile available?</summary><p>Wavetile is coming soon to the App Store for iPhone.</p></details>
+  <section class="features panel" aria-label="Features">
+    <div class="feature reveal">
+      <span class="icon" data-icon="microphone" aria-hidden="true"></span>
+      <p>Podcasts next to your music, with chapters, transcripts and subscriptions synced through Jellyfin.</p>
+    </div>
+    <div class="feature reveal">
+      <span class="icon" data-icon="gauge" aria-hidden="true"></span>
+      <p>A local copy of your library keeps browsing instant, even with 50,000 tracks.</p>
+    </div>
+    <div class="feature reveal">
+      <span class="icon" data-icon="cloud-slash" aria-hidden="true"></span>
+      <p>Works offline. Download albums, playlists and episodes as MP3 or original FLAC.</p>
+    </div>
+    <div class="feature reveal">
+      <span class="icon" data-icon="lock" aria-hidden="true"></span>
+      <p>No account, no analytics, no tracking. Just your server and your podcast feeds.</p>
+    </div>
   </section>
 </main>
 
 <footer class="footer">
+  <span class="footer__mark" data-mark aria-hidden="true"></span>
   <nav aria-label="Footer">
-    <a href="/privacy">Privacy</a>
+    <a href="mailto:support@wavetile.com">Contact</a>
     <a href="/support">Support</a>
+    <a href="/privacy">Privacy</a>
     <a href="https://github.com/derrellwilliams/wavetile" rel="noopener">GitHub</a>
   </nav>
-  <p>Wavetile is an independent app and isn't affiliated with the Jellyfin project. Artwork belongs to its owners. Apple, iPhone and App Store are trademarks of Apple Inc.</p>
+  <p>© 2026 Wavetile. An independent app, not affiliated with the Jellyfin project. Artwork belongs to its owners. Apple, iPhone and App Store are trademarks of Apple Inc.</p>
 </footer>
 </body>
 </html>
