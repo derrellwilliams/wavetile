@@ -10,7 +10,8 @@ The goal: when someone searches or asks an LLM for "a Jellyfin music app for iPh
 | TestFlight | Build 202610281900 approved for the external "public beta" group; public link https://testflight.apple.com/join/pk9dyfMq |
 | App Review login | Jellyfin's public demo: `https://demo.jellyfin.org/stable`, user `demo`, blank password (any typed password fails) |
 | Contact | realslimscrawny@gmail.com (site, support and privacy pages) |
-| Next | Request the CarPlay entitlement; ship a new TestFlight build; get listed on jellyfin.org; recruit testers (r/jellyfin, r/selfhosted) |
+| CarPlay | Entitlement requested 2026-10-29 (Audio); waiting on Apple. Once granted: add `com.apple.developer.carplay-audio` to `App/Wavetile.entitlements` |
+| Next | Ship a new TestFlight build; recruit testers (Jellyfin forum, r/jellyfin, r/selfhosted, awesome-jellyfin); jellyfin.org after launch |
 
 ## Positioning
 Use one line, word for word, everywhere (App Store, site, GitHub, posts):
