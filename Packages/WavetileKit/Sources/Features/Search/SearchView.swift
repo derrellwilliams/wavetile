@@ -48,8 +48,7 @@ struct SearchView: View {
             .themedBackground()
             .navigationTitle("Search")
             .tabRootChrome()
-            .libraryDestinations(zoom: zoom) { path.append($0) }
-            .podcastDestinations(zoom: zoom) { path.append($0) }
+            // Inside libraryDestinations, so the sheet gets the stack's push (Go to Album/Artist).
             .sheet(item: $actionsTrack, onDismiss: actions.presentPending) { track in
                 SongActionsSheet(
                     track: track,
@@ -57,6 +56,8 @@ struct SearchView: View {
                     menu: store.songMenu(for: track, source: "search") { play(track) }
                 )
             }
+            .libraryDestinations(zoom: zoom) { path.append($0) }
+            .podcastDestinations(zoom: zoom) { path.append($0) }
         }
         // Scoped to this tab's stack so the field doesn't leak into other tabs' navigation bars.
         .searchable(text: $text, prompt: prompt)

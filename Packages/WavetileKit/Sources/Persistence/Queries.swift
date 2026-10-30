@@ -12,7 +12,7 @@ public extension LibraryDatabase {
 
     func artists() -> ValueObservation<ValueReducers.Fetch<[ArtistRecord]>> {
         ValueObservation.tracking { db in
-            try ArtistRecord.order(Column("sortName")).fetchAll(db)
+            try ArtistRecord.inLibrary().order(Column("sortName")).fetchAll(db)
         }
     }
 
@@ -63,9 +63,9 @@ public extension LibraryDatabase {
         }
     }
 
-    /// The synced artists among `ids`, in the order given.
+    /// The synced artists among `ids` that have albums here, in the order given.
     func artists(ids: [String]) throws -> [ArtistRecord] {
-        let byID = try pool.read { try ArtistRecord.fetchAll($0, keys: ids) }
+        let byID = try pool.read { try ArtistRecord.inLibrary().filter(keys: ids).fetchAll($0) }
             .reduce(into: [String: ArtistRecord]()) { $0[$1.id] = $1 }
         return ids.compactMap { byID[$0] }
     }
@@ -122,7 +122,7 @@ public extension LibraryDatabase {
             SearchResults(
                 artists: try ArtistRecord.fetchAll(db, sql: """
                     SELECT artist.* FROM artist JOIN artistFTS ON artistFTS.rowid = artist.rowid
-                    WHERE artistFTS MATCH ? ORDER BY rank LIMIT ?
+                    WHERE artistFTS MATCH ? AND \(ArtistRecord.hasAlbumsSQL) ORDER BY rank LIMIT ?
                     """, arguments: [pattern, limit]),
                 albums: try AlbumRecord.fetchAll(db, sql: """
                     SELECT album.* FROM album JOIN albumFTS ON albumFTS.rowid = album.rowid
@@ -134,6 +134,28 @@ public extension LibraryDatabase {
                     """, arguments: [pattern, limit])
             )
         }
+    }
+}
+
+public extension ArtistRecord {
+    /// Jellyfin's album-artist list also has artists with nothing in this library (a second
+    /// album artist, or one whose albums were removed). Lists only show artists with an album here.
+    static let hasAlbumsSQL = "EXISTS (SELECT 1 FROM album WHERE album.artistID = artist.id)"
+
+    static func inLibrary() -> QueryInterfaceRequest<ArtistRecord> {
+        filter(sql: hasAlbumsSQL)
+    }
+}
+
+public extension LibraryDatabase {
+    /// The IDs among `ids` that are albums in the synced library.
+    func albumIDs(in ids: [String]) throws -> Set<String> {
+        try pool.read { try Set(String.fetchAll($0, AlbumRecord.filter(keys: ids).select(Column("id")))) }
+    }
+
+    /// The IDs among `ids` that are songs in the synced library.
+    func trackIDs(in ids: [String]) throws -> Set<String> {
+        try pool.read { try Set(String.fetchAll($0, TrackRecord.filter(keys: ids).select(Column("id")))) }
     }
 }
 
@@ -173,7 +195,7 @@ public extension LibraryDatabase {
 
     func favoriteArtists() -> ValueObservation<ValueReducers.Fetch<[ArtistRecord]>> {
         ValueObservation.tracking { db in
-            try ArtistRecord.filter(Column("isFavorite") == true).order(Column("sortName")).fetchAll(db)
+            try ArtistRecord.inLibrary().filter(Column("isFavorite") == true).order(Column("sortName")).fetchAll(db)
         }
     }
 
@@ -299,7 +321,7 @@ public extension LibraryDatabase {
     }
 
     func artistList(limit: Int) throws -> [ArtistRecord] {
-        try pool.read { try ArtistRecord.order(Column("sortName")).limit(limit).fetchAll($0) }
+        try pool.read { try ArtistRecord.inLibrary().order(Column("sortName")).limit(limit).fetchAll($0) }
     }
 
     func playlistList() throws -> [PlaylistRecord] {
@@ -312,6 +334,6 @@ public extension LibraryDatabase {
     }
 
     func favoriteArtistList(limit: Int) throws -> [ArtistRecord] {
-        try pool.read { try ArtistRecord.filter(Column("isFavorite") == true).order(Column("sortName")).limit(limit).fetchAll($0) }
+        try pool.read { try ArtistRecord.inLibrary().filter(Column("isFavorite") == true).order(Column("sortName")).limit(limit).fetchAll($0) }
     }
 }

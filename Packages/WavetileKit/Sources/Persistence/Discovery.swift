@@ -15,7 +15,7 @@ public extension LibraryDatabase {
         try pool.read { db in
             try LibraryStats(
                 albums: AlbumRecord.fetchCount(db),
-                artists: ArtistRecord.fetchCount(db),
+                artists: ArtistRecord.inLibrary().fetchCount(db),
                 tracks: TrackRecord.fetchCount(db)
             )
         }

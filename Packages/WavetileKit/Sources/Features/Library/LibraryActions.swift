@@ -54,8 +54,13 @@ final class LibraryActions {
     func startRadio(from itemID: String, store: LibraryStore, player: AudioPlayer) {
         Task {
             do {
-                let queue = try await store.api.instantMix(itemID: itemID).compactMap { mix in
+                var queue = try await store.api.instantMix(itemID: itemID).compactMap { mix in
                     mix.album.map { QueuedTrack(mix.track, album: $0) }
+                }
+                // Instant Mix can pull from outside the synced music library; keep only songs here
+                // (unless the first sync hasn't finished, when there's nothing to check against).
+                if (try? store.database.isEmpty()) == false, let synced = try? store.database.trackIDs(in: queue.map(\.trackID)) {
+                    queue.removeAll { !synced.contains($0.trackID) }
                 }
                 guard !queue.isEmpty else {
                     errorMessage = "Couldn't find songs to make a station from."

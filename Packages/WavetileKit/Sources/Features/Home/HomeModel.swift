@@ -152,8 +152,13 @@ final class HomeModel {
         ]
         // Server results win; a shelf that failed keeps its local version.
         let previous = Dictionary(uniqueKeysWithValues: shelves.map { ($0.kind, $0) })
+        // Play history can name albums outside the synced music library (other libraries, removed
+        // albums); keep only ones here. Before the first sync there's nothing to check against.
+        let serverIDs = results.flatMap { (try? $0.1.get())?.map(\.id) ?? [] }
+        let synced = (try? database?.isEmpty()) == false ? try? database?.albumIDs(in: serverIDs) : nil
         shelves = results.compactMap { kind, result in
-            if let albums = try? result.get() {
+            if var albums = try? result.get() {
+                if let synced { albums.removeAll { !synced.contains($0.id) } }
                 return albums.isEmpty ? nil : Shelf(kind: kind, albums: albums)
             }
             return previous[kind]
