@@ -66,7 +66,9 @@ public struct SideDrawer<Content: View, Drawer: View>: View {
                             .onTapGesture { setOpen(false) }
                             .accessibilityHidden(true)
                     }
-                    .shadow(color: .black.opacity(0.5 * progress), radius: 24)
+                    // No blur radius while closed: a shadow on the whole tab view costs an extra
+                    // render pass on every scrolling screen.
+                    .shadow(color: .black.opacity(0.5 * progress), radius: progress > 0 ? 24 : 0)
                     .offset(x: offset)
                     .accessibilityHidden(isOpen)
                     .gesture(dragGesture(width: width), isEnabled: isOpen)

@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 /// Downloads and parses feeds, and keeps the database's shows up to date.
@@ -29,20 +30,16 @@ public struct FeedFetcher: Sendable {
             if http.statusCode == 304 { return .notModified }
             try PodcastNetwork.check(http)
         }
-        // Refused up front when the host states a size, and cut off at the cap when it doesn't,
-        // so an oversized feed never fills memory or disk.
-        guard response.expectedContentLength <= Self.maxBytes else { throw FeedError.tooLarge }
-        var data = Data()
-        if response.expectedContentLength > 0 { data.reserveCapacity(Int(response.expectedContentLength)) }
-        for try await byte in bytes {
-            data.append(byte)
-            guard data.count <= Self.maxBytes else { throw FeedError.tooLarge }
-        }
+        let data = try await PodcastNetwork.read(bytes, response, maxBytes: Int(Self.maxBytes))
+        // The same bytes as last time: skip parsing and writing, as for a 304.
+        let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        if let previous = validators?.bodyHash, previous == hash { return .notModified }
         let feed = try FeedParser.parse(data)
         let http = response as? HTTPURLResponse
         let newValidators = FeedValidators(
             etag: http?.value(forHTTPHeaderField: "ETag"),
-            lastModified: http?.value(forHTTPHeaderField: "Last-Modified")
+            lastModified: http?.value(forHTTPHeaderField: "Last-Modified"),
+            bodyHash: hash
         )
         return .feed(feed, newValidators)
     }
@@ -57,7 +54,7 @@ public struct FeedFetcher: Sendable {
 
     /// Refreshes one show; returns IDs of episodes that are new to this device.
     public func refresh(_ show: ShowRecord) async throws -> [String] {
-        let validators = FeedValidators(etag: show.etag, lastModified: show.lastModified)
+        let validators = FeedValidators(etag: show.etag, lastModified: show.lastModified, bodyHash: show.bodyHash)
         switch try await fetch(show.feedURL, validators: validators) {
         case .notModified:
             try await database.touch(showID: show.id)

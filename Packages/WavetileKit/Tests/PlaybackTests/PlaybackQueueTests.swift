@@ -82,3 +82,12 @@ struct PlaybackQueueTests {
         #expect(queue.items[0].queueID != queue.items[1].queueID)
     }
 }
+
+struct PlayCountRuleTests {
+    @Test func halfASongOrFourMinutesCounts() {
+        #expect(AudioPlayer.countsAsPlay(position: 100, duration: 180))
+        #expect(!AudioPlayer.countsAsPlay(position: 80, duration: 180))
+        #expect(AudioPlayer.countsAsPlay(position: 240, duration: 1200))
+        #expect(!AudioPlayer.countsAsPlay(position: 0, duration: 0))
+    }
+}

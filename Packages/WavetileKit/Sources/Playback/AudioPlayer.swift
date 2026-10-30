@@ -60,6 +60,9 @@ public final class AudioPlayer {
     @ObservationIgnored public var resumePosition: ((QueuedTrack) -> Double?)?
     /// Episode progress, every few seconds while playing and whenever it stops (position, duration).
     @ObservationIgnored public var onEpisodeProgress: ((QueuedTrack, Double, Double) -> Void)?
+    /// A song was listened to but its stop report didn't reach Jellyfin (offline): track ID and
+    /// when it was played, to be sent later.
+    @ObservationIgnored public var onUnreportedPlay: ((String, Date) -> Void)?
 
     /// Returns a downloaded file for a track ID; when set, local files play instead of streams.
     @ObservationIgnored public var localFile: ((String) -> URL?)?
@@ -213,7 +216,14 @@ public final class AudioPlayer {
     /// Repeat-one replays in place and the end-of-episode sleep timer stops there; otherwise the
     /// queue player advances by itself.
     private func updateActionAtItemEnd() {
-        player.actionAtItemEnd = queue.repeatMode == .one || sleepTimer == .endOfItem ? .pause : .advance
+        player.actionAtItemEnd = loopsCurrent || sleepTimer == .endOfItem ? .pause : .advance
+    }
+
+    /// The current item plays again at its end: repeat-one, or repeat-all with a one-track
+    /// queue (whose next track is itself, which AVQueuePlayer can't preload behind it).
+    private var loopsCurrent: Bool {
+        queue.repeatMode == .one
+            || (queue.repeatMode == .all && queue.current != nil && queue.automaticNext?.queueID == queue.current?.queueID)
     }
 
     /// Stops playback and clears the queue (sign out).
@@ -265,12 +275,22 @@ public final class AudioPlayer {
 
     /// Ensures exactly one preloaded item (the automatic next track) follows the current item.
     private func enqueueNext() {
-        for item in player.items().dropFirst() {
+        // Queue edits can start or stop a one-track loop.
+        updateActionAtItemEnd()
+        // Keep a preloaded item that's still the right one: rebuilding it on every queue edit
+        // throws away what it has buffered and risks a gap near the end of the current track.
+        let preloaded = player.items().dropFirst()
+        if !loopsCurrent, let next = queue.automaticNext, next.queueID != queue.current?.queueID,
+           preloaded.count == 1, let item = preloaded.first, item.status != .failed,
+           entries[ObjectIdentifier(item)]?.track.queueID == next.queueID {
+            return
+        }
+        for item in preloaded {
             player.remove(item)
             entries.removeValue(forKey: ObjectIdentifier(item))
             statusObservations.removeValue(forKey: ObjectIdentifier(item))
         }
-        guard queue.repeatMode != .one, let next = queue.automaticNext, next.queueID != queue.current?.queueID,
+        guard !loopsCurrent, let next = queue.automaticNext, next.queueID != queue.current?.queueID,
               let currentItem = player.currentItem, let item = makeItem(for: next)
         else { return }
         player.insert(item, after: currentItem)
@@ -337,6 +357,12 @@ public final class AudioPlayer {
             return
         }
         guard let entry = entries[ObjectIdentifier(item)], entry.track.queueID != queue.current?.queueID else { return }
+        // Forget items AVQueuePlayer has moved past, so a long gapless run doesn't pile them up.
+        let live = Set(player.items().map(ObjectIdentifier.init))
+        for key in entries.keys where !live.contains(key) {
+            entries.removeValue(forKey: key)
+            statusObservations.removeValue(forKey: key)
+        }
         reportStopped()
         if entry.track.queueID == queue.automaticNext?.queueID {
             _ = queue.advanceAutomatically()
@@ -349,6 +375,8 @@ public final class AudioPlayer {
         applyRate()
         seekToResumePosition(entry.track)
         didStart(entry.track)
+        // A preloaded item can fail before it's current; its status observer ignores it then.
+        if item.status == .failed { itemFailed(item) }
     }
 
     private func didStart(_ track: QueuedTrack) {
@@ -428,8 +456,8 @@ public final class AudioPlayer {
             updateNowPlayingPlayback()
             return
         }
-        // Repeat-one: the item pauses at its end (actionAtItemEnd = .pause); restart it as a new play.
-        guard queue.repeatMode == .one, let track = queue.current else { return }
+        // Looping one item: it pauses at its end (actionAtItemEnd = .pause); restart it as a new play.
+        guard loopsCurrent, let track = queue.current else { return }
         reportStopped()
         player.seek(to: .zero)
         player.play()
@@ -439,15 +467,18 @@ public final class AudioPlayer {
     private func observeStatus(of item: AVPlayerItem) {
         statusObservations[ObjectIdentifier(item)] = item.observe(\.status, options: [.new]) { [weak self] item, _ in
             guard item.status == .failed else { return }
-            let message = item.error?.localizedDescription
             Task { @MainActor in
                 guard let self, item === self.player.currentItem else { return }
-                let fallback = self.queue.current?.isEpisode == true ? "This episode couldn't be played." : "This track couldn't be played."
-                self.errorMessage = message ?? fallback
-                // Skip unplayable tracks rather than stalling the queue.
-                if self.queue.skipForward() { self.loadCurrent() } else { self.pause() }
+                self.itemFailed(item)
             }
         }
+    }
+
+    private func itemFailed(_ item: AVPlayerItem) {
+        let fallback = queue.current?.isEpisode == true ? "This episode couldn't be played." : "This track couldn't be played."
+        errorMessage = item.error?.localizedDescription ?? fallback
+        // Skip unplayable tracks rather than stalling the queue.
+        if queue.skipForward() { loadCurrent() } else { pause() }
     }
 
     // MARK: - Audio session
@@ -583,7 +614,8 @@ public final class AudioPlayer {
             info[MPMediaItemPropertyArtwork] = existing[MPMediaItemPropertyArtwork]
         }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
-        loadArtwork(for: track)
+        // Same album, same art: keep it rather than downloading it again for every track.
+        if info[MPMediaItemPropertyArtwork] == nil || track.isEpisode { loadArtwork(for: track) }
     }
 
     private func updateNowPlayingPlayback() {
@@ -602,7 +634,7 @@ public final class AudioPlayer {
         else { return }
         artworkTask = Task { [weak self] in
             guard let (data, _) = try? await URLSession.shared.data(from: url),
-                  let image = UIImage(data: data), !Task.isCancelled,
+                  let image = await Self.decodeArtwork(data), !Task.isCancelled,
                   self?.queue.current?.queueID == track.queueID
             else { return }
             let artwork = Self.makeArtwork(image)
@@ -610,6 +642,11 @@ public final class AudioPlayer {
             info[MPMediaItemPropertyArtwork] = artwork
             MPNowPlayingInfoCenter.default().nowPlayingInfo = info
         }
+    }
+
+    /// Decoded off the main actor and scaled down: third-party podcast art can be 3000 px.
+    @concurrent private nonisolated static func decodeArtwork(_ data: Data) async -> UIImage? {
+        UIImage(data: data)?.preparingThumbnail(of: CGSize(width: 600, height: 600))
     }
 
     /// MediaPlayer invokes the image handler on its own queue. Built in a nonisolated context so
@@ -644,6 +681,16 @@ public final class AudioPlayer {
             onEpisodeProgress?(track, position, duration)
             return
         }
-        Task { await library.reportStopped(trackID: track.trackID, playSessionID: entry.playSessionID, positionSeconds: position) }
+        let length = duration, playedAt = Date()
+        Task {
+            let reported = await library.reportStopped(trackID: track.trackID, playSessionID: entry.playSessionID, positionSeconds: position)
+            if !reported, Self.countsAsPlay(position: position, duration: length) { onUnreportedPlay?(track.trackID, playedAt) }
+        }
+    }
+
+    /// The usual scrobbling rule: half the song, or four minutes of a long one.
+    nonisolated static func countsAsPlay(position: Double, duration: Double) -> Bool {
+        guard position.isFinite, position > 0 else { return false }
+        return position >= 240 || (duration > 0 && position >= duration / 2)
     }
 }

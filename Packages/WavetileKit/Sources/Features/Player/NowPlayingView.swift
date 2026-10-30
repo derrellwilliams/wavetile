@@ -76,13 +76,7 @@ struct NowPlayingView: View {
                     Text((isEpisode ? player.current?.albumTitle : player.current?.artist) ?? "")
                         .font(theme.typography.lead)
                         .foregroundStyle(theme.palette.textPrimary)
-                    if let chapter = currentChapter {
-                        Text(chapter.title)
-                            .font(theme.typography.caption.weight(.semibold))
-                            .foregroundStyle(theme.palette.textSecondary)
-                            .contentTransition(.opacity)
-                            .animation(theme.motion.smooth, value: chapter)
-                    }
+                    if !chapters.isEmpty { CurrentChapterLabel(chapters: chapters) }
                     if let error = player.errorMessage {
                         Label(error, glyph: .warning)
                             .font(theme.typography.caption)
@@ -151,11 +145,6 @@ struct NowPlayingView: View {
             .animation(theme.motion.smooth, value: player.isPlaying)
             .id(player.current?.podcast?.artworkURL?.absoluteString ?? player.current?.albumID)
             .transition(.opacity)
-    }
-
-    /// The chapter playing now, if the episode has chapters.
-    private var currentChapter: Chapter? {
-        chapters.current(at: player.currentTime)
     }
 
     private var transport: some View {
@@ -453,6 +442,24 @@ struct SaveEpisodeButton: View {
         // Same frame as the tap, so the icon swap answers the touch immediately.
         withAnimation(theme.motion.snappy) { isSaved.toggle() }
         podcasts.setSaved(episodeID, isSaved)
+    }
+}
+
+/// The chapter playing now. Its own view so the clock (twice a second) redraws only this label,
+/// not the whole Now Playing screen.
+private struct CurrentChapterLabel: View {
+    @Environment(\.theme) private var theme
+    @Environment(AudioPlayer.self) private var player
+    let chapters: [Chapter]
+
+    var body: some View {
+        if let chapter = chapters.current(at: player.currentTime) {
+            Text(chapter.title)
+                .font(theme.typography.caption.weight(.semibold))
+                .foregroundStyle(theme.palette.textSecondary)
+                .contentTransition(.opacity)
+                .animation(theme.motion.smooth, value: chapter)
+        }
     }
 }
 

@@ -112,3 +112,56 @@ struct LibraryDatabaseTests {
         #expect(albums.map(\.id) == ["a1", "a2"])
     }
 }
+
+struct SyncWriteTests {
+    let base = LibraryDatabaseTests()
+
+    @Test func upsertChangedSkipsUnchangedRows() throws {
+        let db = try LibraryDatabase.temporary()
+        let added = Date(timeIntervalSince1970: 1_700_000_000.123_456_7)
+        var track = base.makeTrack("t1", "Nude")
+        track.dateAdded = added
+        try db.pool.write { db in try TrackRecord.upsertChanged([track], in: db) }
+
+        // A later sync with the same content (sub-millisecond date noise) writes nothing.
+        var again = track
+        again.generation = 2
+        again.dateAdded = added.addingTimeInterval(0.000_04)
+        let unchanged = try db.pool.write { db in try TrackRecord.upsertChanged([again], in: db) }
+        #expect(unchanged.isEmpty)
+
+        again.title = "Big Ideas"
+        let changed = try db.pool.write { db in
+            try TrackRecord.upsertChanged([again, base.makeTrack("t2", "Reckoner")], in: db)
+        }
+        #expect(changed == ["t1", "t2"])
+        #expect(try db.search("big").tracks.map(\.id) == ["t1"])
+    }
+
+    @Test func pruneKeepsOnlySeenIDs() throws {
+        let db = try LibraryDatabase.temporary()
+        try db.pool.write { db in
+            for id in ["t1", "t2", "t3"] { try base.makeTrack(id, id).insert(db) }
+            try LibraryDatabase.prune("track", keeping: ["t1", "t3"], in: db)
+        }
+        #expect(try db.pool.read { try TrackRecord.fetchAll($0).map(\.id).sorted() } == ["t1", "t3"])
+    }
+}
+
+struct PendingPlayTests {
+    @Test func offlinePlaysCountLocallyAndQueueInOrder() async throws {
+        let db = try LibraryDatabase.temporary()
+        try await db.pool.write { try LibraryDatabaseTests().makeTrack("t1", "Nude").insert($0) }
+        let first = Date(timeIntervalSince1970: 1_700_000_000), second = first.addingTimeInterval(600)
+        try await db.queuePlay(trackID: "t1", at: second)
+        try await db.queuePlay(trackID: "t1", at: first)
+
+        let track = try await db.pool.read { try TrackRecord.fetchOne($0, key: "t1") }
+        #expect(track?.playCount == 2)
+        let plays = try await db.pendingPlays()
+        #expect(plays.map(\.playedAt) == [first, second])
+
+        try await db.removePendingPlay(id: try #require(plays.first?.id))
+        #expect(try await db.pendingPlays().count == 1)
+    }
+}

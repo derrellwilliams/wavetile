@@ -74,10 +74,10 @@ struct SignInFlow: View {
         } else {
             switch model.transportWarning {
             case .insecureRemote:
-                Label("HTTP over the internet sends your password and token unencrypted, and iOS will block it. Use HTTPS.", glyph: .lockOpen)
+                Label("HTTP over the internet would send your password and token unencrypted. Use HTTPS.", glyph: .lockOpen)
                     .foregroundStyle(theme.palette.textPrimary)
             case .insecureLocal:
-                Label("Unencrypted connection. OK on your home network only.", glyph: .lockOpen)
+                Label("Unencrypted connection. OK on your home network or over Tailscale only.", glyph: .lockOpen)
             case nil:
                 EmptyView()
             }

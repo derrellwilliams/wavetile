@@ -201,7 +201,7 @@ extension EpisodeDownloadManager: URLSessionDownloadDelegate {
     }
 
     public func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
-        let completion = BackgroundSessionEvents.take(identifier)
+        let completion = BackgroundSessionEvents.finished(identifier)
         DispatchQueue.main.async { completion?() }
     }
 }

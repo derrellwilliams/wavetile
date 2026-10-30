@@ -25,7 +25,10 @@ public extension LibraryClient {
             audioBitRate: 320_000,
             transcodingContainer: "mp3",
             transcodingProtocol: .http,
-            enableRedirection: true
+            // No redirects: for items with a remote path Jellyfin would answer 302 to another host,
+            // and AVFoundation may carry the Authorization header (the token) along with it.
+            // Without redirection the server streams the item itself.
+            enableRedirection: false
         )
         guard var url = client.url(with: Paths.getUniversalAudioStream(itemID: trackID, parameters: params)) else { return nil }
         url.append(queryItems: [URLQueryItem(name: "PlaySessionId", value: playSessionID)])
@@ -65,9 +68,23 @@ public extension LibraryClient {
         try? await client.send(Paths.reportPlaybackProgress(info))
     }
 
-    func reportStopped(trackID: String, playSessionID: String, positionSeconds: Double) async {
+    /// Returns false when the report didn't reach the server (offline), so the play can be
+    /// recorded later with `markPlayed`.
+    @discardableResult
+    func reportStopped(trackID: String, playSessionID: String, positionSeconds: Double) async -> Bool {
         let info = PlaybackStopInfo(itemID: trackID, playSessionID: playSessionID, positionTicks: Self.ticks(positionSeconds))
-        try? await client.send(Paths.reportPlaybackStopped(info))
+        do {
+            try await client.send(Paths.reportPlaybackStopped(info))
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// Records a play that happened earlier (offline), at the time it happened. Jellyfin bumps the
+    /// play count and last-played date, which drive Recently Played and Most Played.
+    func markPlayed(trackID: String, at date: Date) async -> Bool {
+        (try? await client.send(Paths.markPlayedItem(itemID: trackID, userID: session.userID, datePlayed: date))) != nil
     }
 
     private static func ticks(_ seconds: Double) -> Int {

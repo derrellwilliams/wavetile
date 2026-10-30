@@ -28,6 +28,11 @@ struct ServerAddressTests {
         ("http://10.1.2.3.nip.io", false),
         ("http://fdroid.example.com", false),
         ("http://music.example.com", false),
+        ("http://100.101.102.103:8096", true),
+        ("http://100.63.0.1", false),
+        ("http://100.128.0.1", false),
+        ("http://nas.tail1234.ts.net:8096", true),
+        ("http://ts.net.example.com", false),
     ])
     func classifiesLocalNetwork(_ input: String, isLocal: Bool) throws {
         #expect(try ServerAddress(input).isLocalNetwork == isLocal)

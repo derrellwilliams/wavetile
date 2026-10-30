@@ -35,7 +35,15 @@ public final class DownloadManager: NSObject, Sendable {
     private struct MutableState {
         var session: URLSession?
         var lastProgressWrite: [String: Double] = [:]
+        /// Automatic retries so far per track, this launch.
+        var retries: [String: Int] = [:]
+        /// The settings of the last enqueue, for retries that start a fresh request.
+        var quality: Quality = .high
+        var allowCellular = true
     }
+
+    /// A dropped transfer is retried this many times (resuming where it stopped when it can).
+    static let maxRetries = 3
 
     /// Background session identifiers must be stable across launches and unique per account.
     public static func sessionIdentifier(serverID: String, userID: String) -> String {
@@ -94,9 +102,11 @@ public final class DownloadManager: NSObject, Sendable {
         }
     }
 
-    /// Restarts queued downloads that have no running task (e.g. after the app was killed).
+    /// Restarts queued downloads that have no running task (e.g. after the app was killed), and
+    /// gives failed ones another go.
     public func resumePending(quality: Quality, allowCellular: Bool) async {
         let running = Set(await session.allTasks.compactMap(\.taskDescription))
+        _ = try? await database.requeueFailedDownloads()
         let pending = (try? database.pendingDownloads().map(\.trackID)) ?? []
         enqueue(pending.filter { !running.contains($0) }, quality: quality, allowCellular: allowCellular)
     }
@@ -117,6 +127,10 @@ public final class DownloadManager: NSObject, Sendable {
     // MARK: - Internals
 
     private func enqueue(_ trackIDs: [String], quality: Quality, allowCellular: Bool) {
+        state.withLock {
+            $0.quality = quality
+            $0.allowCellular = allowCellular
+        }
         for trackID in trackIDs {
             guard let stream = library.streamRequest(trackID: trackID, maxBitrate: quality.maxBitrate) else { continue }
             var request = URLRequest(url: stream.url)
@@ -208,14 +222,17 @@ extension DownloadManager: URLSessionDownloadDelegate {
             try (destination as NSURL).setResourceValue(FileProtectionType.completeUntilFirstUserAuthentication, forKey: .fileProtectionKey)
             let bytes = (try? destination.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init) ?? 0
             state.withLock { _ = $0.lastProgressWrite.removeValue(forKey: trackID) }
-            Task {
-                try? await database.updateDownload(trackID: trackID) {
+            state.withLock { _ = $0.retries.removeValue(forKey: trackID) }
+            Task { [directory] in
+                let wanted = (try? await database.updateDownload(trackID: trackID) {
                     $0.state = .done
                     $0.fileName = name
                     $0.bytes = bytes
                     $0.progress = 1
                     $0.error = nil
-                }
+                }) ?? true
+                // Its collection was removed while this finished: don't leave the file behind.
+                if !wanted { try? FileManager.default.removeItem(at: directory.appending(path: name)) }
             }
         } catch {
             markFailed(trackID, error.localizedDescription)
@@ -226,11 +243,34 @@ extension DownloadManager: URLSessionDownloadDelegate {
         guard let error, let trackID = task.taskDescription else { return }
         if (error as? URLError)?.code == .cancelled { return }
         log.error("Download failed for \(trackID, privacy: .public): \(error.localizedDescription, privacy: .public)")
-        markFailed(trackID, error.localizedDescription)
+        let attempt = state.withLock { state -> Int in
+            let attempt = (state.retries[trackID] ?? 0) + 1
+            state.retries[trackID] = attempt
+            return attempt
+        }
+        guard attempt <= Self.maxRetries else {
+            markFailed(trackID, error.localizedDescription)
+            return
+        }
+        // Resume from where it stopped when the server allows it; otherwise start over.
+        let resumeData = (error as NSError).userInfo[NSURLSessionDownloadTaskResumeData] as? Data
+        Task {
+            try? await Task.sleep(for: .seconds(pow(2, Double(attempt))))
+            guard (try? database.pendingDownloads().contains { $0.trackID == trackID }) == true else { return }
+            if let resumeData {
+                let retry = self.session.downloadTask(withResumeData: resumeData)
+                retry.taskDescription = trackID
+                retry.resume()
+            } else {
+                let (quality, cellular) = state.withLock { ($0.quality, $0.allowCellular) }
+                enqueue([trackID], quality: quality, allowCellular: cellular)
+            }
+        }
     }
 
     public func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
-        let completion = BackgroundSessionEvents.take(identifier)
+        // If the app delegate hasn't handed over its handler yet, it's called on arrival instead.
+        let completion = BackgroundSessionEvents.finished(identifier)
         DispatchQueue.main.async { completion?() }
     }
 
@@ -247,13 +287,31 @@ extension DownloadManager: URLSessionDownloadDelegate {
 /// Holds the completion handler iOS passes to the app delegate when it relaunches the app to
 /// deliver background transfer events. The matching `DownloadManager` calls it when done.
 public enum BackgroundSessionEvents {
-    private static let handlers = OSAllocatedUnfairLock(initialState: [String: @Sendable () -> Void]())
-
-    public static func store(_ identifier: String, completion: @escaping @Sendable () -> Void) {
-        handlers.withLock { $0[identifier] = completion }
+    private struct Events {
+        var handlers: [String: @Sendable () -> Void] = [:]
+        /// Sessions whose events finished before the app delegate stored a handler. Sessions are
+        /// created at launch, so on a background relaunch their events can finish first.
+        var finishedEarly: Set<String> = []
     }
 
-    public static func take(_ identifier: String) -> (@Sendable () -> Void)? {
-        handlers.withLock { $0.removeValue(forKey: identifier) }
+    private static let events = OSAllocatedUnfairLock(initialState: Events())
+
+    public static func store(_ identifier: String, completion: @escaping @Sendable () -> Void) {
+        let alreadyFinished = events.withLock { events in
+            if events.finishedEarly.remove(identifier) != nil { return true }
+            events.handlers[identifier] = completion
+            return false
+        }
+        if alreadyFinished { DispatchQueue.main.async { completion() } }
+    }
+
+    /// The session's events are delivered: returns the stored handler to call, or records that
+    /// they finished so a handler stored later is called right away.
+    public static func finished(_ identifier: String) -> (@Sendable () -> Void)? {
+        events.withLock { events in
+            if let handler = events.handlers.removeValue(forKey: identifier) { return handler }
+            events.finishedEarly.insert(identifier)
+            return nil
+        }
     }
 }

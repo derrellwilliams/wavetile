@@ -96,9 +96,16 @@ targets:
         NSLocalNetworkUsageDescription: Wavetile connects to Jellyfin servers on your home network.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
-          # Podcast audio only: some publishers still serve episodes over plain HTTP. This
-          # exception covers AVFoundation media alone; feeds, search, downloads and the Jellyfin
-          # connection (which carries the token) still require HTTPS off the LAN.
+          # Tailscale MagicDNS names only resolve inside the user's tailnet, and WireGuard
+          # encrypts the traffic, so plain HTTP to them is allowed like the LAN.
+          NSExceptionDomains:
+            ts.net:
+              NSIncludesSubdomains: true
+              NSExceptionAllowsInsecureHTTPLoads: true
+          # For podcast audio: some publishers still serve episodes over plain HTTP. ATS can't
+          # scope this to podcasts, so it covers all AVFoundation media, Jellyfin streams included.
+          # The token stays off cleartext because AuthService refuses HTTP Jellyfin servers off
+          # the LAN at sign-in (and AppModel drops any such saved session).
           NSAllowsArbitraryLoadsInMedia: true
 
   WavetileWidgets:

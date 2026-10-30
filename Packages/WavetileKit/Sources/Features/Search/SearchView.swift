@@ -55,7 +55,7 @@ struct SearchView: View {
             .sheet(item: $actionsTrack, onDismiss: actions.presentPending) { track in
                 SongActionsSheet(
                     track: track,
-                    artwork: store.artwork(itemID: track.albumID, maxPixelWidth: 144),
+                    artwork: store.artwork(itemID: track.albumID, tag: track.albumImageTag, maxPixelWidth: 144),
                     menu: store.songMenu(for: track, source: "search") { play(track) }
                 )
             }
@@ -73,8 +73,8 @@ struct SearchView: View {
             // Debounce typing; FTS queries are fast but there's no need to run one per keystroke.
             try? await Task.sleep(for: .milliseconds(150))
             guard !Task.isCancelled else { return }
-            results = (try? store.database.search(text)) ?? .init()
-            podcastResults = podcasts.isEnabled ? ((try? podcasts.database.search(text)) ?? .init()) : .init()
+            results = (try? await store.database.search(text)) ?? .init()
+            podcastResults = podcasts.isEnabled ? ((try? await podcasts.database.search(text)) ?? .init()) : .init()
         }
         .task(id: "\(scope)|\(text)") { await searchApple() }
         .enableInjection()
@@ -214,7 +214,7 @@ struct SearchView: View {
                                     title: track.title,
                                     subtitle: "\(track.artistName) · \(track.albumTitle)",
                                     duration: track.durationMs.map { .milliseconds($0) },
-                                    leading: .artwork(store.artwork(itemID: track.albumID, maxPixelWidth: 144)),
+                                    leading: .artwork(store.artwork(itemID: track.albumID, tag: track.albumImageTag, maxPixelWidth: 144)),
                                     isPlaying: player.current?.trackID == track.id,
                                     isDownloaded: downloads.isDownloaded(track.id)
                                 )

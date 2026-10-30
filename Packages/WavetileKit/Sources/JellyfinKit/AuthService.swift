@@ -24,6 +24,8 @@ public struct AuthService: Sendable {
         case setupIncomplete
         case quickConnectDisabled
         case missingUser
+        /// Plain HTTP to a host outside the local network would send the password and token in cleartext.
+        case insecureTransport
     }
 
     public enum QuickConnectEvent: Sendable, Equatable {
@@ -47,6 +49,8 @@ public struct AuthService: Sendable {
 
     /// Confirms the address is a usable Jellyfin server and whether Quick Connect is on.
     public func validate(_ address: ServerAddress) async throws -> ServerInfo {
+        // Enforced here, not left to ATS: its local-networking and media exceptions can let HTTP through.
+        guard address.transportWarning != .insecureRemote else { throw AuthError.insecureTransport }
         let client = makeClient(for: address.url)
         let info: PublicSystemInfo
         do {

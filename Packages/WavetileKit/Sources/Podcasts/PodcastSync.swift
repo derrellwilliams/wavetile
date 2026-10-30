@@ -5,7 +5,7 @@ import Foundation
 ///
 /// Privacy: server admins (and any client signed in as the user) can read these preferences.
 /// Only feed URLs, opaque episode IDs and timestamps are stored: no titles, no history list.
-/// Private feeds (URLs carrying a token in the query or credentials) are never synced.
+/// Private feeds (see `isPrivate`) are never synced.
 public struct PodcastSyncState: Equatable, Sendable {
     public var enabled: Bool?
     public var enabledUpdated: Date?
@@ -41,10 +41,28 @@ public struct PodcastSyncState: Equatable, Sendable {
         self.played = played
     }
 
-    /// Feeds that look personal (a token in the query, or embedded credentials) stay on device.
+    /// Feeds that look personal stay on device: a token in the query, embedded credentials, a
+    /// members-only host or `/private/` path (Supercast, Patreon, Substack), or a token-like path
+    /// segment. Errs toward private: a public feed misjudged here only skips syncing.
     public static func isPrivate(_ url: URL) -> Bool {
         let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        return !(components?.queryItems ?? []).isEmpty || components?.user != nil || components?.password != nil
+        if !(components?.queryItems ?? []).isEmpty || components?.user != nil || components?.password != nil { return true }
+        let host = url.host()?.lowercased() ?? ""
+        if privateHosts.contains(where: { host == $0 || host.hasSuffix("." + $0) }) { return true }
+        return url.pathComponents.contains { segment in
+            segment.lowercased() == "private" || looksLikeToken(segment)
+        }
+    }
+
+    static let privateHosts = ["supercast.com", "patreon.com", "memberful.com", "supportingcast.fm", "glow.fm"]
+
+    /// 20+ characters of letters and digits mixed (with `-` or `_`), like an access key. UUIDs
+    /// are left out: hosts such as Omny put public show IDs in the path that way.
+    static func looksLikeToken(_ segment: String) -> Bool {
+        let name = segment.split(separator: ".").first.map(String.init) ?? segment
+        guard name.count >= 20, name.wholeMatch(of: /[A-Za-z0-9_-]+/) != nil,
+              name.contains(where: \.isLetter), name.contains(where: \.isNumber) else { return false }
+        return name.wholeMatch(of: /[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}/) == nil
     }
 
     // MARK: CustomPrefs encoding

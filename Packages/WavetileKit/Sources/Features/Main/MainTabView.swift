@@ -12,7 +12,7 @@ struct MainTabView: View {
     @State private var home: HomeModel
     @State private var searchText = ""
     @State private var showNowPlaying = false
-    @State private var connectivity = Connectivity()
+    @State private var connectivity = Connectivity.shared
     @State private var actions = LibraryActions()
     @State private var homePath = NavigationPath()
     @State private var widgets: WidgetBridge

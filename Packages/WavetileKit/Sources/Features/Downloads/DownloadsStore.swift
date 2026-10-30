@@ -11,6 +11,9 @@ import WidgetShared
 /// Online/offline state. Screens dim music that isn't downloaded while offline.
 @Observable
 final class Connectivity {
+    /// One monitor for the app, started at launch so Siri and CarPlay see the real state at once.
+    static let shared = Connectivity()
+
     private(set) var isOnline = true
     @ObservationIgnored private let monitor = NWPathMonitor()
 
@@ -126,6 +129,10 @@ final class DownloadsStore {
         let initial = DownloadActivityAttributes.ContentState(done: status.done, total: status.total, progress: status.progress)
         guard let activity = try? Activity.request(attributes: attributes, content: .init(state: initial, staleDate: nil)) else { return }
 
+        // Progress writes land many times a second; ActivityKit throttles updates and each one
+        // costs battery, so send one when a track finishes or every 2 s otherwise.
+        var lastDone = status.done
+        var lastUpdate = ContinuousClock.now
         do {
             for try await status in library.observe(database.downloadStatus(collectionID: record.id)) {
                 let state = DownloadActivityAttributes.ContentState(done: status.done, total: status.total, progress: status.progress)
@@ -134,6 +141,9 @@ final class DownloadsStore {
                     await activity.end(.init(state: state, staleDate: nil), dismissalPolicy: .after(.now + 60))
                     return
                 }
+                guard status.done != lastDone || ContinuousClock.now - lastUpdate >= .seconds(2) else { continue }
+                lastDone = status.done
+                lastUpdate = .now
                 await activity.update(.init(state: state, staleDate: nil))
             }
         } catch {

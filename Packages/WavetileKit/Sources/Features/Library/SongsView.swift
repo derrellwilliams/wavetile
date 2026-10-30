@@ -12,9 +12,8 @@ struct SongsView: View {
     @Environment(LibraryActions.self) private var actions
     @Environment(AudioPlayer.self) private var player
     @Environment(DownloadsStore.self) private var downloads
-    @State private var tracks: [TrackRecord] = []
-    /// Row index by track ID, rebuilt only when the list changes (not on every render).
-    @State private var indexByID: [String: Int] = [:]
+    /// Every song plus its row index by ID, built off the main actor when the list changes.
+    @State private var list = TrackList()
     @Environment(Connectivity.self) private var connectivity
     /// The song whose ⋯ actions sheet is showing.
     @State private var actionsTrack: TrackRecord?
@@ -25,13 +24,14 @@ struct SongsView: View {
                 PlayableRow(
                     trackID: track.id, index: indexByID[track.id] ?? 0,
                     tracks: { tracks.map(QueuedTrack.init) },
+                    track: { QueuedTrack(track) },
                     menu: menu(for: track)
                 ) {
                     TrackRow(
                         title: track.title,
                         subtitle: track.artistName,
                         duration: track.durationMs.map { .milliseconds($0) },
-                        leading: .artwork(store.artwork(itemID: track.albumID, maxPixelWidth: 144)),
+                        leading: .artwork(store.artwork(itemID: track.albumID, tag: track.albumImageTag, maxPixelWidth: 144)),
                         isPlaying: player.current?.trackID == track.id,
                         isDownloaded: downloads.isDownloaded(track.id)
                     )
@@ -49,18 +49,18 @@ struct SongsView: View {
         .themedBackground()
         .navigationTitle("Songs")
         .sheet(item: $actionsTrack, onDismiss: actions.presentPending) { track in
-            SongActionsSheet(track: track, artwork: store.artwork(itemID: track.albumID, maxPixelWidth: 144), menu: menu(for: track))
+            SongActionsSheet(track: track, artwork: store.artwork(itemID: track.albumID, tag: track.albumImageTag, maxPixelWidth: 144), menu: menu(for: track))
         }
         .task {
             do {
-                for try await value in store.observe(store.database.allTracks()) {
-                    tracks = value
-                    indexByID = Dictionary(value.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { first, _ in first })
-                }
+                for try await value in store.observe(store.database.allTracks()) { list = value }
             } catch { Log.observationFailed(error) }
         }
         .enableInjection()
     }
+
+    private var tracks: [TrackRecord] { list.tracks }
+    private var indexByID: [String: Int] { list.indexByID }
 
     private func menu(for track: TrackRecord) -> SongMenu {
         store.songMenu(for: track, source: "songs") {

@@ -19,7 +19,7 @@ import Podcasts
 public final class CarPlayController {
     private let interface: CPInterfaceController
     private let app: AppModel
-    private let connectivity = Connectivity()
+    private let connectivity = Connectivity.shared
     /// Long lists are cut off here; CarPlay limits list length while driving anyway.
     private let listLimit = 200
 
@@ -83,11 +83,27 @@ public final class CarPlayController {
         }
     }
 
+    /// What each list showed last, so a write that doesn't change it (a podcast progress save
+    /// every few seconds, an unchanged sync page) doesn't rebuild items and reload artwork.
+    private var shown: [String: [String]] = [:]
+
     private func refreshLists() {
         guard isConnected, let signedIn else { return }
-        home?.updateSections(homeSections(signedIn))
-        playlists?.updateSections(playlistSections(signedIn))
-        podcasts?.updateSections(podcastSections(signedIn))
+        if let home, changed("home", homeContent(signedIn).flatMap { $0.map(\.id) + ["|"] }) {
+            home.updateSections(homeSections(signedIn))
+        }
+        if let playlists, changed("playlists", playlistContent(signedIn).map { "\($0.id) \($0.name) \($0.trackCount) \($0.imageTag ?? "")" }) {
+            playlists.updateSections(playlistSections(signedIn))
+        }
+        if let podcasts, changed("podcasts", podcastContent(signedIn).map(\.id)) {
+            podcasts.updateSections(podcastSections(signedIn))
+        }
+    }
+
+    private func changed(_ list: String, _ content: [String]) -> Bool {
+        guard shown[list] != content else { return false }
+        shown[list] = content
+        return true
     }
 
     private var signedIn: AppModel.SignedIn? {
@@ -99,6 +115,7 @@ public final class CarPlayController {
         home = nil
         playlists = nil
         podcasts = nil
+        shown = [:]
         guard let signedIn else {
             let template = CPListTemplate(title: "Wavetile", sections: [])
             template.emptyViewTitleVariants = ["Sign in on your iPhone"]
@@ -121,10 +138,14 @@ public final class CarPlayController {
         return template
     }
 
-    private func homeSections(_ signedIn: AppModel.SignedIn) -> [CPListSection] {
+    private func homeContent(_ signedIn: AppModel.SignedIn) -> [[AlbumRecord]] {
         let database = signedIn.library.database
-        let recent = (try? database.recentlyPlayedAlbums(limit: 24)) ?? []
-        let most = (try? database.mostPlayedAlbums(limit: 24)) ?? []
+        return [(try? database.recentlyPlayedAlbums(limit: 24)) ?? [], (try? database.mostPlayedAlbums(limit: 24)) ?? []]
+    }
+
+    private func homeSections(_ signedIn: AppModel.SignedIn) -> [CPListSection] {
+        let content = homeContent(signedIn)
+        let recent = content[0], most = content[1]
         return [
             CPListSection(items: recent.map { albumItem($0, signedIn) }, header: "Recently Played", sectionIndexTitle: nil),
             CPListSection(items: most.map { albumItem($0, signedIn) }, header: "Most Played", sectionIndexTitle: nil),
@@ -140,9 +161,12 @@ public final class CarPlayController {
         return template
     }
 
+    private func playlistContent(_ signedIn: AppModel.SignedIn) -> [PlaylistRecord] {
+        Array(((try? signedIn.library.database.playlistList()) ?? []).prefix(listLimit))
+    }
+
     private func playlistSections(_ signedIn: AppModel.SignedIn) -> [CPListSection] {
-        let playlists = (try? signedIn.library.database.playlistList()) ?? []
-        let items = playlists.prefix(listLimit).map { playlist in
+        let items = playlistContent(signedIn).map { playlist in
             let item = CPListItem(text: playlist.name, detailText: "\(playlist.trackCount) songs")
             loadImage(item, itemID: playlist.id, tag: playlist.imageTag, signedIn)
             item.handler = { [weak self] _, completion in
@@ -151,7 +175,7 @@ public final class CarPlayController {
             }
             return item
         }
-        return [CPListSection(items: Array(items))]
+        return [CPListSection(items: items)]
     }
 
     private func libraryTab(_ signedIn: AppModel.SignedIn) -> CPListTemplate {
@@ -186,8 +210,12 @@ public final class CarPlayController {
         return template
     }
 
+    private func podcastContent(_ signedIn: AppModel.SignedIn) -> [EpisodeItem] {
+        (try? signedIn.podcasts.database.upNextShelfNow()) ?? []
+    }
+
     private func podcastSections(_ signedIn: AppModel.SignedIn) -> [CPListSection] {
-        let episodes = (try? signedIn.podcasts.database.upNextShelfNow()) ?? []
+        let episodes = podcastContent(signedIn)
         let items = episodes.map { episode in
             let item = CPListItem(text: episode.episode.title, detailText: episode.show.title)
             if let url = episode.artworkURL { loadImage(item, url: url) }
@@ -258,11 +286,7 @@ public final class CarPlayController {
     private func play(_ tracks: [TrackRecord], startAt index: Int = 0, shuffled: Bool = false, _ signedIn: AppModel.SignedIn) {
         let queue = tracks.map(QueuedTrack.init)
         guard !queue.isEmpty else { return }
-        if shuffled {
-            signedIn.player.play(queue, shuffled: true)
-        } else {
-            signedIn.player.play(queue, startAt: index, online: connectivity.isOnline, downloads: signedIn.downloads)
-        }
+        signedIn.player.play(queue, startAt: index, shuffled: shuffled, online: connectivity.isOnline, downloads: signedIn.downloads)
         showNowPlaying()
     }
 

@@ -19,11 +19,17 @@ public struct ClientIdentity: Sendable, Equatable {
     public static func load(deviceName: String, keychain: Keychain = Keychain()) -> ClientIdentity {
         let account = "device-id"
         let deviceID: String
-        if let existing = try? keychain.string(for: account) {
-            deviceID = existing
-        } else {
+        do {
+            if let existing = try keychain.string(for: account) {
+                deviceID = existing
+            } else {
+                deviceID = UUID().uuidString
+                try? keychain.set(deviceID, for: account)
+            }
+        } catch {
+            // The Keychain couldn't be read (e.g. before first unlock after a reboot), which
+            // isn't the same as no ID saved: use one for this launch only, and keep the real one.
             deviceID = UUID().uuidString
-            try? keychain.set(deviceID, for: account)
         }
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1"
         return ClientIdentity(clientName: "Wavetile", version: version, deviceName: deviceName, deviceID: deviceID)

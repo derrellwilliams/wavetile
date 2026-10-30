@@ -181,6 +181,28 @@ public enum PodcastNetwork {
         }
     }
 
+    /// Reads a response body, refused up front when the host states a size over `maxBytes` and
+    /// cut off at the cap when it doesn't, so a hostile host can never fill memory.
+    /// Appends in 64 KB chunks: per-byte `Data.append` costs millions of calls on a big feed.
+    static func read(_ bytes: URLSession.AsyncBytes, _ response: URLResponse, maxBytes: Int) async throws -> Data {
+        guard response.expectedContentLength <= maxBytes else { throw FeedError.tooLarge }
+        var data = Data()
+        if response.expectedContentLength > 0 { data.reserveCapacity(Int(response.expectedContentLength)) }
+        var chunk: [UInt8] = []
+        chunk.reserveCapacity(65_536)
+        for try await byte in bytes {
+            chunk.append(byte)
+            if chunk.count == 65_536 {
+                data.append(contentsOf: chunk)
+                chunk.removeAll(keepingCapacity: true)
+                guard data.count <= maxBytes else { throw FeedError.tooLarge }
+            }
+        }
+        data.append(contentsOf: chunk)
+        guard data.count <= maxBytes else { throw FeedError.tooLarge }
+        return data
+    }
+
     /// Feeds must be fetched over HTTPS (App Transport Security). `http://` links are upgraded.
     public static func secure(_ url: URL) -> URL? {
         guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }

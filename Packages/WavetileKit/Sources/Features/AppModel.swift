@@ -43,17 +43,29 @@ public final class AppModel {
         let savedTheme = UserDefaults.standard.string(forKey: "themeID")
         self.theme = Theme.all.first { $0.id == savedTheme } ?? .dark
         Self.current = self
+        _ = Connectivity.shared
+        // Once per launch, here rather than in a view's init (which re-runs on every app body
+        // update), and before CarPlay, which can launch the app with no phone window at all.
+        BrandFont.register()
+        ImageCaching.configure()
+        BrandFont.applyNavigationBarAppearance()
     }
 
     /// Restores the saved session from the Keychain. Synchronous so the first frame is already correct.
     public func restore() {
         guard case .launching = phase else { return }
-        if let (session, token) = store.load(), let signedIn = try? makeSignedIn(session, token: token) {
+        if let (session, token) = store.load(), Self.isTransportAllowed(session.serverURL),
+           let signedIn = try? makeSignedIn(session, token: token) {
             phase = .signedIn(signedIn)
         } else {
             // No saved session, or no usable library storage (signing in again reports why).
             phase = .signedOut
         }
+    }
+
+    /// Sessions saved before remote HTTP was refused at sign-in must not keep sending the token in cleartext.
+    private static func isTransportAllowed(_ url: URL) -> Bool {
+        (try? ServerAddress(url.absoluteString))?.transportWarning != .insecureRemote
     }
 
     public func didSignIn(_ session: ServerSession, token: String) throws {
@@ -85,12 +97,17 @@ public final class AppModel {
             podcasts?.episodeProgress(track, position: position, duration: duration)
         }
         library.afterSync = { [weak downloads] in await downloads?.syncPlaylists() }
+        player.onUnreportedPlay = { [weak library] trackID, date in
+            Task { try? await library?.database.queuePlay(trackID: trackID, at: date) }
+        }
         return SignedIn(session: session, library: library, player: player, downloads: downloads, podcasts: podcasts)
     }
 
     public func signOut() async {
+        // Revoke the token on the server in the background: offline, waiting for it would hang
+        // sign-out for a request timeout. Local data goes right away either way.
         if let (session, token) = store.load() {
-            await auth.signOut(session, token: token)
+            Task.detached { [auth] in await auth.signOut(session, token: token) }
         }
         if case let .signedIn(signedIn) = phase {
             signedIn.player.stop()

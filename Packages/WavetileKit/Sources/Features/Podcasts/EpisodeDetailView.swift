@@ -75,8 +75,8 @@ struct EpisodeDetailView: View {
         }
         // Fetched from the podcast host when the page opens; the section only appears once it loads.
         .task(id: item?.episode.transcriptURL) {
-            guard let episode = item?.episode, let url = episode.transcriptURL else { return }
-            let loaded = (try? await Transcript.load(url: url, type: episode.transcriptType)) ?? []
+            guard let episode = item?.episode, episode.transcriptURL != nil else { return }
+            let loaded = await podcasts.transcript(for: episode)
             guard !Task.isCancelled else { return }
             withAnimation(theme.motion.smooth) { transcript = loaded }
         }
@@ -181,14 +181,7 @@ struct EpisodeDetailView: View {
                             .foregroundStyle(theme.palette.textPrimary)
                             .accessibilityAddTraits(.isHeader)
                             .padding(.bottom, theme.spacing.sm)
-                        // Highlights the chapter playing now when this episode is the one playing.
-                        let current = player.current?.trackID == item.id ? chapters.current(at: player.currentTime) : nil
-                        ForEach(chapters) { chapter in
-                            ChapterRow(chapter: chapter, isCurrent: chapter == current, verticalPadding: theme.spacing.md) {
-                                podcasts.play(item, from: chapter.start)
-                            }
-                            Divider().overlay(theme.palette.separator)
-                        }
+                        EpisodeChapterList(chapters: chapters, episodeID: item.id) { podcasts.play(item, from: $0.start) }
                     }
                 }
 
@@ -346,5 +339,23 @@ private struct TranscriptSheet: View {
         return seconds >= 3600
             ? duration.formatted(.time(pattern: .hourMinuteSecond))
             : duration.formatted(.time(pattern: .minuteSecond))
+    }
+}
+
+/// An episode's chapters, highlighting the one playing now when this episode is playing. Its own
+/// view so the clock redraws only this list, not the whole episode page.
+private struct EpisodeChapterList: View {
+    @Environment(\.theme) private var theme
+    @Environment(AudioPlayer.self) private var player
+    let chapters: [Chapter]
+    let episodeID: String
+    let play: (Chapter) -> Void
+
+    var body: some View {
+        let current = player.current?.trackID == episodeID ? chapters.current(at: player.currentTime) : nil
+        ForEach(chapters) { chapter in
+            ChapterRow(chapter: chapter, isCurrent: chapter == current, verticalPadding: theme.spacing.md) { play(chapter) }
+            Divider().overlay(theme.palette.separator)
+        }
     }
 }

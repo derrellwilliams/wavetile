@@ -166,7 +166,7 @@ public struct LibraryClient: Sendable {
     }
 
     private func playedTracks(sortBy: ItemSortBy, limit: Int) async throws -> [BaseItemDto] {
-        let params = Paths.GetItemsParameters(
+        var params = Paths.GetItemsParameters(
             userID: session.userID,
             limit: limit,
             isRecursive: true,
@@ -175,6 +175,11 @@ public struct LibraryClient: Sendable {
             filters: [.isPlayed],
             sortBy: [sortBy]
         )
+        // Hundreds of rows only to work out albums: no optional fields, and only the primary
+        // image info (the album's tag comes with the base item).
+        params.fields = []
+        params.enableImageTypes = [.primary]
+        params.imageTypeLimit = 1
         return try await client.send(Paths.getItems(parameters: params)).value.items ?? []
     }
 

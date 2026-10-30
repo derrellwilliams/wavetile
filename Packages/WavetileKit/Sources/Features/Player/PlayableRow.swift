@@ -12,6 +12,7 @@ extension QueuedTrack {
             artist: record.artistName,
             albumTitle: record.albumTitle,
             albumID: record.albumID,
+            albumImageTag: record.albumImageTag,
             duration: record.durationMs.map { .milliseconds($0) },
             normalizationGain: record.normalizationGain
         )
@@ -47,6 +48,8 @@ struct PlayableRow<Label: View>: View {
     let trackID: String
     let index: Int
     let tracks: () -> [QueuedTrack]
+    /// This row's track alone, for Play Next / Add to Queue, so they don't build the whole list.
+    var track: (() -> QueuedTrack?)?
     var onTap: (() -> Void)?
     /// Adds Play / Go to Album / Go to Artist to the long press, matching the ⋯ sheet.
     var menu: SongMenu?
@@ -77,6 +80,10 @@ struct PlayableRow<Label: View>: View {
         .sensoryFeedback(.selection, trigger: taps)
     }
 
+    private func thisTrack() -> QueuedTrack? {
+        track?() ?? tracks()[safe: index]
+    }
+
     @ViewBuilder private var menuItems: some View {
         if let menu {
             Button("Play", glyph: .play, action: menu.play)
@@ -85,10 +92,10 @@ struct PlayableRow<Label: View>: View {
             Divider()
         }
         Button("Play Next", glyph: .playNext) {
-            if let track = tracks()[safe: index] { player.playNext([track.requeued()]) }
+            if let track = thisTrack() { player.playNext([track.requeued()]) }
         }
         Button("Add to Queue", glyph: .queue) {
-            if let track = tracks()[safe: index] { player.addToQueue([track.requeued()]) }
+            if let track = thisTrack() { player.addToQueue([track.requeued()]) }
         }
         Button("Start Radio", glyph: .radio) { actions.startRadio(from: trackID, store: store, player: player) }
         Divider()
@@ -123,7 +130,7 @@ extension Array {
 extension AudioPlayer {
     /// Plays `queue` from `index`. Offline, queues only what's on the device so playback
     /// doesn't hit dead tracks.
-    func play(_ queue: [QueuedTrack], startAt index: Int, online: Bool, downloads: DownloadsStore) {
+    func play(_ queue: [QueuedTrack], startAt index: Int = 0, shuffled: Bool = false, online: Bool, downloads: DownloadsStore) {
         var queue = queue
         var start = index
         if !online {
@@ -131,6 +138,6 @@ extension AudioPlayer {
             queue = queue.filter { downloads.isDownloaded($0.trackID) }
             start = queue.firstIndex { $0.queueID == tapped } ?? 0
         }
-        play(queue, startAt: start)
+        play(queue, startAt: start, shuffled: shuffled)
     }
 }

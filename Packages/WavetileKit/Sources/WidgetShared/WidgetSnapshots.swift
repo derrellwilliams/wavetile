@@ -34,6 +34,12 @@ public struct NowPlayingSnapshot: Codable, Sendable, Equatable {
         self.artworkFile = artworkFile
         self.updatedAt = updatedAt
     }
+
+    /// Equal when the widget would look the same; the timestamp alone isn't a change worth a reload.
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.title == rhs.title && lhs.artist == rhs.artist && lhs.album == rhs.album && lhs.albumID == rhs.albumID
+            && lhs.isPlaying == rhs.isPlaying && lhs.artworkFile == rhs.artworkFile
+    }
 }
 
 public struct RecentAlbumSnapshot: Codable, Sendable, Equatable, Identifiable {

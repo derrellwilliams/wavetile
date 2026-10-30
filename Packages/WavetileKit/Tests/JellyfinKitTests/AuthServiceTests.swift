@@ -62,6 +62,14 @@ struct AuthServiceTests {
         }
     }
 
+    @Test func validateRefusesRemoteHTTP() async throws {
+        MockURLProtocol.reset(["/System/Info/Public": (200, systemInfo)])
+        await #expect(throws: AuthService.AuthError.insecureTransport) {
+            try await service.validate(try ServerAddress("http://music.example.com:8096"))
+        }
+        #expect(MockURLProtocol.requests.isEmpty)
+    }
+
     @Test func quickConnectYieldsCodeThenSession() async throws {
         MockURLProtocol.reset([
             "/System/Info/Public": (200, systemInfo),

@@ -21,6 +21,8 @@ final class PodcastsStore {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let keyPrefix: String
     @ObservationIgnored private var pushTask: Task<Void, Never>?
+    @ObservationIgnored private var isSyncing = false
+    @ObservationIgnored private var syncAgain = false
     @ObservationIgnored private let log = Logger(subsystem: "com.derrellwilliams.wavetile", category: "podcasts")
     @ObservationIgnored private var cachedLaunchUpNext: [EpisodeItem]?
 
@@ -120,6 +122,11 @@ final class PodcastsStore {
     /// Live stream of a query's results; ends when the observing task is cancelled.
     func observe<T: Sendable>(_ observation: ValueObservation<ValueReducers.Fetch<T>>) -> AsyncValueObservation<T> {
         observation.values(in: database.pool)
+    }
+
+    /// Skips results equal to the last one (a progress save that doesn't change this list).
+    func observe<T: Sendable & Equatable>(_ observation: ValueObservation<ValueReducers.Fetch<T>>) -> AsyncValueObservation<T> {
+        observation.removeDuplicates().values(in: database.pool)
     }
 
     /// Long-running: download badges, storage, resumed downloads, sync and a refresh when stale.
@@ -256,7 +263,13 @@ final class PodcastsStore {
                item.download != nil, self.player.current?.trackID != id {
                 try await self.downloads?.remove(episodeID: id)
             }
-            self.schedulePush()
+            // The 5 s ticks while playing only need to reach the server now and then; a pause,
+            // stop or finish goes out soon after.
+            if finished || !self.player.isPlaying {
+                self.schedulePush()
+            } else {
+                self.schedulePush(after: .seconds(120), restart: false)
+            }
         }
     }
 
@@ -380,9 +393,25 @@ final class PodcastsStore {
 
     @ObservationIgnored private var chapterLoads: [String: Task<[Chapter], Never>] = [:]
 
+    @ObservationIgnored private var transcriptLoads: [String: Task<[TranscriptParagraph], Never>] = [:]
+
     /// An episode's chapters (feed JSON, embedded in the audio, or timestamps in the show
     /// notes), loaded once per launch. The load is stored before its first `await`, so the
     /// episode page and the player asking at the same moment share one fetch, not two.
+    /// An episode's transcript, fetched once per launch: reopening the page doesn't download
+    /// and parse it (up to 5 MB) again.
+    func transcript(for episode: EpisodeRecord) async -> [TranscriptParagraph] {
+        guard let url = episode.transcriptURL else { return [] }
+        if let load = transcriptLoads[episode.id] { return await load.value }
+        let type = episode.transcriptType
+        let load = Task { (try? await Transcript.load(url: url, type: type)) ?? [] }
+        transcriptLoads[episode.id] = load
+        let paragraphs = await load.value
+        // A failed fetch can be tried again next time the page opens.
+        if paragraphs.isEmpty { transcriptLoads[episode.id] = nil }
+        return paragraphs
+    }
+
     func chapters(for episode: EpisodeRecord) async -> [Chapter] {
         if let load = chapterLoads[episode.id] { return await load.value }
         let audioURL = localFile(episodeID: episode.id) ?? episode.audioURL
@@ -460,24 +489,29 @@ final class PodcastsStore {
         schedulePush()
     }
 
-    private func schedulePush() {
+    /// Debounces a sync. With `restart: false`, an already-pending push is left to fire on time
+    /// (a throttle), so steady progress ticks can't keep postponing it.
+    private func schedulePush(after delay: Duration = .seconds(5), restart: Bool = true) {
         guard syncWithJellyfin else { return }
+        if pushTask != nil, !restart { return }
         pushTask?.cancel()
         pushTask = Task {
-            try? await Task.sleep(for: .seconds(5))
+            try? await Task.sleep(for: delay)
             guard !Task.isCancelled else { return }
+            // From here on a new schedulePush starts a fresh timer instead of cancelling this sync.
+            pushTask = nil
             await sync()
         }
     }
 
-    private func localSyncState() -> PodcastSyncState {
+    private func localSyncState() async -> PodcastSyncState {
         func date(_ name: String) -> Date? { (defaults.object(forKey: key(name)) as? Double).map(Date.init(timeIntervalSince1970:)) }
         var state = PodcastSyncState(
             enabled: isEnabled, enabledUpdated: date("enabledUpdated"),
             subscriptions: ((try? database.followedShowsNow()) ?? []).map(\.feedURL),
             subscriptionsUpdated: date("subsUpdated")
         )
-        for episode in (try? database.listeningState()) ?? [] {
+        for episode in (try? await database.listeningState()) ?? [] {
             if let played = episode.playedAt {
                 state.played[episode.id] = played
             } else if episode.position > 0 {
@@ -490,9 +524,16 @@ final class PodcastsStore {
     /// Pulls the server's copy, applies anything newer here, and pushes the merged result.
     func sync() async {
         guard syncWithJellyfin else { return }
+        // One sync at a time; a request during one runs once more after it.
+        guard !isSyncing else { syncAgain = true; return }
+        isSyncing = true
+        defer {
+            isSyncing = false
+            if syncAgain { syncAgain = false; schedulePush() }
+        }
         do {
             let remote = PodcastSyncState(customPrefs: try await library.customPreferences(id: PodcastSyncState.preferencesID))
-            let local = localSyncState()
+            let local = await localSyncState()
             let merged = local.merged(withRemote: remote)
             try await apply(merged, over: local)
             let pushed = merged.customPrefs

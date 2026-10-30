@@ -9,7 +9,7 @@ public struct TranscriptParagraph: Hashable, Sendable, Identifiable {
 }
 
 /// Podcasting 2.0 transcripts (`podcast:transcript`): WebVTT, SRT, JSON, HTML or plain text,
-/// turned into readable paragraphs. Fetched on demand when an episode page opens.
+/// turned into readable paragraphs. Fetched when an episode page opens, once per episode per launch.
 public enum Transcript {
     /// Larger than any real transcript; a guard against hostile hosts.
     static let maxBytes = 5_000_000
@@ -18,14 +18,7 @@ public enum Transcript {
         guard let secure = PodcastNetwork.secure(url) else { throw FeedError.insecure }
         let (bytes, response) = try await PodcastNetwork.session.bytes(from: secure)
         try PodcastNetwork.check(response)
-        // Refused up front when the host states a size, and cut off at the cap when it doesn't,
-        // so an oversized file is never held in memory.
-        guard response.expectedContentLength <= maxBytes else { throw FeedError.tooLarge }
-        var data = Data()
-        for try await byte in bytes {
-            data.append(byte)
-            guard data.count <= maxBytes else { throw FeedError.tooLarge }
-        }
+        let data = try await PodcastNetwork.read(bytes, response, maxBytes: maxBytes)
         return parse(String(decoding: data, as: UTF8.self), type: type ?? "")
     }
 
@@ -92,18 +85,24 @@ public enum Transcript {
     static func paragraphs(from cues: [Cue]) -> [TranscriptParagraph] {
         var result: [TranscriptParagraph] = []
         var current: Cue?
+        // Tracked alongside: `String.count` walks the whole string, once per cue otherwise.
+        var length = 0
         for cue in cues {
             if var open = current {
                 let newSpeaker = cue.speaker != nil && cue.speaker != open.speaker
-                let ended = open.text.count > 320 && open.text.last.map { ".?!".contains($0) } == true
-                if !newSpeaker, !ended {
+                let ended = length > 320 && open.text.last.map { ".?!".contains($0) } == true
+                // Auto-generated captions often have no punctuation or speakers; break anyway
+                // rather than make the whole episode one paragraph.
+                if !newSpeaker, !ended, length < 1000 {
                     open.text += " " + cue.text
+                    length += 1 + cue.text.count
                     current = open
                     continue
                 }
                 result.append(TranscriptParagraph(id: result.count, start: open.start, speaker: open.speaker, text: open.text))
             }
             current = cue
+            length = cue.text.count
         }
         if let open = current {
             result.append(TranscriptParagraph(id: result.count, start: open.start, speaker: open.speaker, text: open.text))

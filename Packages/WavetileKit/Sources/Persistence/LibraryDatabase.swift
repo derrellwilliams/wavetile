@@ -175,6 +175,24 @@ public final class LibraryDatabase: Sendable {
             // Filled in by the next sync, which re-reads every track.
             try db.alter(table: "track") { t in t.add(column: "normalizationGain", .double) }
         }
+        migrator.registerMigration("v6-favorite-indexes") { db in
+            // Favorites lists filter on isFavorite; partial indexes hold only the favorites, in list order.
+            try db.create(index: "track_favorite", on: "track", columns: ["sortTitle"], condition: Column("isFavorite") == true)
+            try db.create(index: "album_favorite", on: "album", columns: ["sortTitle"], condition: Column("isFavorite") == true)
+            try db.create(index: "artist_favorite", on: "artist", columns: ["sortName"], condition: Column("isFavorite") == true)
+        }
+        migrator.registerMigration("v7-track-album-image-tag") { db in
+            // Filled in by the next sync, which sees every track as changed.
+            try db.alter(table: "track") { t in t.add(column: "albumImageTag", .text) }
+        }
+        migrator.registerMigration("v8-pending-plays") { db in
+            // Plays the server hasn't heard about yet (listened offline).
+            try db.create(table: "pendingPlay") { t in
+                t.autoIncrementedPrimaryKey("id")
+                t.column("trackID", .text).notNull()
+                t.column("playedAt", .datetime).notNull()
+            }
+        }
         return migrator
     }
 }

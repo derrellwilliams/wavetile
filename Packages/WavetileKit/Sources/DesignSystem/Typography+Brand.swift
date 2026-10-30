@@ -49,7 +49,14 @@ public enum BrandFont {
         return UIFontMetrics(forTextStyle: style).scaledFont(for: base)
     }
 
-    /// Navigation bar titles can't be styled from SwiftUI, so use the appearance proxy.
+    /// Navigation bar titles can't be styled from SwiftUI, so use the appearance proxy. The
+    /// proxy is set once, so the color resolves per bar from its interface style (which follows
+    /// the selected theme), and switching Dark/Light in Settings recolors titles at once.
+    public static func applyNavigationBarAppearance() {
+        let dark = UIColor(Theme.dark.palette.textPrimary), light = UIColor(Theme.light.palette.textPrimary)
+        applyNavigationBarAppearance(textColor: UIColor { $0.userInterfaceStyle == .light ? light : dark })
+    }
+
     public static func applyNavigationBarAppearance(textColor: UIColor) {
         let bar = UINavigationBar.appearance()
         // Negative kerning on large titles (size-specific tracking); a lighter touch on inline titles.

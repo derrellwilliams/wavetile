@@ -137,7 +137,7 @@ struct PlaylistDetailView: View {
                                 title: track.title,
                                 subtitle: track.artistName,
                                 duration: track.durationMs.map { .milliseconds($0) },
-                                leading: .artwork(store.artwork(itemID: track.albumID, maxPixelWidth: 144)),
+                                leading: .artwork(store.artwork(itemID: track.albumID, tag: track.albumImageTag, maxPixelWidth: 144)),
                                 isPlaying: player.current?.trackID == track.id,
                                 isDownloaded: downloads.isDownloaded(track.id)
                             )
@@ -247,7 +247,7 @@ private struct PlaylistEditor: View {
                     TrackRow(
                         title: item.track.title,
                         subtitle: item.track.artistName,
-                        leading: .artwork(store.artwork(itemID: item.track.albumID, maxPixelWidth: 144))
+                        leading: .artwork(store.artwork(itemID: item.track.albumID, tag: item.track.albumImageTag, maxPixelWidth: 144))
                     )
                     .listRowBackground(Color.clear)
                 }

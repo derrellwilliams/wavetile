@@ -58,7 +58,11 @@ public extension AppModel {
         case .playlist: (try? database.tracks(playlistID: item.id)) ?? []
         }
         guard !tracks.isEmpty else { return false }
-        signedIn.player.play(tracks.map(QueuedTrack.init), shuffled: item.kind == .artist)
+        let queue = tracks.map(QueuedTrack.init)
+        let online = Connectivity.shared.isOnline
+        // Offline, only downloaded songs can play.
+        guard online || queue.contains(where: { signedIn.downloads.isDownloaded($0.trackID) }) else { return false }
+        signedIn.player.play(queue, shuffled: item.kind == .artist, online: online, downloads: signedIn.downloads)
         return true
     }
 

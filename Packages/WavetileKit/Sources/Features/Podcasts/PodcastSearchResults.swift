@@ -61,7 +61,7 @@ struct PodcastSearchResults: View {
         .overlay { emptyState }
         .sheet(isPresented: $showAddFeed) { AddFeedSheet() }
         .task(id: trimmed) {
-            local = (try? podcasts.database.search(trimmed)) ?? .init()
+            local = (try? await podcasts.database.search(trimmed)) ?? .init()
             directory = []
             directoryError = nil
             guard trimmed.count >= 2, pastedFeed == nil else { return }

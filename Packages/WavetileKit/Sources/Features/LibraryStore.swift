@@ -45,6 +45,8 @@ final class LibraryStore {
             isSyncing = false
             progress = nil
         }
+        // Send plays from offline listening first, so the sync pulls counts that include them.
+        await reportPendingPlays()
         do {
             try await sync.run { [weak self] progress in
                 Task { @MainActor in self?.progress = progress }
@@ -57,9 +59,25 @@ final class LibraryStore {
         }
     }
 
+    /// Sends plays recorded offline, oldest first; stops at the first failure (still offline)
+    /// and tries again on the next sync.
+    func reportPendingPlays() async {
+        guard let plays = try? await database.pendingPlays() else { return }
+        for play in plays {
+            guard let id = play.id, await api.markPlayed(trackID: play.trackID, at: play.playedAt) else { return }
+            try? await database.removePendingPlay(id: id)
+        }
+    }
+
     /// Live stream of a query's results; ends when the observing task is cancelled.
     func observe<T: Sendable>(_ observation: ValueObservation<ValueReducers.Fetch<T>>) -> AsyncValueObservation<T> {
         observation.values(in: database.pool)
+    }
+
+    /// Skips results equal to the last one, so writes that don't change what a screen shows
+    /// (another table's rows, a no-op sync page) don't re-render it.
+    func observe<T: Sendable & Equatable>(_ observation: ValueObservation<ValueReducers.Fetch<T>>) -> AsyncValueObservation<T> {
+        observation.removeDuplicates().values(in: database.pool)
     }
 
     // MARK: Artwork

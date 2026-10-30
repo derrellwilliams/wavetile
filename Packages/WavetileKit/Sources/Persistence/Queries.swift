@@ -30,6 +30,13 @@ public extension LibraryDatabase {
         }
     }
 
+    /// The newest albums, for the Music tab's shelf (uses the `dateAdded` index; no full-table read).
+    func recentlyAddedAlbums(limit: Int) -> ValueObservation<ValueReducers.Fetch<[AlbumRecord]>> {
+        ValueObservation.tracking { db in
+            try AlbumRecord.order(Column("dateAdded").desc).limit(limit).fetchAll(db)
+        }
+    }
+
     func albums(artistID: String) -> ValueObservation<ValueReducers.Fetch<[AlbumRecord]>> {
         ValueObservation.tracking { db in
             try AlbumRecord.filter(Column("artistID") == artistID).order(Column("year").desc, Column("sortTitle")).fetchAll(db)
@@ -70,9 +77,11 @@ public extension LibraryDatabase {
         return ids.compactMap { byID[$0] }
     }
 
-    func allTracks() -> ValueObservation<ValueReducers.Fetch<[TrackRecord]>> {
+    /// Every song A–Z with a row index by ID, built here on the reader's queue rather than on
+    /// the main actor (50k entries).
+    func allTracks() -> ValueObservation<ValueReducers.Fetch<TrackList>> {
         ValueObservation.tracking { db in
-            try TrackRecord.order(Column("sortTitle")).fetchAll(db)
+            TrackList(try TrackRecord.order(Column("sortTitle")).fetchAll(db))
         }
     }
 
@@ -117,9 +126,18 @@ public extension LibraryDatabase {
 
     /// Prefix-matching full-text search ("radi kid" finds "Kid A" by Radiohead), ranked by relevance.
     func search(_ text: String, limit: Int = 25) throws -> SearchResults {
+        try pool.read { db in try Self.search(text, limit: limit, in: db) }
+    }
+
+    /// The same search, read off the caller's actor (search-as-you-type).
+    func search(_ text: String, limit: Int = 25) async throws -> SearchResults {
+        try await pool.read { db in try Self.search(text, limit: limit, in: db) }
+    }
+
+    private static func search(_ text: String, limit: Int, in db: Database) throws -> SearchResults {
         guard let pattern = FTS5Pattern(matchingAllPrefixesIn: text) else { return SearchResults() }
-        return try pool.read { db in
-            SearchResults(
+        do {
+            return SearchResults(
                 artists: try ArtistRecord.fetchAll(db, sql: """
                     SELECT artist.* FROM artist JOIN artistFTS ON artistFTS.rowid = artist.rowid
                     WHERE artistFTS MATCH ? AND \(ArtistRecord.hasAlbumsSQL) ORDER BY rank LIMIT ?
@@ -135,6 +153,18 @@ public extension LibraryDatabase {
             )
         }
     }
+}
+
+public struct TrackList: Sendable, Equatable {
+    public let tracks: [TrackRecord]
+    public let indexByID: [String: Int]
+
+    public init(_ tracks: [TrackRecord] = []) {
+        self.tracks = tracks
+        indexByID = Dictionary(tracks.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { first, _ in first })
+    }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool { lhs.tracks == rhs.tracks }
 }
 
 public extension ArtistRecord {
@@ -335,5 +365,33 @@ public extension LibraryDatabase {
 
     func favoriteArtistList(limit: Int) throws -> [ArtistRecord] {
         try pool.read { try ArtistRecord.inLibrary().filter(Column("isFavorite") == true).order(Column("sortName")).limit(limit).fetchAll($0) }
+    }
+}
+
+// MARK: - Plays to report later (offline listening)
+
+public struct PendingPlay: Codable, Sendable, Equatable, FetchableRecord, PersistableRecord {
+    public static let databaseTableName = "pendingPlay"
+    public var id: Int64?
+    public var trackID: String
+    public var playedAt: Date
+}
+
+public extension LibraryDatabase {
+    /// Keeps a play for later and counts it locally now, so Home's Recently Played and Most
+    /// Played reflect offline listening right away.
+    func queuePlay(trackID: String, at date: Date) async throws {
+        try await pool.write { db in
+            try PendingPlay(id: nil, trackID: trackID, playedAt: date).insert(db)
+            try db.execute(sql: "UPDATE track SET playCount = playCount + 1, lastPlayed = ? WHERE id = ?", arguments: [date, trackID])
+        }
+    }
+
+    func pendingPlays() async throws -> [PendingPlay] {
+        try await pool.read { try PendingPlay.order(Column("playedAt")).fetchAll($0) }
+    }
+
+    func removePendingPlay(id: Int64) async throws {
+        _ = try await pool.write { try PendingPlay.deleteOne($0, key: id) }
     }
 }

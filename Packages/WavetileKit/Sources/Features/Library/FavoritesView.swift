@@ -61,7 +61,7 @@ struct FavoritesView: View {
                         title: track.title,
                         subtitle: track.artistName,
                         duration: track.durationMs.map { .milliseconds($0) },
-                        leading: .artwork(store.artwork(itemID: track.albumID, maxPixelWidth: 144)),
+                        leading: .artwork(store.artwork(itemID: track.albumID, tag: track.albumImageTag, maxPixelWidth: 144)),
                         isPlaying: player.current?.trackID == track.id,
                         isDownloaded: downloads.isDownloaded(track.id)
                     )

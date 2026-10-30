@@ -130,6 +130,14 @@ public final class PodcastDatabase: Sendable {
             // refresh fills the new fields in.
             try db.execute(sql: "UPDATE show SET etag = NULL, lastModified = NULL")
         }
+        migrator.registerMigration("v4-listening-indexes") { db in
+            // Continue Listening, History and Saved re-run on every progress save while playing.
+            try db.create(index: "episode_lastPlayedAt", on: "episode", columns: ["lastPlayedAt"], condition: Column("lastPlayedAt") != nil)
+            try db.create(index: "episode_savedAt", on: "episode", columns: ["savedAt"], condition: Column("savedAt") != nil)
+        }
+        migrator.registerMigration("v5-feed-body-hash") { db in
+            try db.alter(table: "show") { t in t.add(column: "bodyHash", .text) }
+        }
         return migrator
     }
 }
@@ -154,9 +162,21 @@ extension ShowSummary {
 // MARK: - Reads
 
 public extension PodcastDatabase {
-    /// Episodes joined with their show and download.
-    private static func items(_ request: QueryInterfaceRequest<EpisodeRecord>) -> QueryInterfaceRequest<EpisodeItem> {
-        request
+    /// Every episode column but the show notes, which lists never draw and can be 100 KB each.
+    static let listColumnNames = [
+        "id", "showID", "guid", "title", "summary", "publishedAt", "duration", "audioURL", "mimeType",
+        "byteLength", "artworkURL", "season", "number", "episodeType", "chaptersURL", "transcriptURL",
+        "transcriptType", "people", "position", "playedAt", "lastPlayedAt", "savedAt", "firstSeenAt", "generation",
+    ]
+    private static var listColumns: [any SQLSelectable] {
+        // A typed expression, not an SQL literal: GRDB must know the column count to join shows.
+        listColumnNames.map { Column($0) } + ["".sqlExpression.forKey("notesHTML")]
+    }
+
+    /// Episodes joined with their show and download. Lists leave out the show notes; pass
+    /// `notes: true` for a single episode's page.
+    private static func items(_ request: QueryInterfaceRequest<EpisodeRecord>, notes: Bool = false) -> QueryInterfaceRequest<EpisodeItem> {
+        (notes ? request : request.select(listColumns))
             .including(required: EpisodeRecord.show)
             .including(optional: EpisodeRecord.download)
             .asRequest(of: EpisodeItem.self)
@@ -201,11 +221,11 @@ public extension PodcastDatabase {
     }
 
     func episode(id: String) -> ValueObservation<ValueReducers.Fetch<EpisodeItem?>> {
-        ValueObservation.tracking { db in try Self.items(EpisodeRecord.filter(key: id)).fetchOne(db) }
+        ValueObservation.tracking { db in try Self.items(EpisodeRecord.filter(key: id), notes: true).fetchOne(db) }
     }
 
     func episodeNow(id: String) throws -> EpisodeItem? {
-        try pool.read { db in try Self.items(EpisodeRecord.filter(key: id)).fetchOne(db) }
+        try pool.read { db in try Self.items(EpisodeRecord.filter(key: id), notes: true).fetchOne(db) }
     }
 
     func episodesNow(ids: [String]) throws -> [EpisodeItem] {
@@ -333,10 +353,19 @@ public extension PodcastDatabase {
 
     /// Followed shows and their episodes whose titles (or show author) match.
     func search(_ text: String) throws -> SearchResults {
+        try pool.read { db in try Self.search(text, in: db) }
+    }
+
+    /// The same search, read off the caller's actor (search-as-you-type).
+    func search(_ text: String) async throws -> SearchResults {
+        try await pool.read { db in try Self.search(text, in: db) }
+    }
+
+    private static func search(_ text: String, in db: Database) throws -> SearchResults {
         let term = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !term.isEmpty else { return SearchResults() }
         let pattern = "%\(term.replacingOccurrences(of: "%", with: "").replacingOccurrences(of: "_", with: ""))%"
-        return try pool.read { db in
+        do {
             var results = SearchResults()
             results.shows = try ShowRecord
                 .filter(Column("followedAt") != nil)
@@ -372,10 +401,21 @@ public extension PodcastDatabase {
         }
     }
 
-    /// Positions and played dates for every episode with listening state (sync).
-    func listeningState() throws -> [EpisodeRecord] {
-        try pool.read { db in
-            try EpisodeRecord.filter(Column("position") > 0 || Column("playedAt") != nil).fetchAll(db)
+    /// One episode's listening state, without the rest of the row (show notes can be 100 KB).
+    struct ListeningState: Codable, Sendable, FetchableRecord {
+        public var id: String
+        public var position: Double
+        public var playedAt: Date?
+        public var lastPlayedAt: Date?
+    }
+
+    /// Positions and played dates for every episode with listening state (sync). Async so the
+    /// read runs off the caller's actor.
+    func listeningState() async throws -> [ListeningState] {
+        try await pool.read { db in
+            try ListeningState.fetchAll(db, EpisodeRecord
+                .select(Column("id"), Column("position"), Column("playedAt"), Column("lastPlayedAt"))
+                .filter(Column("position") > 0 || Column("playedAt") != nil))
         }
     }
 }
@@ -411,15 +451,20 @@ public extension PodcastDatabase {
             if let validators {
                 show.etag = validators.etag
                 show.lastModified = validators.lastModified
+                show.bodyHash = validators.bodyHash
             }
             if follow, show.followedAt == nil { show.followedAt = now }
             try show.save(db)
 
             let generation = (try Int.fetchOne(db, sql: "SELECT MAX(generation) FROM episode WHERE showID = ?", arguments: [showID]) ?? 0) + 1
             var newIDs: [String] = []
+            var seen: Set<String> = []
             for parsed in feed.episodes {
                 let id = PodcastID.episode(feedURL: feedURL, guid: parsed.guid)
+                seen.insert(id)
                 if var existing = try EpisodeRecord.fetchOne(db, key: id) {
+                    // Only changed columns are written; an unchanged episode costs no write at all.
+                    let original = existing
                     existing.title = parsed.title
                     existing.summary = parsed.summary
                     existing.notesHTML = parsed.notesHTML
@@ -436,8 +481,7 @@ public extension PodcastDatabase {
                     existing.transcriptURL = parsed.transcriptURL
                     existing.transcriptType = parsed.transcriptType
                     existing.people = parsed.people
-                    existing.generation = generation
-                    try existing.update(db)
+                    try existing.updateChanges(db, from: original)
                 } else {
                     newIDs.append(id)
                     var episode = EpisodeRecord(
@@ -454,13 +498,19 @@ public extension PodcastDatabase {
                     try episode.insert(db)
                 }
             }
+            // Episodes that left the feed: everything this fetch didn't see.
+            try db.execute(sql: "CREATE TEMP TABLE IF NOT EXISTS seenEpisode (id TEXT PRIMARY KEY)")
+            try db.execute(sql: "DELETE FROM seenEpisode")
+            let insert = try db.makeStatement(sql: "INSERT OR IGNORE INTO seenEpisode (id) VALUES (?)")
+            for id in seen { try insert.execute(arguments: [id]) }
             try db.execute(sql: """
                 DELETE FROM episode
-                WHERE showID = ? AND generation < ?
+                WHERE showID = ? AND id NOT IN (SELECT id FROM seenEpisode)
                   AND position = 0 AND savedAt IS NULL
                   AND id NOT IN (SELECT episodeID FROM upNext)
                   AND id NOT IN (SELECT episodeID FROM episodeDownload)
-                """, arguments: [showID, generation])
+                """, arguments: [showID])
+            try db.execute(sql: "DELETE FROM seenEpisode")
             return UpsertResult(show: show, newEpisodeIDs: newIDs)
         }
     }
@@ -500,6 +550,8 @@ public extension PodcastDatabase {
     func savePosition(episodeID: String, position: Double, duration: Double) async throws -> Bool {
         try await pool.write { db in
             guard var episode = try EpisodeRecord.fetchOne(db, key: episodeID) else { return false }
+            // Writes only the columns that changed, not the whole row (show notes included).
+            let original = episode
             let length = duration > 0 ? duration : (episode.duration ?? 0)
             if length > 0, episode.duration == nil || abs((episode.duration ?? 0) - length) > 5 { episode.duration = length }
             let finished = length > 0 && position >= length - 30
@@ -508,14 +560,14 @@ public extension PodcastDatabase {
                 let wasPlayed = episode.isPlayed
                 episode.playedAt = episode.playedAt ?? Date()
                 episode.position = 0
-                try episode.update(db)
+                try episode.updateChanges(db, from: original)
                 try UpNextRecord.deleteOne(db, key: episodeID)
                 return !wasPlayed
             }
             // A few seconds in isn't a listen worth resuming.
             episode.position = position < 5 ? 0 : position
             if position >= 5 { episode.playedAt = nil }
-            try episode.update(db)
+            try episode.updateChanges(db, from: original)
             return false
         }
     }

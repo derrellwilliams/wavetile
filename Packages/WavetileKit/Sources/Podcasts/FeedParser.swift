@@ -35,10 +35,13 @@ public struct ParsedEpisode: Sendable, Equatable {
 public struct FeedValidators: Sendable, Equatable {
     public var etag: String?
     public var lastModified: String?
+    /// SHA-256 of the last body, for hosts that send neither header (they answer 200 every time).
+    public var bodyHash: String?
 
-    public init(etag: String?, lastModified: String?) {
+    public init(etag: String?, lastModified: String?, bodyHash: String? = nil) {
         self.etag = etag
         self.lastModified = lastModified
+        self.bodyHash = bodyHash
     }
 }
 
@@ -97,14 +100,21 @@ public enum FeedParser {
         "EEE, dd MMM yyyy", "yyyy-MM-dd'T'HH:mm:ssZ", "yyyy-MM-dd'T'HH:mm:ss.SSSZ", "yyyy-MM-dd",
     ]
 
-    static func date(_ text: String) -> Date? {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
+    /// Built once: making a formatter (and switching its format) per episode cost about half a
+    /// second on a 3000-episode feed. DateFormatter is thread-safe for parsing (iOS 7+), and these
+    /// are never mutated after creation, so sharing them across feeds parsed in parallel is safe.
+    nonisolated(unsafe) private static let dateFormatters: [DateFormatter] = dateFormats.map { format in
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        for format in dateFormats {
-            formatter.dateFormat = format
+        formatter.dateFormat = format
+        return formatter
+    }
+
+    static func date(_ text: String) -> Date? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        for formatter in dateFormatters {
             if let date = formatter.date(from: trimmed) { return date }
         }
         return nil

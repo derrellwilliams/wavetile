@@ -5,7 +5,10 @@ import UIKit
 /// Image pipeline with a persistent on-disk cache, so artwork for downloaded music shows offline
 /// and scrolling never re-downloads art. Call once at launch, before any image loads.
 public enum ImageCaching {
-    public static func configure() {
+    /// Idempotent: replacing the shared pipeline while requests are in flight would orphan them.
+    @MainActor public static func configure() {
+        guard !isConfigured else { return }
+        isConfigured = true
         var configuration = ImagePipeline.Configuration.withDataCache(
             name: "com.derrellwilliams.wavetile.artwork",
             sizeLimit: 1024 * 1024 * 1024
@@ -13,6 +16,8 @@ public enum ImageCaching {
         configuration.isProgressiveDecodingEnabled = false
         ImagePipeline.shared = ImagePipeline(configuration: configuration)
     }
+
+    @MainActor private static var isConfigured = false
 
     /// One image, from the cache when it's there (CarPlay list artwork).
     public static func image(for url: URL) async -> UIImage? {

@@ -67,7 +67,7 @@ private struct LibraryDestination: View {
     var body: some View {
         switch route {
         case let .album(album):
-            AlbumDetailView(model: AlbumDetailModel(album: album.album, store: store))
+            AlbumDestination(album: album.album)
                 .navigationTransition(.zoom(sourceID: album.sourceID, in: zoom))
         case let .artist(id, name):
             ArtistDetailView(artistID: id, name: name)
@@ -169,6 +169,23 @@ private struct ZoomSource: ViewModifier {
             content.matchedTransitionSource(id: id, in: namespace)
         } else {
             content
+        }
+    }
+}
+
+/// Builds the album page's model once. This destination is re-created whenever the screen
+/// underneath redraws; building the model inline would repeat its database reads each time,
+/// only for `@State` to throw the new model away.
+private struct AlbumDestination: View {
+    @Environment(LibraryStore.self) private var store
+    let album: AlbumSummary
+    @State private var model: AlbumDetailModel?
+
+    var body: some View {
+        if let model {
+            AlbumDetailView(model: model)
+        } else {
+            Color.clear.themedBackground().onAppear { model = AlbumDetailModel(album: album, store: store) }
         }
     }
 }

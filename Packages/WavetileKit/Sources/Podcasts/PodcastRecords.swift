@@ -38,6 +38,8 @@ public struct ShowRecord: Codable, Hashable, Sendable, Identifiable, FetchableRe
     /// Conditional GET validators from the last fetch.
     public var etag: String?
     public var lastModified: String?
+    /// See `FeedValidators.bodyHash`.
+    public var bodyHash: String?
     /// Per-show settings. nil means "use the app default".
     public var playbackRate: Double?
     public var autoDownload: Bool

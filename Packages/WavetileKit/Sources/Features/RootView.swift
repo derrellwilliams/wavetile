@@ -11,9 +11,6 @@ public struct RootView: View {
 
     public init(app: AppModel) {
         self.app = app
-        BrandFont.register()
-        ImageCaching.configure()
-        BrandFont.applyNavigationBarAppearance(textColor: UIColor(app.theme.palette.textPrimary))
     }
 
     public var body: some View {

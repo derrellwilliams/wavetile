@@ -73,6 +73,20 @@ struct PodcastDatabaseTests {
         #expect(try db.episodeNow(id: id("a"))?.episode.isInProgress == false)
     }
 
+    @Test func listsLeaveOutShowNotesButEpisodePagesHaveThem() async throws {
+        let db = try PodcastDatabase.temporary()
+        var withNotes = episode("a", daysAgo: 1)
+        withNotes.notesHTML = "<p>Notes</p>"
+        _ = try await db.upsert(feed: feed([withNotes]), feedURL: feedURL, validators: nil, follow: true)
+        let listed = try await first(db.latestEpisodes(), in: db)
+        #expect(listed.map(\.id) == [id("a")])
+        #expect(listed.first?.episode.notesHTML == "")
+        #expect(try db.episodeNow(id: id("a"))?.episode.notesHTML == "<p>Notes</p>")
+        // The list projection names every episode column, so a new column can't be silently dropped.
+        let columns = try await db.pool.read { try $0.columns(in: "episode").map(\.name) }
+        #expect(Set(columns) == Set(PodcastDatabase.listColumnNames + ["notesHTML"]))
+    }
+
     @Test func upNextOrdersFrontAndBack() async throws {
         let db = try PodcastDatabase.temporary()
         _ = try await db.upsert(feed: feed([episode("a", daysAgo: 3), episode("b", daysAgo: 2), episode("c", daysAgo: 1)]), feedURL: feedURL, validators: nil, follow: true)
@@ -169,6 +183,18 @@ struct PodcastSyncTests {
         #expect(PodcastSyncState.isPrivate(secret))
         #expect(PodcastSyncState.isPrivate(URL(string: "https://user:pass@host.com/feed")!))
         #expect(!PodcastSyncState.isPrivate(a))
+    }
+
+    @Test(arguments: [
+        ("https://example.supercast.com/feeds/Ab12Cd34Ef56Gh78Ij90", true),
+        ("https://api.substack.com/feed/podcast/123/private/6f1c2a7e-0d3b-4c8e-9a51-2f4b7c9d1e00.rss", true),
+        ("https://feeds.example.com/members/k3Jd9sLq0aZx7Wv2Pt5Y/feed.xml", true),
+        ("https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/podcast.rss", false),
+        ("https://feeds.simplecast.com/54nAGcIl", false),
+        ("https://rss.art19.com/the-daily-podcast-from-the-times", false),
+    ])
+    func pathTokensArePrivate(_ url: String, isPrivate: Bool) {
+        #expect(PodcastSyncState.isPrivate(URL(string: url)!) == isPrivate)
     }
 }
 

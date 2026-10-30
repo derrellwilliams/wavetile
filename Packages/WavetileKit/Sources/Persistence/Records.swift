@@ -83,6 +83,8 @@ public struct TrackRecord: Codable, Hashable, Sendable, Identifiable, FetchableR
     public var container: String?
     /// Jellyfin's loudness correction in dB (server 10.9+), for volume levelling.
     public var normalizationGain: Double?
+    /// The album's primary image tag, so song-row art URLs match the album's and refresh when it changes.
+    public var albumImageTag: String?
     public var generation: Int
 
     public init(

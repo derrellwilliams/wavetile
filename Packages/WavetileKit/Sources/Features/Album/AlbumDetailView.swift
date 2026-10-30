@@ -155,13 +155,14 @@ struct AlbumDetailView: View {
                             .padding(.top, theme.spacing.lg)
                             .padding(.bottom, theme.spacing.xs)
                     }
-                    ForEach(disc.tracks) { track in
-                        PlayableRow(trackID: track.id, index: model.tracks.firstIndex(of: track) ?? 0, tracks: queue, showsMore: true) {
+                    ForEach(disc.rows, id: \.track.id) { row in
+                        let track = row.track
+                        PlayableRow(trackID: track.id, index: row.index, tracks: queue, showsMore: true) {
                             TrackRow(
                                 title: track.title,
                                 subtitle: track.artist == model.album.artist ? nil : track.artist,
                                 duration: track.duration,
-                                leading: .number(model.number(for: track, in: disc.tracks)),
+                                leading: .number(row.number),
                                 isPlaying: player.current?.trackID == track.id,
                                 isDownloaded: downloads.isDownloaded(track.id)
                             )
@@ -170,7 +171,7 @@ struct AlbumDetailView: View {
                         }
                         // The ⋯ tap area is wider than its glyph; this lines the glyph up with the inset.
                         .padding(.trailing, theme.spacing.screenInset - 12)
-                        if track.id != disc.tracks.last?.id {
+                        if track.id != disc.rows.last?.track.id {
                             Divider()
                                 .overlay(theme.palette.separator)
                                 .padding(.leading, theme.spacing.screenInset + 24 + theme.spacing.md)

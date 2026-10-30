@@ -24,7 +24,7 @@ struct LibraryView: View {
                         Divider().overlay(theme.palette.separator).padding(.leading, 28 + theme.spacing.md)
                     }
 
-                    syncStatus
+                    LibrarySyncStatus()
 
                     if !recentlyAdded.isEmpty {
                         Text("Recently Added")
@@ -47,7 +47,9 @@ struct LibraryView: View {
                 .padding(.horizontal, theme.spacing.screenInset)
                 .padding(.bottom, theme.spacing.xxl)
                 // The sync line fading in or out moves Recently Added smoothly, not in a jump.
-                .animation(theme.motion.smooth, value: store.statusText == nil)
+                // Keyed on isSyncing (flips twice a sync), not the progress count, which changes
+                // every page and would redraw this whole tab.
+                .animation(theme.motion.smooth, value: store.isSyncing)
                 .animation(theme.motion.smooth, value: store.syncError)
             }
             .themedBackground()
@@ -57,16 +59,22 @@ struct LibraryView: View {
             .libraryDestinations(zoom: zoom) { path.append($0) }
             .task {
                 do {
-                    for try await albums in store.observe(store.database.albums(sort: .recentlyAdded)) {
-                        recentlyAdded = Array(albums.prefix(12))
+                    for try await albums in store.observe(store.database.recentlyAddedAlbums(limit: 12)) {
+                        recentlyAdded = albums
                     }
                 } catch { Log.observationFailed(error) }
             }
         }
         .enableInjection()
     }
+}
 
-    @ViewBuilder private var syncStatus: some View {
+/// The sync progress line. Its own view so per-page progress redraws only this line.
+private struct LibrarySyncStatus: View {
+    @Environment(\.theme) private var theme
+    @Environment(LibraryStore.self) private var store
+
+    var body: some View {
         if let status = store.statusText {
             HStack(spacing: theme.spacing.sm) {
                 ProgressView().controlSize(.small)

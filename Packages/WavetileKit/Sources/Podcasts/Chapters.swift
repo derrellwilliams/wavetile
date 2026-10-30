@@ -25,10 +25,10 @@ public enum ChapterLoader {
 
     static func json(_ url: URL) async throws -> [Chapter] {
         guard let secure = PodcastNetwork.secure(url) else { return [] }
-        let (data, response) = try await PodcastNetwork.session.data(from: secure)
+        // The URL comes from the feed (untrusted), so the body is capped while it streams in.
+        let (bytes, response) = try await PodcastNetwork.session.bytes(from: secure)
         try PodcastNetwork.check(response)
-        guard data.count < 2 * 1024 * 1024 else { return [] }
-        return try parseJSON(data)
+        return try parseJSON(try await PodcastNetwork.read(bytes, response, maxBytes: 2 * 1024 * 1024))
     }
 
     static func parseJSON(_ data: Data) throws -> [Chapter] {

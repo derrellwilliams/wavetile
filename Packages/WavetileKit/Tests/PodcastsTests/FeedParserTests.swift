@@ -8,6 +8,28 @@ struct FeedParserTests {
         return try Data(contentsOf: url)
     }
 
+    /// "Billion laughs": nested internal entities that would expand to gigabytes. The parser must
+    /// refuse the expansion (libxml2's amplification limit) rather than build it in memory.
+    @Test(.timeLimit(.minutes(1))) func nestedEntitiesDontExpand() throws {
+        var dtd = #"<!ENTITY lol0 "lolololololololololololololololololololololololololololololololololololol">"#
+        for level in 1 ... 9 {
+            dtd += "<!ENTITY lol\(level) \"" + String(repeating: "&lol\(level - 1);", count: 10) + "\">"
+        }
+        let xml = """
+            <?xml version="1.0"?>
+            <!DOCTYPE rss [\(dtd)]>
+            <rss version="2.0"><channel><title>&lol9;</title>
+            <item><guid>a</guid><title>&lol9;</title><enclosure url="https://example.com/a.mp3" type="audio/mpeg"/></item>
+            </channel></rss>
+            """
+        let start = ContinuousClock.now
+        let feed = try? FeedParser.parse(Data(xml.utf8))
+        #expect(ContinuousClock.now - start < .seconds(5))
+        // Fully expanded, the title alone would be 7 GB; anything kept must be small.
+        #expect((feed?.title.utf8.count ?? 0) < 1_000_000)
+        #expect((feed?.episodes.first?.title.utf8.count ?? 0) < 1_000_000)
+    }
+
     @Test func parsesChannelAndEpisodes() throws {
         let feed = try FeedParser.parse(fixture("feed.xml"))
         #expect(feed.title == "Test Cast & Friends")

@@ -6,7 +6,13 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
     private var controller: CarPlayController?
 
     func templateApplicationScene(_ scene: CPTemplateApplicationScene, didConnect interfaceController: CPInterfaceController) {
-        guard let app = AppModel.current else { return }
+        guard let app = AppModel.current else {
+            // Never leave the car screen blank.
+            let template = CPListTemplate(title: "Wavetile", sections: [])
+            template.emptyViewTitleVariants = ["Open Wavetile on your iPhone"]
+            interfaceController.setRootTemplate(template, animated: false, completion: nil)
+            return
+        }
         let controller = CarPlayController(interface: interfaceController, app: app)
         controller.connect()
         self.controller = controller

@@ -87,12 +87,15 @@ public extension LibraryDatabase {
         }
     }
 
-    func updateDownload(trackID: String, _ change: @escaping @Sendable (inout DownloadedTrackRecord) -> Void) async throws {
+    /// Returns false when the track is no longer wanted (its collection was removed meanwhile).
+    @discardableResult
+    func updateDownload(trackID: String, _ change: @escaping @Sendable (inout DownloadedTrackRecord) -> Void) async throws -> Bool {
         try await pool.write { db in
-            guard var record = try DownloadedTrackRecord.fetchOne(db, key: trackID) else { return }
+            guard var record = try DownloadedTrackRecord.fetchOne(db, key: trackID) else { return false }
             change(&record)
             record.updatedAt = Date()
             try record.update(db)
+            return true
         }
     }
 
@@ -117,6 +120,15 @@ public extension LibraryDatabase {
         try pool.read { try DownloadedTrackRecord.filter(["queued", "downloading"].contains(Column("state"))).fetchAll($0) }
     }
 
+    /// Puts failed downloads back in the queue (a retry on launch) and returns their track IDs.
+    func requeueFailedDownloads() async throws -> [String] {
+        try await pool.write { db in
+            let ids = try String.fetchAll(db, sql: "SELECT trackID FROM downloadedTrack WHERE state = 'failed'")
+            try db.execute(sql: "UPDATE downloadedTrack SET state = 'queued', progress = 0, error = NULL WHERE state = 'failed'")
+            return ids
+        }
+    }
+
     func downloadedPlaylistIDs() throws -> [String] {
         try pool.read { try String.fetchAll($0, sql: "SELECT id FROM downloadCollection WHERE kind = 'playlist'") }
     }
@@ -134,14 +146,23 @@ public extension LibraryDatabase {
         }
     }
 
+    /// Every collection with its status and size, in one grouped query (download progress writes
+    /// re-run this many times a second).
     func downloadedCollections() -> ValueObservation<ValueReducers.Fetch<[DownloadedCollection]>> {
         ValueObservation.tracking { db in
-            try DownloadCollectionRecord.order(Column("addedAt").desc).fetchAll(db).map { collection in
-                let bytes = try Int64.fetchOne(db, sql: """
-                    SELECT COALESCE(SUM(t.bytes), 0) FROM downloadMembership m
-                    JOIN downloadedTrack t ON t.trackID = m.trackID WHERE m.collectionID = ?
-                    """, arguments: [collection.id]) ?? 0
-                return DownloadedCollection(collection: collection, status: try Self.status(db, collectionID: collection.id), bytes: bytes)
+            let rows = try Row.fetchAll(db, sql: """
+                SELECT m.collectionID AS id, COUNT(*) AS total,
+                       SUM(t.state = 'done') AS done,
+                       SUM(t.state = 'failed') AS failed,
+                       SUM(CASE WHEN t.state = 'done' THEN 1.0 ELSE t.progress END) AS progressSum,
+                       COALESCE(SUM(t.bytes), 0) AS bytes
+                FROM downloadMembership m JOIN downloadedTrack t ON t.trackID = m.trackID
+                GROUP BY m.collectionID
+                """)
+            let stats = Dictionary(rows.map { (String($0["id"]) ?? "", $0) }, uniquingKeysWith: { first, _ in first })
+            return try DownloadCollectionRecord.order(Column("addedAt").desc).fetchAll(db).map { collection in
+                guard let row = stats[collection.id] else { return DownloadedCollection(collection: collection, status: .none, bytes: 0) }
+                return DownloadedCollection(collection: collection, status: Self.status(row), bytes: row["bytes"] ?? 0)
             }
         }
     }
@@ -161,13 +182,17 @@ public extension LibraryDatabase {
             FROM downloadMembership m JOIN downloadedTrack t ON t.trackID = m.trackID
             WHERE m.collectionID = ?
             """, arguments: [collectionID])
-        let total: Int = row?["total"] ?? 0
+        return row.map(status) ?? .none
+    }
+
+    fileprivate static func status(_ row: Row) -> DownloadStatus {
+        let total: Int = row["total"] ?? 0
         guard total > 0 else { return .none }
         return DownloadStatus(
             total: total,
-            done: row?["done"] ?? 0,
-            failed: row?["failed"] ?? 0,
-            progress: (row?["progressSum"] ?? 0.0) / Double(total)
+            done: row["done"] ?? 0,
+            failed: row["failed"] ?? 0,
+            progress: (row["progressSum"] ?? 0.0) / Double(total)
         )
     }
 }
