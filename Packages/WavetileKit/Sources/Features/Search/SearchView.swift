@@ -8,10 +8,11 @@ import SwiftUI
 
 /// Offline full-text search over the synced library. The search field itself is attached here
 /// (scoped to this tab); `.tabViewSearchActivation` on the TabView makes the tab detach.
-/// With podcasts on, an All | Music | Podcasts filter appears (All is the default). All shows
+/// With podcasts on, All | Music | Podcasts search scopes appear (All is the default). All shows
 /// music plus followed podcasts from the device, and Apple Podcasts shows only when they match
 /// what was typed. Privacy: with podcasts on, All and Podcasts send the typed text to Apple's
 /// directory after typing pauses; Music never leaves the device, nor does anything with podcasts off.
+/// Recent searches are the field's suggestions while it's empty.
 struct SearchView: View {
     @ObserveInjection var inject
     @Environment(\.theme) private var theme
@@ -21,11 +22,14 @@ struct SearchView: View {
     @Environment(AudioPlayer.self) private var player
     @Environment(DownloadsStore.self) private var downloads
     @Environment(Connectivity.self) private var connectivity
-    @Environment(\.openNowPlaying) private var openNowPlaying
     @Environment(PodcastsStore.self) private var podcasts
     @Binding var text: String
     @Binding var scope: MediaKind
     @State private var results = LibraryDatabase.SearchResults()
+    /// The text `results` were found for, so "No Results" waits for the search to finish.
+    @State private var searchedText = ""
+    /// The query Apple's directory has answered (or was skipped) for, under the All scope.
+    @State private var appleSearchedText = ""
     @State private var podcastResults = PodcastDatabase.SearchResults()
     /// Apple Podcasts shows for the All filter, already narrowed to ones named like the query.
     @State private var appleShows: [DirectoryShow] = []
@@ -39,14 +43,9 @@ struct SearchView: View {
             Group {
                 switch podcasts.isEnabled ? scope : .music {
                 case .podcasts: PodcastSearchResults(text: text)
-                // With nothing typed, recent searches replace the empty state (Podcasts keeps its own).
-                case .all where showsRecents, .music where showsRecents: recentSearches
                 case .all: allResults
                 case .music: musicResults
                 }
-            }
-            .safeAreaInset(edge: .top, spacing: 0) {
-                if podcasts.isEnabled { MediaFilter(selection: $scope, options: [.all, .music, .podcasts]) }
             }
             .themedBackground()
             .navigationTitle("Search")
@@ -64,6 +63,8 @@ struct SearchView: View {
         }
         // Scoped to this tab's stack so the field doesn't leak into other tabs' navigation bars.
         .searchable(text: $text, prompt: prompt)
+        .searchSuggestions { recentSuggestions }
+        .modifier(MediaScopes(scope: $scope, isEnabled: podcasts.isEnabled))
         .onSubmit(of: .search) { recents.add(text) }
         // Opening a result from the search root keeps the query.
         .onChange(of: path.count) { old, new in
@@ -75,6 +76,7 @@ struct SearchView: View {
             guard !Task.isCancelled else { return }
             results = (try? await store.database.search(text)) ?? .init()
             podcastResults = podcasts.isEnabled ? ((try? await podcasts.database.search(text)) ?? .init()) : .init()
+            searchedText = text
         }
         .task(id: "\(scope)|\(text)") { await searchApple() }
         .enableInjection()
@@ -87,6 +89,7 @@ struct SearchView: View {
         let query = trimmedText
         guard podcasts.isEnabled, scope == .all, query.count >= 2 else {
             appleShows = []
+            appleSearchedText = query
             return
         }
         // Debounce: Apple allows about 20 searches a minute per device.
@@ -97,6 +100,7 @@ struct SearchView: View {
         let followed = Set(podcastResults.shows.map(\.feedURL))
         let relevant = shows.filter { show in show.matches(query) && !(show.feedURL.map(followed.contains) ?? false) }
         withAnimation(theme.motion.smooth) { appleShows = Array(relevant.prefix(5)) }
+        appleSearchedText = query
     }
 
     private var prompt: String {
@@ -124,30 +128,28 @@ struct SearchView: View {
         .overlay {
             if trimmedText.isEmpty {
                 EmptyState("Search Everything", glyph: .search, message: "Find artists, albums, songs, and the podcasts you follow.")
+            } else if searchedText == text, appleSearchedText == trimmedText,
+                      results.isEmpty, podcastResults.isEmpty, appleShows.isEmpty {
+                EmptyState("No Results", glyph: .search, message: "Nothing in your library, your podcasts, or Apple Podcasts matches “\(text)”.")
             }
         }
     }
 
     private var trimmedText: String { text.trimmingCharacters(in: .whitespaces) }
 
-    private var showsRecents: Bool { trimmedText.isEmpty && !recents.queries.isEmpty }
-
-    private var recentSearches: some View {
-        List {
+    /// Shown while the field is active and empty; tapping one fills in and runs the search.
+    /// Podcasts keeps its own empty screen.
+    @ViewBuilder private var recentSuggestions: some View {
+        if trimmedText.isEmpty, !recents.queries.isEmpty, !(podcasts.isEnabled && scope == .podcasts) {
             Section {
                 ForEach(recents.queries, id: \.self) { query in
-                    Button { text = query } label: {
-                        Label(query, glyph: .history)
-                            .labelStyle(.tintedIcon)
-                            .font(theme.typography.body)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .contentShape(.rect)
-                    }
-                    .buttonStyle(.plain)
-                    .listRowBackground(Color.clear)
-                    .swipeActions {
-                        Button("Remove", glyph: .trash, role: .destructive) { recents.remove(query) }
-                    }
+                    Label(query, glyph: .history)
+                        .labelStyle(.tintedIcon)
+                        .font(theme.typography.body)
+                        .searchCompletion(query)
+                        .swipeActions {
+                            Button("Remove", glyph: .trash, role: .destructive) { recents.remove(query) }
+                        }
                 }
             } header: {
                 HStack {
@@ -159,8 +161,6 @@ struct SearchView: View {
                 }
             }
         }
-        .listStyle(.plain)
-        .scrollDismissesKeyboard(.immediately)
     }
 
     private var musicResults: some View {
@@ -230,7 +230,7 @@ struct SearchView: View {
     }
 
     /// Plays the song within its album (so playback continues through the record, not the
-    /// search results) and opens Now Playing.
+    /// search results). Search stays up, like Apple Music; the mini player shows the song.
     private func play(_ track: TrackRecord) {
         var queue = [QueuedTrack(track)]
         if let albumID = track.albumID, let albumTracks = try? store.database.tracks(albumID: albumID), !albumTracks.isEmpty {
@@ -241,14 +241,30 @@ struct SearchView: View {
         guard let start = queue.firstIndex(where: { $0.trackID == track.id }) else { return }
         recents.add(text)
         player.play(queue, startAt: start)
-        openNowPlaying()
     }
 
     @ViewBuilder private var emptyState: some View {
         if text.trimmingCharacters(in: .whitespaces).isEmpty {
             EmptyState("Search Your Library", glyph: .search, message: "Find artists, albums, and songs, even offline.")
-        } else if results.isEmpty {
+        } else if searchedText == text, results.isEmpty {
             EmptyState("No Results", glyph: .search, message: "Nothing in your library matches “\(text)”.")
+        }
+    }
+}
+
+/// The system scope bar under the search field, only when podcasts are on (music-only users
+/// have nothing to choose between).
+private struct MediaScopes: ViewModifier {
+    @Binding var scope: MediaKind
+    let isEnabled: Bool
+
+    func body(content: Content) -> some View {
+        if isEnabled {
+            content.searchScopes($scope, activation: .onSearchPresentation) {
+                ForEach(MediaKind.allCases, id: \.self) { Text($0.title).tag($0) }
+            }
+        } else {
+            content
         }
     }
 }
