@@ -32,12 +32,15 @@ struct SearchView: View {
     @State private var path = NavigationPath()
     /// The song whose ⋯ actions sheet is showing.
     @State private var actionsTrack: TrackRecord?
+    @State private var recents = RecentSearches()
 
     var body: some View {
         NavigationStack(path: $path) {
             Group {
                 switch podcasts.isEnabled ? scope : .music {
                 case .podcasts: PodcastSearchResults(text: text)
+                // With nothing typed, recent searches replace the empty state (Podcasts keeps its own).
+                case .all where showsRecents, .music where showsRecents: recentSearches
                 case .all: allResults
                 case .music: musicResults
                 }
@@ -61,6 +64,11 @@ struct SearchView: View {
         }
         // Scoped to this tab's stack so the field doesn't leak into other tabs' navigation bars.
         .searchable(text: $text, prompt: prompt)
+        .onSubmit(of: .search) { recents.add(text) }
+        // Opening a result from the search root keeps the query.
+        .onChange(of: path.count) { old, new in
+            if old == 0, new > 0 { recents.add(text) }
+        }
         .task(id: text) {
             // Debounce typing; FTS queries are fast but there's no need to run one per keystroke.
             try? await Task.sleep(for: .milliseconds(150))
@@ -121,6 +129,39 @@ struct SearchView: View {
     }
 
     private var trimmedText: String { text.trimmingCharacters(in: .whitespaces) }
+
+    private var showsRecents: Bool { trimmedText.isEmpty && !recents.queries.isEmpty }
+
+    private var recentSearches: some View {
+        List {
+            Section {
+                ForEach(recents.queries, id: \.self) { query in
+                    Button { text = query } label: {
+                        Label(query, glyph: .history)
+                            .labelStyle(.tintedIcon)
+                            .font(theme.typography.body)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                    .listRowBackground(Color.clear)
+                    .swipeActions {
+                        Button("Remove", glyph: .trash, role: .destructive) { recents.remove(query) }
+                    }
+                }
+            } header: {
+                HStack {
+                    Text("Recent Searches")
+                    Spacer()
+                    Button("Clear") { withAnimation(theme.motion.smooth) { recents.clear() } }
+                        .font(theme.typography.body)
+                        .foregroundStyle(theme.palette.accent)
+                }
+            }
+        }
+        .listStyle(.plain)
+        .scrollDismissesKeyboard(.immediately)
+    }
 
     private var musicResults: some View {
         List { musicSections }
@@ -198,6 +239,7 @@ struct SearchView: View {
         // Offline, queue only what's on the device (same rule as tapping any row).
         if !connectivity.isOnline { queue = queue.filter { downloads.isDownloaded($0.trackID) } }
         guard let start = queue.firstIndex(where: { $0.trackID == track.id }) else { return }
+        recents.add(text)
         player.play(queue, startAt: start)
         openNowPlaying()
     }

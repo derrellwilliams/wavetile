@@ -104,7 +104,7 @@ struct MainTabView: View {
         }
         // Required on iOS 27 for the detached search button (searchable lives in SearchView).
         .tabViewSearchActivation(.searchTabSelection)
-        .tabBarMinimizeBehavior(.onScrollDown)
+        .tabBarMinimizeBehavior(.never)
         .onChange(of: signedIn.player.current?.queueID) {
             widgets.playerChanged()
             home.albumStartedPlaying(signedIn.player.current?.albumID)

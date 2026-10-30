@@ -102,6 +102,7 @@ public final class AppModel {
             PodcastDatabase.delete(serverID: signedIn.session.serverID, userID: signedIn.session.userID)
             // The cached library is private to this account; don't leave it on disk.
             LibraryDatabase.delete(serverID: signedIn.session.serverID, userID: signedIn.session.userID)
+            RecentSearches.clearStored()
         }
         store.clear()
         phase = .signedOut
