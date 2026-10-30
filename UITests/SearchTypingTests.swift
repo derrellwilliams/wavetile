@@ -1,6 +1,6 @@
 import XCTest
 
-/// Search tab checks: typing, and the ⋯ song actions sheet.
+/// Search tab checks: typing, and the ⋯ song menu.
 /// Requires a signed-in session with a synced library, like the accessibility audits.
 final class SearchTypingTests: XCTestCase {
     @MainActor func testSearchFieldAcceptsTyping() throws {
@@ -17,7 +17,7 @@ final class SearchTypingTests: XCTestCase {
         XCTAssertEqual(field.value as? String, "moon")
     }
 
-    @MainActor func testSongActionsSheetGoesToAlbum() throws {
+    @MainActor func testSongMenuGoesToAlbum() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-tab", "search"]
         app.launch()

@@ -2,76 +2,50 @@ import DesignSystem
 import JellyfinKit
 import SwiftUI
 
-/// Grouped card section with a small caps header, shared by Profile and the Settings drawer.
-struct SettingsSection<Rows: View>: View {
+/// A native grouped `Form` in the theme's colors, shared by the Settings drawer and Podcast
+/// Settings. Rows are system controls (`LabeledContent`, `Toggle`, menu `Picker`, `Button`)
+/// with Phosphor icons; the form handles separators, highlights, headers and large text stacking.
+struct SettingsForm<Content: View>: View {
     @Environment(\.theme) private var theme
-    let title: String
-    @ViewBuilder let rows: Rows
+    @ViewBuilder let content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: theme.spacing.md) {
-            Text(title.uppercased())
-                .font(theme.typography.caption.weight(.semibold))
-                .kerning(1)
-                .foregroundStyle(theme.palette.textSecondary)
-                .accessibilityAddTraits(.isHeader)
-            VStack(spacing: 0) { rows }
-                .background(theme.palette.surface, in: .rect(cornerRadius: theme.radius.card, style: .continuous))
+        Form {
+            Group { content }
+                .listRowBackground(theme.palette.surface)
         }
+        .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .scrollIndicators(.hidden)
+        .font(theme.typography.body)
+        .labelStyle(.tintedIcon)
+        .toggleStyle(.switch)
+        .tint(theme.palette.toggle)
+        .foregroundStyle(theme.palette.textPrimary)
+        .themedBackground()
     }
 }
 
-struct SettingsRow: View {
-    @Environment(\.theme) private var theme
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    let glyph: Glyph
+/// A read-only settings row: icon and title, with the value trailing (stacked at large sizes).
+/// Read as one element, so VoiceOver says "Address, 192.168…" rather than a bare value.
+struct SettingsValue: View {
     let title: String
+    let glyph: Glyph
     let value: String
 
-    init(_ glyph: Glyph, _ title: String, value: String) {
-        self.glyph = glyph
+    init(_ title: String, glyph: Glyph, value: String) {
         self.title = title
+        self.glyph = glyph
         self.value = value
     }
 
     var body: some View {
-        // Side by side when label and value both fit on one line; otherwise stacked (like iOS
-        // Settings) so neither has to break mid-word or truncate, at any text size.
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: theme.spacing.md) {
-                titleLabel
-                Spacer(minLength: theme.spacing.sm)
-                valueText.fixedSize()
-            }
-            VStack(alignment: .leading, spacing: theme.spacing.xxs) {
-                titleLabel
-                valueText
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, dynamicTypeSize.isAccessibilitySize ? theme.spacing.md : theme.spacing.lg)
-        .padding(.vertical, theme.spacing.md + 2)
-        .contentShape(.rect)
-        .accessibilityElement(children: .combine)
-    }
-
-    private var titleLabel: some View {
-        HStack(spacing: theme.spacing.md) {
-            glyph.image
-                .foregroundStyle(theme.palette.accent)
-            Text(title)
-                .font(theme.typography.body)
-                .foregroundStyle(theme.palette.textPrimary)
-                .fixedSize()
-        }
-    }
-
-    @ViewBuilder private var valueText: some View {
-        if !value.isEmpty {
+        LabeledContent {
             Text(value)
-                .font(theme.typography.itemSubtitle)
-                .foregroundStyle(theme.palette.textSecondary)
+        } label: {
+            Label(title, glyph: glyph)
         }
+        .accessibilityElement(children: .combine)
     }
 }
 

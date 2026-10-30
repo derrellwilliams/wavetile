@@ -34,9 +34,9 @@ extension QueuedTrack {
 
 /// Makes a track row playable: tap plays the surrounding list from this row; long-press
 /// offers Play Next / Add to Queue. `tracks` is built lazily on tap, so long lists stay cheap.
-/// `onTap` replaces the default play (search plays the song's album and opens Now Playing);
+/// `onTap` replaces the default play (search plays the song's album);
 /// the long-press menu is the same. `showsMore` adds a trailing ⋯ with that menu, so the
-/// actions don't depend on discovering the long press.
+/// actions don't depend on discovering the long press; `moreLabel` names it for VoiceOver.
 struct PlayableRow<Label: View>: View {
     @Environment(\.theme) private var theme
     @Environment(AudioPlayer.self) private var player
@@ -54,6 +54,7 @@ struct PlayableRow<Label: View>: View {
     /// Adds Play / Go to Album / Go to Artist to the long press, matching the ⋯ sheet.
     var menu: SongMenu?
     var showsMore = false
+    var moreLabel = "More"
     @ViewBuilder let label: Label
     /// Haptic on the tap that starts playback, not on every track change (auto-advance included).
     @State private var taps = 0
@@ -74,7 +75,7 @@ struct PlayableRow<Label: View>: View {
                         .frame(width: 44, height: 44)
                         .contentShape(.rect)
                 }
-                .accessibilityLabel("More")
+                .accessibilityLabel(moreLabel)
             }
         }
         .sensoryFeedback(.selection, trigger: taps)

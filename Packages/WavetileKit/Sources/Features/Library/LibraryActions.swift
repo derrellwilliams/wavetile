@@ -75,15 +75,6 @@ final class LibraryActions {
 
     func addToPlaylist(_ trackIDs: [String]) { addToPlaylist = TrackSelection(trackIDs: trackIDs) }
 
-    /// Songs a sheet wants to add to a playlist once it has dismissed (one sheet can't present
-    /// over another that's leaving). The presenter calls `presentPending()` from `onDismiss`.
-    var pendingPlaylistTrackIDs: [String]?
-
-    func presentPending() {
-        guard let ids = pendingPlaylistTrackIDs else { return }
-        pendingPlaylistTrackIDs = nil
-        addToPlaylist(ids)
-    }
     func addToCollection(_ albumIDs: [String]) { addToCollection = AlbumSelection(albumIDs: albumIDs) }
 }
 

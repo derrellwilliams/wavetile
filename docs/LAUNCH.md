@@ -10,7 +10,7 @@ The goal: when someone searches or asks an LLM for "a Jellyfin music app for iPh
 | TestFlight | Build 202610281900 approved for the external "public beta" group; public link https://testflight.apple.com/join/pk9dyfMq |
 | App Review login | Jellyfin's public demo: `https://demo.jellyfin.org/stable`, user `demo`, blank password (any typed password fails) |
 | Contact | realslimscrawny@gmail.com (site, support and privacy pages) |
-| CarPlay | Entitlement requested 2026-10-29 (Audio); waiting on Apple. Once granted: add `com.apple.developer.carplay-audio` to `App/Wavetile.entitlements` |
+| CarPlay | Audio entitlement granted 2026-10-30 and added to the app's entitlements. Enable CarPlay Audio on the App ID before the next TestFlight build |
 | Next | Ship a new TestFlight build; recruit testers (Jellyfin forum, r/jellyfin, r/selfhosted, awesome-jellyfin); jellyfin.org after launch |
 
 ## Positioning

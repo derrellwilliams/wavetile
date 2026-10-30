@@ -17,7 +17,6 @@ struct SearchView: View {
     @ObserveInjection var inject
     @Environment(\.theme) private var theme
     @Environment(LibraryStore.self) private var store
-    @Environment(LibraryActions.self) private var actions
     @Namespace private var zoom
     @Environment(AudioPlayer.self) private var player
     @Environment(DownloadsStore.self) private var downloads
@@ -34,8 +33,6 @@ struct SearchView: View {
     /// Apple Podcasts shows for the All filter, already narrowed to ones named like the query.
     @State private var appleShows: [DirectoryShow] = []
     @State private var path = NavigationPath()
-    /// The song whose ⋯ actions sheet is showing.
-    @State private var actionsTrack: TrackRecord?
     @State private var recents = RecentSearches()
 
     var body: some View {
@@ -50,14 +47,6 @@ struct SearchView: View {
             .themedBackground()
             .navigationTitle("Search")
             .tabRootChrome()
-            // Inside libraryDestinations, so the sheet gets the stack's push (Go to Album/Artist).
-            .sheet(item: $actionsTrack, onDismiss: actions.presentPending) { track in
-                SongActionsSheet(
-                    track: track,
-                    artwork: store.artwork(itemID: track.albumID, tag: track.albumImageTag, maxPixelWidth: 144),
-                    menu: store.songMenu(for: track, source: "search") { play(track) }
-                )
-            }
             .libraryDestinations(zoom: zoom) { path.append($0) }
             .podcastDestinations(zoom: zoom) { path.append($0) }
         }
@@ -203,25 +192,21 @@ struct SearchView: View {
             if !results.tracks.isEmpty {
                 Section("Songs") {
                     ForEach(Array(results.tracks.enumerated()), id: \.element.id) { index, track in
-                        HStack(spacing: theme.spacing.xs) {
-                            PlayableRow(
-                                trackID: track.id, index: index,
-                                tracks: { results.tracks.map(QueuedTrack.init) },
-                                onTap: { play(track) },
-                                menu: store.songMenu(for: track, source: "search") { play(track) }
-                            ) {
-                                TrackRow(
-                                    title: track.title,
-                                    subtitle: "\(track.artistName) · \(track.albumTitle)",
-                                    duration: track.durationMs.map { .milliseconds($0) },
-                                    leading: .artwork(store.artwork(itemID: track.albumID, tag: track.albumImageTag, maxPixelWidth: 144)),
-                                    isPlaying: player.current?.trackID == track.id,
-                                    isDownloaded: downloads.isDownloaded(track.id)
-                                )
-                            }
-                            GlyphButton("More for \(track.title)", glyph: .more, size: 20) { actionsTrack = track }
-                                .buttonStyle(.plain)
-                                .foregroundStyle(theme.palette.accent)
+                        PlayableRow(
+                            trackID: track.id, index: index,
+                            tracks: { results.tracks.map(QueuedTrack.init) },
+                            onTap: { play(track) },
+                            menu: store.songMenu(for: track, source: "search") { play(track) },
+                            showsMore: true, moreLabel: "More for \(track.title)"
+                        ) {
+                            TrackRow(
+                                title: track.title,
+                                subtitle: "\(track.artistName) · \(track.albumTitle)",
+                                duration: track.durationMs.map { .milliseconds($0) },
+                                leading: .artwork(store.artwork(itemID: track.albumID, tag: track.albumImageTag, maxPixelWidth: 144)),
+                                isPlaying: player.current?.trackID == track.id,
+                                isDownloaded: downloads.isDownloaded(track.id)
+                            )
                         }
                         .listRowBackground(Color.clear)
                     }

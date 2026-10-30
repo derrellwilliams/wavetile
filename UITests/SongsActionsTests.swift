@@ -28,7 +28,7 @@ final class SongsActionsTests: XCTestCase {
         XCTAssertFalse(app.navigationBars["Songs"].exists, "Artist page didn't open")
     }
 
-    /// Long press on a song offers the same actions as its ⋯ sheet.
+    /// Long press on a song offers the same actions as its ⋯ menu.
     @MainActor func testSongsLongPressMatchesMoreSheet() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-tab", "music"]

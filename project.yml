@@ -55,13 +55,12 @@ targets:
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.music
-        # Simulator builds aren't provisioned, so they can carry CarPlay before Apple grants it
-        # (device builds would fail signing). Once granted, add the key to Wavetile.entitlements.
-        "CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]": App/Wavetile-Simulator.entitlements
     entitlements:
       path: App/Wavetile.entitlements
       properties:
         com.apple.security.application-groups: [group.com.derrellwilliams.wavetile]
+        # Granted by Apple 2026-10-30 (managed capability: enable CarPlay Audio on the App ID).
+        com.apple.developer.carplay-audio: true
     info:
       path: App/Info.plist
       properties:

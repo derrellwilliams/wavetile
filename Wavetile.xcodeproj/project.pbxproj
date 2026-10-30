@@ -76,7 +76,6 @@
 		600A6831CAFBA608604EC65C /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		8024A92BB845E32D58BE675C /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		8BC9880BE0B4A0A353E499A1 /* RecentlyPlayedWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentlyPlayedWidget.swift; sourceTree = "<group>"; };
-		930C0A008B6260D8B697AC00 /* Wavetile-Simulator.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Wavetile-Simulator.entitlements"; sourceTree = "<group>"; };
 		9B3DBC04AB9BCCD7E614F3F9 /* SearchTypingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchTypingTests.swift; sourceTree = "<group>"; };
 		9DD2A2844C81BA65529BD051 /* WavetileKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = WavetileKit; path = Packages/WavetileKit; sourceTree = SOURCE_ROOT; };
 		A618CF1452D243D448B37A64 /* WavetileWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WavetileWidgets.entitlements; sourceTree = "<group>"; };
@@ -170,7 +169,6 @@
 				C64E8E56C9DEE15869AD6949 /* Info.plist */,
 				D885B860AC3826586D46546F /* MusicIntents.swift */,
 				BC49F38495CF5B01CA0BBC54 /* PrivacyInfo.xcprivacy */,
-				930C0A008B6260D8B697AC00 /* Wavetile-Simulator.entitlements */,
 				353AC9D25C695D5691A49C82 /* Wavetile.entitlements */,
 				AE62EBD766A57ECC0F9E43CD /* WavetileApp.swift */,
 			);
@@ -592,7 +590,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = App/Wavetile.entitlements;
-				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "App/Wavetile-Simulator.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
@@ -616,7 +613,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = App/Wavetile.entitlements;
-				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "App/Wavetile-Simulator.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;

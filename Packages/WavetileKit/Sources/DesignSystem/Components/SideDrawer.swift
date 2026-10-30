@@ -45,13 +45,17 @@ public struct SideDrawer<Content: View, Drawer: View>: View {
             let progress = revealed / width
 
             ZStack(alignment: edge == .leading ? .leading : .trailing) {
-                drawer
-                    .frame(width: width)
-                    .frame(maxHeight: .infinity)
-                    // Subtle parallax: the drawer drifts in slower than the content.
-                    .offset(x: reduceMotion ? 0 : -direction * (1 - progress) * width * 0.25)
-                    .opacity(0.4 + 0.6 * progress)
-                    .accessibilityHidden(!isOpen)
+                // Only drawn while showing: a closed drawer under every screen would still reach
+                // the accessibility tree (UIKit-backed lists ignore accessibilityHidden) and cost a render.
+                if isOpen || revealed > 0 {
+                    drawer
+                        .frame(width: width)
+                        .frame(maxHeight: .infinity)
+                        // Subtle parallax: the drawer drifts in slower than the content.
+                        .offset(x: reduceMotion ? 0 : -direction * (1 - progress) * width * 0.25)
+                        .opacity(0.4 + 0.6 * progress)
+                        .accessibilityHidden(!isOpen)
+                }
 
                 // Shapes ignore the safe area so the clip covers the status bar and tab bar regions too.
                 let card = RoundedRectangle(cornerRadius: theme.radius.sheet * progress, style: .continuous)

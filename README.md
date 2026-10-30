@@ -17,7 +17,7 @@ You need an iPhone on iOS 26.1 or later and a Jellyfin server with a music libra
 | Playback | Gapless queue, shuffle/repeat, lock screen and Control Center controls, Start Radio (Jellyfin Instant Mix) |
 | Downloads | Background downloads of albums and playlists (MP3 256 kbps by default, or the original file) |
 | Podcasts | Opt-in in Settings: directory search, follow by URL or OPML, chapters, transcripts, episode downloads, subscriptions synced through Jellyfin |
-| System | Now Playing and Recently Played widgets, download Live Activity, Siri, CarPlay (waiting on Apple's entitlement) |
+| System | Now Playing and Recently Played widgets, download Live Activity, Siri, CarPlay |
 | Themes | Dark (default) and Light |
 
 ## Setup

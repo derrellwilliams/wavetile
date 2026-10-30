@@ -11,18 +11,18 @@ struct PodcastSettingsSection: View {
 
     var body: some View {
         @Bindable var podcasts = podcasts
-        SettingsSection(title: "Podcasts") {
-            SettingsToggle(.podcasts, "Show Podcasts", isOn: $podcasts.isEnabled.animation(theme.motion.smooth))
+        Section("Podcasts") {
+            Toggle(isOn: $podcasts.isEnabled.animation(theme.motion.smooth)) {
+                Label("Show Podcasts", glyph: .podcasts)
+            }
         }
     }
 }
 
 /// Podcast settings, from the gear on the Podcasts tab: playback, downloads, sync and
-/// import/export. Same sections and rows as the profile drawer.
+/// import/export. Same form style as the profile drawer.
 struct PodcastSettingsView: View {
-    @Environment(\.theme) private var theme
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(PodcastsStore.self) private var podcasts
     @State private var showImporter = false
     @State private var importMessage: String?
@@ -32,70 +32,61 @@ struct PodcastSettingsView: View {
     var body: some View {
         @Bindable var podcasts = podcasts
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: theme.spacing.xxl) {
-                    SettingsSection(title: "Playback") {
-                        Menu {
-                            Picker("Skip Back", selection: $podcasts.skipBack) {
-                                ForEach([10.0, 15, 30], id: \.self) { Text("\(Int($0)) seconds").tag($0) }
-                            }
-                        } label: {
-                            SettingsRow(.skipBack, "Skip Back", value: "\(Int(podcasts.skipBack))s")
-                        }
-                        Menu {
-                            Picker("Skip Forward", selection: $podcasts.skipForward) {
-                                ForEach([15.0, 30, 45, 60], id: \.self) { Text("\(Int($0)) seconds").tag($0) }
-                            }
-                        } label: {
-                            SettingsRow(.skipForward, "Skip Forward", value: "\(Int(podcasts.skipForward))s")
-                        }
-                        Menu {
-                            Picker("Default Speed", selection: $podcasts.defaultRate) {
-                                ForEach(AudioPlayer.podcastRates, id: \.self) { Text("\(Double($0).formatted())×").tag(Double($0)) }
-                            }
-                        } label: {
-                            SettingsRow(.speed, "Default Speed", value: "\(podcasts.defaultRate.formatted())×")
-                        }
+            SettingsForm {
+                Section("Playback") {
+                    Picker(selection: $podcasts.skipBack) {
+                        ForEach([10.0, 15, 30], id: \.self) { Text("\(Int($0)) seconds").tag($0) }
+                    } label: {
+                        Label("Skip Back", glyph: .skipBack)
                     }
-
-                    SettingsSection(title: "Downloads") {
-                        Menu {
-                            Picker("Auto-Download", selection: $podcasts.autoDownloadCount) {
-                                Text("Off").tag(0)
-                                Text("Latest Episode").tag(1)
-                                Text("Latest 3 Episodes").tag(3)
-                                Text("Latest 5 Episodes").tag(5)
-                            }
-                        } label: {
-                            SettingsRow(.download, "Auto-Download", value: podcasts.autoDownloadCount == 0 ? "Off" : "Latest \(podcasts.autoDownloadCount)")
-                        }
-                        SettingsToggle(.trash, "Remove Played Downloads", isOn: $podcasts.deletePlayedDownloads)
-                        SettingsRow(.downloads, "Episode Storage", value: ByteCountFormatter.string(fromByteCount: podcasts.totalBytes, countStyle: .file))
-                        Button { confirmRemoveDownloads = true } label: {
-                            SettingsRow(.trash, "Remove Episode Downloads", value: "")
-                        }
-                        .disabled(podcasts.totalBytes == 0)
+                    Picker(selection: $podcasts.skipForward) {
+                        ForEach([15.0, 30, 45, 60], id: \.self) { Text("\(Int($0)) seconds").tag($0) }
+                    } label: {
+                        Label("Skip Forward", glyph: .skipForward)
                     }
-
-                    SettingsSection(title: "Shows") {
-                        SettingsToggle(.server, "Sync with Jellyfin", isOn: $podcasts.syncWithJellyfin)
-                        Button { showImporter = true } label: {
-                            SettingsRow(.download, "Import OPML", value: "")
-                        }
-                        ShareLink(item: OPMLDocument(text: podcasts.exportOPML()), preview: SharePreview("Wavetile Podcasts.opml")) {
-                            SettingsRow(.export, "Export OPML", value: "")
-                        }
-                        Button { confirmRemove = true } label: {
-                            SettingsRow(.trash, "Remove All Podcast Data", value: "")
-                        }
+                    Picker(selection: $podcasts.defaultRate) {
+                        ForEach(AudioPlayer.podcastRates, id: \.self) { Text("\(Double($0).formatted())×").tag(Double($0)) }
+                    } label: {
+                        Label("Default Speed", glyph: .speed)
                     }
                 }
-                .padding(.horizontal, dynamicTypeSize.isAccessibilitySize ? theme.spacing.md : theme.spacing.xl)
-                .padding(.vertical, theme.spacing.lg)
+                .pickerStyle(.menu)
+
+                Section("Downloads") {
+                    Picker(selection: $podcasts.autoDownloadCount) {
+                        Text("Off").tag(0)
+                        Text("Latest Episode").tag(1)
+                        Text("Latest 3 Episodes").tag(3)
+                        Text("Latest 5 Episodes").tag(5)
+                    } label: {
+                        Label("Auto-Download", glyph: .download)
+                    }
+                    .pickerStyle(.menu)
+                    Toggle(isOn: $podcasts.deletePlayedDownloads) {
+                        Label("Remove Played Downloads", glyph: .trash)
+                    }
+                    SettingsValue("Episode Storage", glyph: .downloads, value: ByteCountFormatter.string(fromByteCount: podcasts.totalBytes, countStyle: .file))
+                    Button { confirmRemoveDownloads = true } label: {
+                        Label("Remove Episode Downloads", glyph: .trash)
+                    }
+                    .disabled(podcasts.totalBytes == 0)
+                }
+
+                Section("Shows") {
+                    Toggle(isOn: $podcasts.syncWithJellyfin) {
+                        Label("Sync with Jellyfin", glyph: .server)
+                    }
+                    Button { showImporter = true } label: {
+                        Label("Import OPML", glyph: .download)
+                    }
+                    ShareLink(item: OPMLDocument(text: podcasts.exportOPML()), preview: SharePreview("Wavetile Podcasts.opml")) {
+                        Label("Export OPML", glyph: .export)
+                    }
+                    Button { confirmRemove = true } label: {
+                        Label("Remove All Podcast Data", glyph: .trash)
+                    }
+                }
             }
-            .scrollIndicators(.hidden)
-            .foregroundStyle(theme.palette.textPrimary)
-            .themedBackground()
             .navigationTitle("Podcast Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -113,34 +104,6 @@ struct PodcastSettingsView: View {
         } message: {
             Text("Unfollows every show and deletes progress, Up Next and downloads on this device. With sync on, other devices update too.")
         }
-    }
-}
-
-/// A settings row with a switch, matching `SettingsRow`.
-struct SettingsToggle: View {
-    @Environment(\.theme) private var theme
-    let glyph: Glyph
-    let title: String
-    @Binding var isOn: Bool
-
-    init(_ glyph: Glyph, _ title: String, isOn: Binding<Bool>) {
-        self.glyph = glyph
-        self.title = title
-        self._isOn = isOn
-    }
-
-    var body: some View {
-        Toggle(isOn: $isOn) {
-            HStack(spacing: theme.spacing.md) {
-                glyph.image.foregroundStyle(theme.palette.accent)
-                Text(title)
-                    .font(theme.typography.body)
-                    .foregroundStyle(theme.palette.textPrimary)
-            }
-        }
-        .tint(theme.palette.toggle)
-        .padding(.horizontal, theme.spacing.lg)
-        .padding(.vertical, theme.spacing.sm)
     }
 }
 
