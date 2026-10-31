@@ -62,9 +62,9 @@ struct PlayableRow<Label: View>: View {
     var body: some View {
         HStack(spacing: 0) {
             tapAction
-                // Offline, only downloaded songs can play; dim the rest.
-                .disabled(!isAvailable)
+                // Offline, only downloaded songs can play; dim the rest (tapping one says why).
                 .opacity(isAvailable ? 1 : 0.35)
+                .accessibilityHint(isAvailable ? "" : "Not downloaded")
                 .contextMenu { menuItems }
             if showsMore {
                 Menu { menuItems } label: {
@@ -108,9 +108,10 @@ struct PlayableRow<Label: View>: View {
 
     private var tapAction: some View {
         Button {
+            guard isAvailable else { return actions.showOffline() }
             taps += 1
             if let onTap { return onTap() }
-            player.play(tracks(), startAt: index, online: connectivity.isOnline, downloads: downloads)
+            player.play(tracks(), startAt: index)
         } label: {
             label.contentShape(.rect)
         }
@@ -125,20 +126,5 @@ struct PlayableRow<Label: View>: View {
 extension Array {
     subscript(safe index: Int) -> Element? {
         indices.contains(index) ? self[index] : nil
-    }
-}
-
-extension AudioPlayer {
-    /// Plays `queue` from `index`. Offline, queues only what's on the device so playback
-    /// doesn't hit dead tracks.
-    func play(_ queue: [QueuedTrack], startAt index: Int = 0, shuffled: Bool = false, online: Bool, downloads: DownloadsStore) {
-        var queue = queue
-        var start = index
-        if !online {
-            let tapped = queue[safe: index]?.queueID
-            queue = queue.filter { downloads.isDownloaded($0.trackID) }
-            start = queue.firstIndex { $0.queueID == tapped } ?? 0
-        }
-        play(queue, startAt: start, shuffled: shuffled)
     }
 }

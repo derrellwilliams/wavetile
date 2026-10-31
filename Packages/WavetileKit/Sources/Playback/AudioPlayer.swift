@@ -24,6 +24,14 @@ public final class AudioPlayer {
     public private(set) var currentTime: Double = 0
     public private(set) var duration: Double = 0
     public private(set) var errorMessage: String?
+    /// Set when something couldn't play because it can't stream right now (offline, or the
+    /// server is out of reach) and it isn't downloaded.
+    /// A new value each time, so the app shows its toast again on every attempt.
+    public private(set) var offlineNotice: OfflineNotice?
+
+    public struct OfflineNotice: Equatable, Sendable {
+        public let id = UUID()
+    }
 
     public var current: QueuedTrack? { queue.current }
 
@@ -66,6 +74,11 @@ public final class AudioPlayer {
 
     /// Returns a downloaded file for a track ID; when set, local files play instead of streams.
     @ObservationIgnored public var localFile: ((String) -> URL?)?
+    /// Whether a track can stream right now (the network is up and, for music, the server
+    /// answers). When it can't, only what's on the device is queued.
+    @ObservationIgnored public var canStream: ((QueuedTrack) -> Bool)?
+    /// A stream failed to connect, so the app can recheck whether its source is reachable.
+    @ObservationIgnored public var onConnectionError: ((QueuedTrack) -> Void)?
     public var hasQueue: Bool { !queue.isEmpty }
 
     @ObservationIgnored private let library: LibraryClient
@@ -98,8 +111,17 @@ public final class AudioPlayer {
     // MARK: - Public controls
 
     /// Replaces the queue and starts playing at `index`.
+    /// When some tracks can't stream, queues only the playable ones, starting at the first from
+    /// `index`; with none playable it plays nothing and posts `offlineNotice`.
     public func play(_ tracks: [QueuedTrack], startAt index: Int = 0, shuffled: Bool = false) {
         guard !tracks.isEmpty else { return }
+        var tracks = tracks, index = index
+        let playable = tracks.indices.filter { canPlay(tracks[$0]) }
+        guard !playable.isEmpty else { return notifyOffline() }
+        if playable.count < tracks.count {
+            index = playable.firstIndex { $0 >= index } ?? 0
+            tracks = playable.map { tracks[$0] }
+        }
         queue = PlaybackQueue(tracks: tracks, startAt: index, shuffled: shuffled)
         queue.repeatMode = .off
         isPlaying = true
@@ -175,6 +197,9 @@ public final class AudioPlayer {
     }
 
     public func jump(to queueID: UUID) {
+        if let track = queue.items.first(where: { $0.queueID == queueID }), !canPlay(track) {
+            return notifyOffline()
+        }
         queue.jump(to: queueID)
         isPlaying = true
         loadCurrent()
@@ -182,12 +207,14 @@ public final class AudioPlayer {
 
     public func playNext(_ tracks: [QueuedTrack]) {
         if queue.isEmpty { return play(tracks) }
+        guard let tracks = playableNow(tracks) else { return }
         queue.playNext(tracks)
         enqueueNext()
     }
 
     public func addToQueue(_ tracks: [QueuedTrack]) {
         if queue.isEmpty { return play(tracks) }
+        guard let tracks = playableNow(tracks) else { return }
         queue.append(tracks)
         enqueueNext()
     }
@@ -248,6 +275,14 @@ public final class AudioPlayer {
         forgetAllItems()
         errorMessage = nil
         currentTime = 0
+        // Next or Previous onto a track that can't stream: move on now rather than after a timeout.
+        if let track = queue.current, !canPlay(track) {
+            notifyOffline()
+            guard skipToPlayable() else {
+                isPlaying = false
+                return updateNowPlayingPlayback()
+            }
+        }
         guard let track = queue.current, let item = makeItem(for: track) else { return }
         player.insert(item, after: nil)
         duration = track.duration.map { Double($0.components.seconds) } ?? 0
@@ -475,10 +510,57 @@ public final class AudioPlayer {
     }
 
     private func itemFailed(_ item: AVPlayerItem) {
+        if let track = queue.current, Self.isConnectionError(item.error) { onConnectionError?(track) }
+        // The connection or server dropped under a stream: say so once and skip to what's
+        // playable, rather than failing through the rest of the queue one track at a time.
+        if let track = queue.current, !canPlay(track) {
+            notifyOffline()
+            if skipToPlayable() { loadCurrent() } else { pause() }
+            return
+        }
         let fallback = queue.current?.isEpisode == true ? "This episode couldn't be played." : "This track couldn't be played."
         errorMessage = item.error?.localizedDescription ?? fallback
         // Skip unplayable tracks rather than stalling the queue.
         if queue.skipForward() { loadCurrent() } else { pause() }
+    }
+
+    // MARK: - Offline
+
+    private func canPlay(_ track: QueuedTrack) -> Bool {
+        localFile?(track.trackID) != nil || canStream?(track) != false
+    }
+
+    private func notifyOffline() {
+        offlineNotice = OfflineNotice()
+    }
+
+    /// The tracks that can play now; nil (after posting the notice) if none can.
+    private func playableNow(_ tracks: [QueuedTrack]) -> [QueuedTrack]? {
+        let playable = tracks.filter(canPlay)
+        if playable.isEmpty { notifyOffline() }
+        return playable.isEmpty ? nil : playable
+    }
+
+    /// Moves forward to the next playable track (at most once around a repeating queue).
+    private func skipToPlayable() -> Bool {
+        for _ in queue.items.indices {
+            guard queue.skipForward() else { return false }
+            if let current = queue.current, canPlay(current) { return true }
+        }
+        return false
+    }
+
+    /// No network, or the host didn't answer. AVFoundation wraps the URL error, so look one
+    /// level down too.
+    private nonisolated static func isConnectionError(_ error: (any Error)?) -> Bool {
+        guard let error = error as NSError? else { return false }
+        let codes = [
+            NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost, NSURLErrorDataNotAllowed,
+            NSURLErrorCannotConnectToHost, NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed, NSURLErrorTimedOut,
+        ]
+        return ([error] + error.underlyingErrors.map { $0 as NSError }).contains {
+            $0.domain == NSURLErrorDomain && codes.contains($0.code)
+        }
     }
 
     // MARK: - Audio session

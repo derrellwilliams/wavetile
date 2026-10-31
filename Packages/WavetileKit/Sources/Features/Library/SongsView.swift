@@ -13,7 +13,6 @@ struct SongsView: View {
     @Environment(DownloadsStore.self) private var downloads
     /// Every song plus its row index by ID, built off the main actor when the list changes.
     @State private var list = TrackList()
-    @Environment(Connectivity.self) private var connectivity
 
     var body: some View {
         List(tracks) { track in
@@ -54,8 +53,7 @@ struct SongsView: View {
 
     private func menu(for track: TrackRecord) -> SongMenu {
         store.songMenu(for: track, source: "songs") {
-            player.play(tracks.map(QueuedTrack.init), startAt: indexByID[track.id] ?? 0,
-                        online: connectivity.isOnline, downloads: downloads)
+            player.play(tracks.map(QueuedTrack.init), startAt: indexByID[track.id] ?? 0)
         }
     }
 }

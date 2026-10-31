@@ -17,10 +17,13 @@ final class LibraryActions {
         let albumIDs: [String]
     }
 
-    /// A short-lived "it worked" banner for actions that otherwise give no visible result.
+    /// A short-lived banner: "it worked" for actions that otherwise give no visible result, or
+    /// why something didn't play.
     struct Confirmation: Identifiable, Equatable {
         let id = UUID()
         let message: String
+        var glyph: Glyph = .check
+        var isWarning = false
     }
 
     var addToPlaylist: TrackSelection?
@@ -29,11 +32,22 @@ final class LibraryActions {
     private(set) var confirmation: Confirmation?
 
     func confirm(_ message: String) {
-        let shown = Confirmation(message: message)
+        show(Confirmation(message: message), for: .seconds(2))
+    }
+
+    /// Tried to play something that isn't downloaded while it can't stream.
+    func showOffline() {
+        let message = Connectivity.shared.hasNetwork
+            ? "Can't reach your server. Download this while it's reachable to listen anywhere."
+            : "You're offline. Download this when you're connected to listen anywhere."
+        show(Confirmation(message: message, glyph: .offline, isWarning: true), for: .seconds(3.5))
+    }
+
+    private func show(_ shown: Confirmation, for duration: Duration) {
         confirmation = shown
-        AccessibilityNotification.Announcement(message).post()
+        AccessibilityNotification.Announcement(shown.message).post()
         Task {
-            try? await Task.sleep(for: .seconds(2))
+            try? await Task.sleep(for: duration)
             if confirmation?.id == shown.id { confirmation = nil }
         }
     }
@@ -105,12 +119,14 @@ private struct LibraryActionSheets: ViewModifier {
             // Slides in from the top and leaves the same way.
             .overlay(alignment: .top) {
                 if let confirmation = actions.confirmation {
-                    ConfirmationBanner(message: confirmation.message)
+                    ConfirmationBanner(confirmation: confirmation)
                         .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
                 }
             }
             .animation(theme.motion.smooth, value: actions.confirmation)
-            .sensoryFeedback(.success, trigger: actions.confirmation) { _, new in new != nil }
+            .sensoryFeedback(trigger: actions.confirmation) { _, new in
+                new.map { $0.isWarning ? .warning : .success }
+            }
             .alert("Something Went Wrong", isPresented: Binding(get: { actions.errorMessage != nil }, set: { if !$0 { actions.errorMessage = nil } })) {
                 Button("OK", role: .cancel) {}
             } message: {
@@ -119,18 +135,20 @@ private struct LibraryActionSheets: ViewModifier {
     }
 }
 
-/// Glass capsule with a check and a short message, shown below the status bar.
+/// Glass capsule with an icon and a short message, shown below the status bar.
 private struct ConfirmationBanner: View {
     @Environment(\.theme) private var theme
-    let message: String
+    let confirmation: LibraryActions.Confirmation
 
     var body: some View {
-        Label(message, glyph: .check)
+        Label(confirmation.message, glyph: confirmation.glyph)
             .labelStyle(.tintedIcon)
             .font(theme.typography.itemTitle)
+            .multilineTextAlignment(.leading)
             .padding(.horizontal, theme.spacing.lg)
             .padding(.vertical, theme.spacing.md)
-            .glassEffect(.regular, in: .capsule)
+            .glassEffect(.regular, in: .rect(cornerRadius: theme.radius.card))
+            .padding(.horizontal, theme.spacing.screenInset)
             .padding(.top, theme.spacing.sm)
             .allowsHitTesting(false)
             .accessibilityHidden(true)  // Announced when shown instead.

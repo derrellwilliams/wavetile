@@ -96,7 +96,7 @@ struct DownloadedView: View {
                 filterHeader
                 VStack(alignment: .leading, spacing: theme.spacing.lg) {
                     if !connectivity.isOnline {
-                        Label("You're offline. Downloaded music still plays.", glyph: .offline)
+                        Label(connectivity.hasNetwork ? "Can't reach your server. Downloaded music still plays." : "You're offline. Downloaded music still plays.", glyph: .offline)
                             .font(theme.typography.itemSubtitle)
                             .foregroundStyle(theme.palette.textSecondary)
                             // Drops in from the top and leaves the same way.

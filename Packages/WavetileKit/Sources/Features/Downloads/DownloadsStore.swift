@@ -6,26 +6,100 @@ import JellyfinKit
 import Network
 import Observation
 import Persistence
+import UIKit
 import WidgetShared
 
-/// Online/offline state. Screens dim music that isn't downloaded while offline.
+/// Online/offline state: whether the device has a network, and whether the Jellyfin server
+/// answers on it (a LAN-only server is out of reach away from home, and remote access can be
+/// down). Screens dim music that isn't downloaded while either is missing.
 @Observable
 final class Connectivity {
     /// One monitor for the app, started at launch so Siri and CarPlay see the real state at once.
     static let shared = Connectivity()
 
-    private(set) var isOnline = true
+    private(set) var hasNetwork = true
+    /// Whether the server answered its last check. Optimistic until a check says otherwise, so
+    /// launch doesn't dim the library while the first check runs.
+    private(set) var serverReachable = true
+    /// Music can stream: the network is up and the server answers.
+    var isOnline: Bool { hasNetwork && serverReachable }
+
+    /// The signed-in server; nil when signed out (nothing to check).
+    var serverURL: URL? {
+        didSet {
+            guard serverURL != oldValue else { return }
+            serverReachable = true
+            check()
+        }
+    }
+
     @ObservationIgnored private let monitor = NWPathMonitor()
+    @ObservationIgnored private var checkTask: Task<Void, Never>?
+    @ObservationIgnored private var foregroundToken: NSObjectProtocol?
+    /// Short timeout and no waiting for a network: the answer is needed now, not eventually.
+    @ObservationIgnored private let session: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 6
+        configuration.waitsForConnectivity = false
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return URLSession(configuration: configuration)
+    }()
 
     init() {
         monitor.pathUpdateHandler = { [weak self] path in
             let online = path.status == .satisfied
-            Task { @MainActor in self?.isOnline = online }
+            Task { @MainActor in self?.networkChanged(online) }
         }
         monitor.start(queue: DispatchQueue(label: "com.derrellwilliams.wavetile.connectivity"))
+        // Coming back to the app is when a listener has likely moved (left home, arrived back).
+        foregroundToken = NotificationCenter.default.addObserver(
+            forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.check() }
+        }
     }
 
-    deinit { monitor.cancel() }
+    deinit {
+        monitor.cancel()
+        checkTask?.cancel()
+    }
+
+    /// A stream couldn't connect: treat the server as out of reach now, and confirm.
+    func serverUnreachable() {
+        serverReachable = false
+        check()
+    }
+
+    private func networkChanged(_ online: Bool) {
+        guard online != hasNetwork else { return }
+        hasNetwork = online
+        check()
+    }
+
+    /// Pings the server; while it doesn't answer, tries again every 30 s.
+    private func check() {
+        checkTask?.cancel()
+        guard hasNetwork, let serverURL else { return }
+        let session = session
+        checkTask = Task { [weak self] in
+            while !Task.isCancelled {
+                let reachable = await Self.ping(serverURL, session: session)
+                guard !Task.isCancelled, let self else { return }
+                serverReachable = reachable
+                if reachable { return }
+                try? await Task.sleep(for: .seconds(30))
+            }
+        }
+    }
+
+    /// Security: Jellyfin's public ping endpoint, sent without the token. Any HTTP answer
+    /// counts as reachable (a proxy in front of the server may answer differently); only a
+    /// transport failure means it's out of reach.
+    @concurrent private nonisolated static func ping(_ serverURL: URL, session: URLSession) async -> Bool {
+        var request = URLRequest(url: serverURL.appending(path: "System/Ping"))
+        request.httpMethod = "GET"
+        return (try? await session.data(for: request)) != nil
+    }
 }
 
 /// UI-facing downloads: settings, live status, and actions.

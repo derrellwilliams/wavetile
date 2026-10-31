@@ -124,6 +124,10 @@ struct MainTabView: View {
         }
         .opmlImporter(isPresented: $showOPMLImporter, message: $opmlMessage)
         .onChange(of: signedIn.player.isPlaying) { widgets.playerChanged() }
+        // Something that isn't downloaded was played offline (a row, Play, the queue, or a dropped stream).
+        .onChange(of: signedIn.player.offlineNotice) { _, notice in
+            if notice != nil { actions.showOffline() }
+        }
         .onOpenURL(perform: openLink)
         .onChange(of: signedIn.player.hasQueue) { _, hasQueue in
             if hasQueue, DebugFlags.openNowPlaying { showNowPlaying = true }

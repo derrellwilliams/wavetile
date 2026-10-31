@@ -12,8 +12,6 @@ struct ArtistDetailView: View {
     @Environment(\.theme) private var theme
     @Environment(LibraryStore.self) private var store
     @Environment(AudioPlayer.self) private var player
-    @Environment(DownloadsStore.self) private var downloads
-    @Environment(Connectivity.self) private var connectivity
     @Environment(LibraryActions.self) private var actions
     let artistID: String
     let name: String
@@ -130,8 +128,7 @@ struct ArtistDetailView: View {
     /// Read on tap, so a large discography costs nothing until it's played.
     /// Offline, only downloaded songs are queued.
     private func play(shuffled: Bool) {
-        guard var queue = try? store.database.tracks(artistID: artistID).map(QueuedTrack.init) else { return }
-        if !connectivity.isOnline { queue = queue.filter { downloads.isDownloaded($0.trackID) } }
+        guard let queue = try? store.database.tracks(artistID: artistID).map(QueuedTrack.init) else { return }
         player.play(queue, shuffled: shuffled)
     }
 }

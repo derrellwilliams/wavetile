@@ -20,7 +20,6 @@ struct SearchView: View {
     @Namespace private var zoom
     @Environment(AudioPlayer.self) private var player
     @Environment(DownloadsStore.self) private var downloads
-    @Environment(Connectivity.self) private var connectivity
     @Environment(PodcastsStore.self) private var podcasts
     @Binding var text: String
     @Binding var scope: MediaKind
@@ -221,8 +220,6 @@ struct SearchView: View {
         if let albumID = track.albumID, let albumTracks = try? store.database.tracks(albumID: albumID), !albumTracks.isEmpty {
             queue = albumTracks.map(QueuedTrack.init)
         }
-        // Offline, queue only what's on the device (same rule as tapping any row).
-        if !connectivity.isOnline { queue = queue.filter { downloads.isDownloaded($0.trackID) } }
         guard let start = queue.firstIndex(where: { $0.trackID == track.id }) else { return }
         recents.add(text)
         player.play(queue, startAt: start)

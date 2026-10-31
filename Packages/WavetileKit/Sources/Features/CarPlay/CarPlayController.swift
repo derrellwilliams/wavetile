@@ -19,7 +19,6 @@ import Podcasts
 public final class CarPlayController {
     private let interface: CPInterfaceController
     private let app: AppModel
-    private let connectivity = Connectivity.shared
     /// Long lists are cut off here; CarPlay limits list length while driving anyway.
     private let listLimit = 200
 
@@ -286,7 +285,7 @@ public final class CarPlayController {
     private func play(_ tracks: [TrackRecord], startAt index: Int = 0, shuffled: Bool = false, _ signedIn: AppModel.SignedIn) {
         let queue = tracks.map(QueuedTrack.init)
         guard !queue.isEmpty else { return }
-        signedIn.player.play(queue, startAt: index, shuffled: shuffled, online: connectivity.isOnline, downloads: signedIn.downloads)
+        signedIn.player.play(queue, startAt: index, shuffled: shuffled)
         showNowPlaying()
     }
 

@@ -92,6 +92,14 @@ public final class AppModel {
         player.localFile = { [weak downloads, weak podcasts] id in
             downloads?.localFile(trackID: id) ?? podcasts?.localFile(episodeID: id)
         }
+        // Episodes stream from their publishers, so they only need a network; music needs the server.
+        player.canStream = { track in
+            track.isEpisode ? Connectivity.shared.hasNetwork : Connectivity.shared.isOnline
+        }
+        player.onConnectionError = { track in
+            if !track.isEpisode { Connectivity.shared.serverUnreachable() }
+        }
+        Connectivity.shared.serverURL = session.serverURL
         player.resumePosition = { [weak podcasts] track in podcasts?.resumePosition(for: track) }
         player.onEpisodeProgress = { [weak podcasts] track, position, duration in
             podcasts?.episodeProgress(track, position: position, duration: duration)
@@ -112,6 +120,7 @@ public final class AppModel {
         if case let .signedIn(signedIn) = phase {
             signedIn.player.stop()
             WidgetBridge.clear()
+            Connectivity.shared.serverURL = nil
             // Downloaded music is tied to this account; remove it from the device.
             signedIn.downloads.manager?.deleteEverything()
             // Podcast progress and downloads belong to this account too.
