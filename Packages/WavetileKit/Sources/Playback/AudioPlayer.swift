@@ -77,8 +77,12 @@ public final class AudioPlayer {
     /// Whether a track can stream right now (the network is up and, for music, the server
     /// answers). When it can't, only what's on the device is queued.
     @ObservationIgnored public var canStream: ((QueuedTrack) -> Bool)?
-    /// A stream failed to connect, so the app can recheck whether its source is reachable.
-    @ObservationIgnored public var onConnectionError: ((QueuedTrack) -> Void)?
+    /// Whether a track is downloaded, answered from memory: `play()` asks it of every track in
+    /// the list, which can be the whole library.
+    @ObservationIgnored public var isOnDevice: ((QueuedTrack) -> Bool)?
+    /// A stream failed to connect: rechecks whether its source is reachable, returning once
+    /// `canStream` has the answer.
+    @ObservationIgnored public var onConnectionError: ((QueuedTrack) async -> Void)?
     public var hasQueue: Bool { !queue.isEmpty }
 
     @ObservationIgnored private let library: LibraryClient
@@ -112,12 +116,16 @@ public final class AudioPlayer {
 
     /// Replaces the queue and starts playing at `index`.
     /// When some tracks can't stream, queues only the playable ones, starting at the first from
-    /// `index`; with none playable it plays nothing and posts `offlineNotice`.
-    public func play(_ tracks: [QueuedTrack], startAt index: Int = 0, shuffled: Bool = false) {
-        guard !tracks.isEmpty else { return }
+    /// `index`; with none playable it plays nothing, posts `offlineNotice` and returns false.
+    @discardableResult
+    public func play(_ tracks: [QueuedTrack], startAt index: Int = 0, shuffled: Bool = false) -> Bool {
+        guard !tracks.isEmpty else { return false }
         var tracks = tracks, index = index
         let playable = tracks.indices.filter { canPlay(tracks[$0]) }
-        guard !playable.isEmpty else { return notifyOffline() }
+        guard !playable.isEmpty else {
+            notifyOffline()
+            return false
+        }
         if playable.count < tracks.count {
             index = playable.firstIndex { $0 >= index } ?? 0
             tracks = playable.map { tracks[$0] }
@@ -126,6 +134,7 @@ public final class AudioPlayer {
         queue.repeatMode = .off
         isPlaying = true
         loadCurrent()
+        return true
     }
 
     public func togglePlayPause() {
@@ -135,7 +144,7 @@ public final class AudioPlayer {
     public func resume() {
         guard hasQueue else { return }
         activateSession()
-        if player.currentItem == nil { loadCurrent() }
+        if player.currentItem == nil || player.currentItem?.status == .failed { loadCurrent() }
         isPlaying = true
         player.play()
         reportProgress(force: true)
@@ -149,14 +158,16 @@ public final class AudioPlayer {
         updateNowPlayingPlayback()
     }
 
+    /// Skips past tracks that can't play now; with none ahead, stays put and says why.
     public func next() {
-        guard queue.skipForward() else { return }
+        guard move(by: { $0.skipForward() }) else { return }
         loadCurrent()
     }
 
-    /// Restarts the track if more than 3 s in (standard behavior), otherwise goes back one.
+    /// Restarts the track if more than 3 s in (standard behavior), otherwise goes back to the
+    /// previous playable track.
     public func previous() {
-        if currentTime > 3 || !queue.skipBackward() {
+        if currentTime > 3 || !move(by: { $0.skipBackward() }) {
             seek(to: 0)
         } else {
             loadCurrent()
@@ -206,14 +217,14 @@ public final class AudioPlayer {
     }
 
     public func playNext(_ tracks: [QueuedTrack]) {
-        if queue.isEmpty { return play(tracks) }
+        if queue.isEmpty { return _ = play(tracks) }
         guard let tracks = playableNow(tracks) else { return }
         queue.playNext(tracks)
         enqueueNext()
     }
 
     public func addToQueue(_ tracks: [QueuedTrack]) {
-        if queue.isEmpty { return play(tracks) }
+        if queue.isEmpty { return _ = play(tracks) }
         guard let tracks = playableNow(tracks) else { return }
         queue.append(tracks)
         enqueueNext()
@@ -275,14 +286,6 @@ public final class AudioPlayer {
         forgetAllItems()
         errorMessage = nil
         currentTime = 0
-        // Next or Previous onto a track that can't stream: move on now rather than after a timeout.
-        if let track = queue.current, !canPlay(track) {
-            notifyOffline()
-            guard skipToPlayable() else {
-                isPlaying = false
-                return updateNowPlayingPlayback()
-            }
-        }
         guard let track = queue.current, let item = makeItem(for: track) else { return }
         player.insert(item, after: nil)
         duration = track.duration.map { Double($0.components.seconds) } ?? 0
@@ -315,7 +318,8 @@ public final class AudioPlayer {
         // Keep a preloaded item that's still the right one: rebuilding it on every queue edit
         // throws away what it has buffered and risks a gap near the end of the current track.
         let preloaded = player.items().dropFirst()
-        if !loopsCurrent, let next = queue.automaticNext, next.queueID != queue.current?.queueID,
+        let target = preloadTarget
+        if !loopsCurrent, let next = target, next.queueID != queue.current?.queueID,
            preloaded.count == 1, let item = preloaded.first, item.status != .failed,
            entries[ObjectIdentifier(item)]?.track.queueID == next.queueID {
             return
@@ -325,10 +329,23 @@ public final class AudioPlayer {
             entries.removeValue(forKey: ObjectIdentifier(item))
             statusObservations.removeValue(forKey: ObjectIdentifier(item))
         }
-        guard !loopsCurrent, let next = queue.automaticNext, next.queueID != queue.current?.queueID,
+        guard !loopsCurrent, let next = target, next.queueID != queue.current?.queueID,
               let currentItem = player.currentItem, let item = makeItem(for: next)
         else { return }
         player.insert(item, after: currentItem)
+    }
+
+    /// The automatic next track, or the first playable one after it, so the gapless item isn't a
+    /// stream that's sure to fail. AVQueuePlayer moving to it jumps the queue past the rest.
+    private var preloadTarget: QueuedTrack? {
+        guard let next = queue.automaticNext else { return nil }
+        if canPlay(next) { return next }
+        var probe = queue
+        for _ in queue.items.indices {
+            guard probe.skipForward(), let track = probe.current else { return nil }
+            if canPlay(track) { return track }
+        }
+        return nil
     }
 
     private func forgetAllItems() {
@@ -510,12 +527,28 @@ public final class AudioPlayer {
     }
 
     private func itemFailed(_ item: AVPlayerItem) {
-        if let track = queue.current, Self.isConnectionError(item.error) { onConnectionError?(track) }
-        // The connection or server dropped under a stream: say so once and skip to what's
-        // playable, rather than failing through the rest of the queue one track at a time.
-        if let track = queue.current, !canPlay(track) {
+        guard let track = queue.current else { return }
+        // Confirm before treating the source as down: one slow or dropped stream isn't an outage.
+        if Self.isConnectionError(item.error), let recheck = onConnectionError {
+            Task {
+                await recheck(track)
+                // Unless the listener has moved on in the meantime.
+                guard queue.current?.queueID == track.queueID else { return }
+                skipFailed(item, track)
+            }
+            return
+        }
+        skipFailed(item, track)
+    }
+
+    private func skipFailed(_ item: AVPlayerItem, _ track: QueuedTrack) {
+        // The connection or server is gone: skip to what's playable (saying so once), rather
+        // than failing through the rest of the queue one track at a time.
+        if !canPlay(track) {
+            // Paused (the rewind at the end of a queue): nothing to skip or say until play is pressed.
+            guard isPlaying else { return }
             notifyOffline()
-            if skipToPlayable() { loadCurrent() } else { pause() }
+            if move(by: { $0.skipForward() }) { loadCurrent() } else { pause() }
             return
         }
         let fallback = queue.current?.isEpisode == true ? "This episode couldn't be played." : "This track couldn't be played."
@@ -526,8 +559,9 @@ public final class AudioPlayer {
 
     // MARK: - Offline
 
+    /// Streaming is checked first: it's free, and the common case.
     private func canPlay(_ track: QueuedTrack) -> Bool {
-        localFile?(track.trackID) != nil || canStream?(track) != false
+        canStream?(track) != false || isOnDevice?(track) ?? (localFile?(track.trackID) != nil)
     }
 
     private func notifyOffline() {
@@ -541,12 +575,20 @@ public final class AudioPlayer {
         return playable.isEmpty ? nil : playable
     }
 
-    /// Moves forward to the next playable track (at most once around a repeating queue).
-    private func skipToPlayable() -> Bool {
-        for _ in queue.items.indices {
-            guard queue.skipForward() else { return false }
-            if let current = queue.current, canPlay(current) { return true }
+    /// Steps the queue until it lands on a playable track (at most once around a repeating
+    /// queue). Passing over tracks that can't play posts the notice; with none playable the
+    /// queue stays where it was.
+    private func move(by step: (inout PlaybackQueue) -> Bool) -> Bool {
+        var probe = queue
+        for passed in queue.items.indices {
+            guard step(&probe), let track = probe.current else { break }
+            if canPlay(track) {
+                if passed > 0 { notifyOffline() }
+                queue = probe
+                return true
+            }
         }
+        if probe.current?.queueID != queue.current?.queueID { notifyOffline() }
         return false
     }
 

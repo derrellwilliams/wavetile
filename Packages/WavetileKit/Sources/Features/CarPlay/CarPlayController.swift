@@ -284,8 +284,8 @@ public final class CarPlayController {
     /// Offline, only downloaded songs are queued, as on the phone.
     private func play(_ tracks: [TrackRecord], startAt index: Int = 0, shuffled: Bool = false, _ signedIn: AppModel.SignedIn) {
         let queue = tracks.map(QueuedTrack.init)
-        guard !queue.isEmpty else { return }
-        signedIn.player.play(queue, startAt: index, shuffled: shuffled)
+        // Nothing playable (offline or away from the server): stay on the list, not an empty player.
+        guard signedIn.player.play(queue, startAt: index, shuffled: shuffled) else { return }
         showNowPlaying()
     }
 

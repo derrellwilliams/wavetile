@@ -141,9 +141,16 @@ public extension LibraryDatabase {
 
     /// Track IDs that are fully downloaded (row badges, offline availability).
     func downloadedTrackIDs() -> ValueObservation<ValueReducers.Fetch<Set<String>>> {
-        ValueObservation.tracking { db in
-            Set(try String.fetchAll(db, sql: "SELECT trackID FROM downloadedTrack WHERE state = 'done'"))
-        }
+        ValueObservation.tracking(Self.downloadedTrackIDs)
+    }
+
+    /// The same set, read once (before an observation has delivered it, or with no UI at all).
+    func downloadedTrackIDsNow() throws -> Set<String> {
+        try pool.read(Self.downloadedTrackIDs)
+    }
+
+    private static func downloadedTrackIDs(_ db: Database) throws -> Set<String> {
+        Set(try String.fetchAll(db, sql: "SELECT trackID FROM downloadedTrack WHERE state = 'done'"))
     }
 
     /// Every collection with its status and size, in one grouped query (download progress writes

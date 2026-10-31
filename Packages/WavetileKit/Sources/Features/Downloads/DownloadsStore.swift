@@ -17,6 +17,11 @@ final class Connectivity {
     /// One monitor for the app, started at launch so Siri and CarPlay see the real state at once.
     static let shared = Connectivity()
 
+    struct Server: Equatable {
+        let url: URL
+        let id: String
+    }
+
     private(set) var hasNetwork = true
     /// Whether the server answered its last check. Optimistic until a check says otherwise, so
     /// launch doesn't dim the library while the first check runs.
@@ -25,16 +30,20 @@ final class Connectivity {
     var isOnline: Bool { hasNetwork && serverReachable }
 
     /// The signed-in server; nil when signed out (nothing to check).
-    var serverURL: URL? {
+    var server: Server? {
         didSet {
-            guard serverURL != oldValue else { return }
+            guard server != oldValue else { return }
             serverReachable = true
             check()
         }
     }
 
     @ObservationIgnored private let monitor = NWPathMonitor()
+    /// Which interfaces the last path used: Wi-Fi to cellular stays "connected" but can put a
+    /// LAN-only server out of reach, so any change means checking again.
+    @ObservationIgnored private var interfaces: [String] = []
     @ObservationIgnored private var checkTask: Task<Void, Never>?
+    @ObservationIgnored private var retryTask: Task<Void, Never>?
     @ObservationIgnored private var foregroundToken: NSObjectProtocol?
     /// Short timeout and no waiting for a network: the answer is needed now, not eventually.
     @ObservationIgnored private let session: URLSession = {
@@ -48,7 +57,8 @@ final class Connectivity {
     init() {
         monitor.pathUpdateHandler = { [weak self] path in
             let online = path.status == .satisfied
-            Task { @MainActor in self?.networkChanged(online) }
+            let interfaces = path.availableInterfaces.map(\.name)
+            Task { @MainActor in self?.pathChanged(online: online, interfaces: interfaces) }
         }
         monitor.start(queue: DispatchQueue(label: "com.derrellwilliams.wavetile.connectivity"))
         // Coming back to the app is when a listener has likely moved (left home, arrived back).
@@ -62,43 +72,55 @@ final class Connectivity {
     deinit {
         monitor.cancel()
         checkTask?.cancel()
+        retryTask?.cancel()
     }
 
-    /// A stream couldn't connect: treat the server as out of reach now, and confirm.
-    func serverUnreachable() {
-        serverReachable = false
-        check()
-    }
-
-    private func networkChanged(_ online: Bool) {
-        guard online != hasNetwork else { return }
-        hasNetwork = online
-        check()
-    }
-
-    /// Pings the server; while it doesn't answer, tries again every 30 s.
-    private func check() {
-        checkTask?.cancel()
-        guard hasNetwork, let serverURL else { return }
-        let session = session
-        checkTask = Task { [weak self] in
-            while !Task.isCancelled {
-                let reachable = await Self.ping(serverURL, session: session)
-                guard !Task.isCancelled, let self else { return }
-                serverReachable = reachable
-                if reachable { return }
-                try? await Task.sleep(for: .seconds(30))
-            }
+    /// Pings the server now and returns once `serverReachable` has the answer (a stream just
+    /// failed to connect: one bad stream shouldn't dim the library on its own).
+    func recheck() async {
+        guard hasNetwork, let server else { return }
+        let reachable = await Self.ping(server, session: session)
+        guard !Task.isCancelled, server == self.server, hasNetwork else { return }
+        serverReachable = reachable
+        retryTask?.cancel()
+        // While it doesn't answer, try again every 30 s so the library comes back on its own.
+        guard !reachable else { return }
+        retryTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(30))
+            guard !Task.isCancelled else { return }
+            await self?.recheck()
         }
     }
 
-    /// Security: Jellyfin's public ping endpoint, sent without the token. Any HTTP answer
-    /// counts as reachable (a proxy in front of the server may answer differently); only a
-    /// transport failure means it's out of reach.
-    @concurrent private nonisolated static func ping(_ serverURL: URL, session: URLSession) async -> Bool {
-        var request = URLRequest(url: serverURL.appending(path: "System/Ping"))
-        request.httpMethod = "GET"
-        return (try? await session.data(for: request)) != nil
+    private func pathChanged(online: Bool, interfaces: [String]) {
+        guard online != hasNetwork || interfaces != self.interfaces else { return }
+        hasNetwork = online
+        self.interfaces = interfaces
+        check()
+    }
+
+    private func check() {
+        checkTask?.cancel()
+        retryTask?.cancel()
+        checkTask = Task { await recheck() }
+    }
+
+    /// Security: Jellyfin's public info endpoint, sent without the token. Only this server
+    /// answering counts: a captive portal or another host at the same LAN address returns a
+    /// page, not this server's ID.
+    @concurrent private nonisolated static func ping(_ server: Server, session: URLSession) async -> Bool {
+        struct PublicInfo: Decodable {
+            let Id: String?
+        }
+        let url = server.url.appending(path: "System/Info/Public")
+        guard let (data, response) = try? await session.data(from: url),
+              let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
+              let id = (try? JSONDecoder().decode(PublicInfo.self, from: data))?.Id
+        else { return false }
+        // A session saved without an ID can't be matched; any Jellyfin answer has to do.
+        guard !server.id.isEmpty else { return true }
+        let normalized = { (id: String) in id.lowercased().replacingOccurrences(of: "-", with: "") }
+        return normalized(id) == normalized(server.id)
     }
 }
 
@@ -127,6 +149,8 @@ final class DownloadsStore {
         self.manager = try? DownloadManager(serverID: session.serverID, userID: session.userID, database: library.database, library: library.api)
         self.quality = UserDefaults.standard.string(forKey: "downloadQuality").flatMap(DownloadManager.Quality.init) ?? .high
         self.allowCellular = UserDefaults.standard.object(forKey: "downloadOverCellular") as? Bool ?? false
+        // Read now so offline checks are right before `observe()` runs (and in CarPlay, where it may not).
+        self.downloadedTrackIDs = (try? library.database.downloadedTrackIDsNow()) ?? []
     }
 
     /// Long-running: keeps `downloadedTrackIDs` and `totalBytes` live. Run from a view `.task`.
