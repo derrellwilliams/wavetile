@@ -39,8 +39,6 @@ public struct Theme: Sendable, Identifiable, Hashable {
 
     /// Built on Dynamic Type text styles so every token scales with the user's text size (HIG).
     public struct Typography: Sendable, Equatable {
-        /// Centered wordmark in the Home navigation bar.
-        public var wordmark: Font
         public var largeTitle: Font
         public var title: Font
         public var sectionHeader: Font
@@ -110,8 +108,6 @@ public extension Theme {
             artworkPlaceholder: [Color(hex: 0x2E2E2E), Color(hex: 0x222222)]
         ),
         typography: .init(
-            // Logo: fixed size (a mark, not text). 30pt is the largest that sits cleanly in the 44pt bar.
-            wordmark: BrandFont.font(fixedSize: 32, weight: .bold, family: BrandFont.displayFamily),
             largeTitle: BrandFont.display(.largeTitle),
             title: BrandFont.display(.title2),
             sectionHeader: BrandFont.font(.title3, weight: .semibold),

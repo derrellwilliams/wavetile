@@ -17,9 +17,10 @@ struct SignInFlow: View {
             Form {
                 Section {
                     VStack(alignment: .leading, spacing: theme.spacing.sm) {
-                        WavetileMark(isAnimating: true, size: 96, color: theme.palette.surface)
+                        WaveMark(isAnimating: true, width: 120)
                             // Form rows clip to the section's rounded corners; keep the mark clear of them.
                             .padding(.top, theme.spacing.xl)
+                            .padding(.bottom, theme.spacing.md)
                         Text("Connect to Jellyfin")
                             .font(theme.typography.largeTitle)
                             .foregroundStyle(theme.palette.accent)

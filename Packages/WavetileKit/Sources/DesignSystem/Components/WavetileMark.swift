@@ -52,11 +52,13 @@ public struct WavetileMark: View {
         x < 0.5 ? 4 * x * x * x : 1 - pow(-2 * x + 2, 3) / 2
     }
 
+    /// Stroke in points at any size: Phosphor Bold's weight at the app's 24pt icon size (24 on its
+    /// 256 grid), so the mark matches the icons and the splash's waves.
+    public static let strokeWidth: CGFloat = 24 * 24 / 256
+
     // Geometry on a 100-unit grid, matching the loader prototype.
-    private static let lineWidth: CGFloat = 11
     private static let frameRect = CGRect(x: 10, y: 10, width: 80, height: 80)
     private static let frameRadius: CGFloat = 8
-    private static let hubRadius: CGFloat = 5.5
     /// The square the edges end on, and where each edge starts along it (1 per side, clockwise from top-left).
     private static let low: CGFloat = 12, high: CGFloat = 88
     private static let restPositions: [Double] = [0.5, 1.5, 3]
@@ -77,6 +79,8 @@ public struct WavetileMark: View {
         let scale = min(size.width, size.height) / 100
         canvas.translateBy(x: (size.width - 100 * scale) / 2, y: (size.height - 100 * scale) / 2)
         canvas.scaleBy(x: scale, y: scale)
+        // The stroke stays `strokeWidth` points whatever the size; the hub dot matches it.
+        let lineWidth = strokeWidth / scale, hubRadius = lineWidth / 2
         let style = StrokeStyle(lineWidth: lineWidth, lineCap: .butt)
         let center = CGPoint(x: 50, y: 50)
 

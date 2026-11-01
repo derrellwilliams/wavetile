@@ -6,7 +6,8 @@ import UIKit
 public struct RootView: View {
     @ObserveInjection var inject
     let app: AppModel
-    /// Covers the first moments after launch with the turning mark, picking up from the launch image.
+    /// Covers the first moments after launch with the turning cube over the drifting waves,
+    /// picking up from the launch image.
     @State private var showsSplash = true
 
     public init(app: AppModel) {
@@ -29,7 +30,8 @@ public struct RootView: View {
         }
         .overlay {
             if showsSplash {
-                SplashView()
+                // Starts as the static launch screen (the cube over "Wavetile"), so launch hands off without a jump.
+                SplashScreen()
                     .transition(.opacity)
             }
         }
@@ -40,8 +42,8 @@ public struct RootView: View {
         .background(app.theme.palette.background.ignoresSafeArea())
         .onAppear { app.restore() }
         .task {
-            // One quarter turn, then reveal the app.
-            try? await Task.sleep(for: .seconds(WavetileMark.move + 0.15))
+            // One quarter turn and a beat to read the name, then reveal the app.
+            try? await Task.sleep(for: .seconds(WavetileMark.move + WavetileMark.hold + 0.15))
             withAnimation(app.theme.motion.smooth) { showsSplash = false }
         }
         .enableInjection()
@@ -53,19 +55,6 @@ public struct RootView: View {
         case .signedOut: 1
         case .signedIn: 2
         }
-    }
-}
-
-/// Matches the static launch screen (mark centered on the canvas), so launch hands off without a jump.
-private struct SplashView: View {
-    @Environment(\.theme) private var theme
-
-    var body: some View {
-        theme.palette.background
-            .ignoresSafeArea()
-            .overlay { WavetileMark(isAnimating: true, size: 96) }
-            .ignoresSafeArea()
-            .accessibilityHidden(true)
     }
 }
 

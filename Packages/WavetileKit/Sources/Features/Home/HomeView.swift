@@ -85,9 +85,9 @@ struct HomeView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    Text("Wavetile")
-                        .font(theme.typography.wordmark)
-                        .foregroundStyle(theme.palette.accent)
+                    WaveMark(width: 104)
+                        .accessibilityElement()
+                        .accessibilityLabel("Wavetile")
                         .accessibilityAddTraits(.isHeader)
                 }
             }

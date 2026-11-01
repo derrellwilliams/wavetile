@@ -37,7 +37,8 @@ Shelves are read from the local DB on init (first frame, works offline), then `l
 
 ## Conventions
 - Icons: Phosphor Bold via `Glyph` only. Never SF Symbols.
-- Fonts: Familjen Grotesk for UI text and section headers; Stack Sans Notch for the wordmark and content titles (albums, artists, shows). No red in the brand.
+- Fonts: Familjen Grotesk for UI text and section headers; Stack Sans Notch for content titles (albums, artists, shows). No red in the brand.
+- Logo: the wave (`WaveMark`, from wave.svg) is the Home bar wordmark and the sign-in mark. The cube (`WavetileMark`) is the splash (`SplashScreen`: turning cube over "Wavetile" on faint drifting wave rows), `LoadingMark` and pull to refresh. `App/Assets.xcassets/LaunchMark` is the splash's first frame (waves plus lockup, 460 × 1000pt so it covers every iPhone, centered), rendered from the same `WaveField`/`Lockup` numbers so launch hands off without a jump; re-render it if either changes.
 - Match the surrounding code's comment style; screens observe GRDB via `store.observe(...)`.
 - Song/album/artist actions (favorite, add to playlist, Start Radio = Jellyfin Instant Mix replacing the queue) live in `Features/Library/LibraryActions.swift`.
 - Plain HTTP only to LAN hosts; `NSAllowsArbitraryLoadsInMedia` is for podcast audio only. Keep the token off cleartext.
