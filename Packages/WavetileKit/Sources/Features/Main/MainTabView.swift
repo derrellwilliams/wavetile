@@ -239,28 +239,32 @@ struct ProfileButton: View {
     }
 }
 
-/// A bar button's icon in the tinted circle the main buttons use (Play, Shuffle),
-/// instead of the bar's glass. Drawn inside the label: the bar ignores backgrounds added
-/// outside a button, and turns an item holding a menu into that menu's button.
+/// A bar button's icon in the tinted circle the main buttons use (Play, Shuffle), filling
+/// the bar's glass the way the system Back's does (iOS keeps glass behind Back, so every bar
+/// button keeps it, leaving the same faint rim). Drawn inside the label: the bar ignores
+/// backgrounds added outside a button, and turns an item holding a menu into that menu's button.
 struct TintedBarIcon: View {
     @Environment(\.theme) private var theme
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.barIconInGroup) private var inGroup
     let glyph: Glyph
+    /// How far the bar's glass reaches past the item on each side; 0 draws the full circle.
+    var glassInset = TintedBarFill<Circle>.glassInset
 
     var body: some View {
         glyph.image
             .foregroundStyle(theme.palette.accent)
             // In a capsule, the plain button style and `DimmingMenuStyle` dim each item.
             .opacity(isEnabled || inGroup ? 1 : 0.4)
-            .frame(width: 44, height: 44)
+            // Narrower by the glass's inset, so the glass around it is a 44pt circle like Back's.
+            .frame(width: 44 - 2 * (inGroup ? 0 : glassInset), height: 44)
             // In a group, the group's capsule is the fill.
-            .background { if !inGroup { TintedBarFill(shape: .circle) } }
+            .background { if !inGroup { TintedBarFill(shape: .circle).padding(.horizontal, -glassInset) } }
             .contentShape(.circle)
     }
 }
 
-/// A sheet's Close, Cancel or Done as a tinted circle instead of the bar's glass.
+/// A sheet's Close, Cancel or Done as a tinted circle filling the bar's glass.
 struct TintedSheetButton: ToolbarContent {
     let title: String
     let glyph: Glyph
@@ -280,13 +284,15 @@ struct TintedSheetButton: ToolbarContent {
                 .buttonStyle(.plain)
                 .accessibilityLabel(title)
         }
-        .sharedBackgroundVisibility(.hidden)
     }
 }
 
 /// The main buttons' tint as it shows on the page background, but opaque, so bar buttons over
 /// artwork (album and artist pages) read the same as on a plain screen.
 struct TintedBarFill<S: Shape>: View {
+    /// The bar's glass is this much wider than an item on each side.
+    static var glassInset: CGFloat { 4 }
+
     @Environment(\.theme) private var theme
     let shape: S
 
@@ -310,14 +316,16 @@ struct TintedBarCapsule<Content: View>: View {
                     item.frame(width: 44, height: 44)
                 }
             }
-            .frame(width: CGFloat(items.count) * 44, height: 44)
+            // Narrower by the glass's inset (the buttons overhang it), so the fill below
+            // covers the glass the way the system Back's circle does.
+            .frame(width: CGFloat(items.count) * 44 - 2 * TintedBarFill<Capsule>.glassInset, height: 44)
         }
         .buttonStyle(.plain)
         .menuStyle(DimmingMenuStyle())
         .labelStyle(.iconOnly)
         .foregroundStyle(theme.palette.accent)
         .environment(\.barIconInGroup, true)
-        .background { TintedBarFill(shape: .capsule) }
+        .background { TintedBarFill(shape: .capsule).padding(.horizontal, -TintedBarFill<Capsule>.glassInset) }
     }
 }
 
@@ -340,7 +348,7 @@ private struct DimmingMenu: View {
 
 extension View {
     /// A detail page's bar: the tinted system Back on the left and the page's buttons in one
-    /// tinted capsule on the right, instead of the bar's glass. SwiftUI's bar rebuilds an item
+    /// tinted capsule on the right, filling the bar's glass. SwiftUI's bar rebuilds an item
     /// as a bar button (dropping the capsule and every button after the first), and the bar
     /// takes the taps of anything floated over it, so the capsule is a UIKit custom bar item.
     func detailBarButtons<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
@@ -358,7 +366,7 @@ private struct DetailBar<Buttons: View>: ViewModifier {
     }
 }
 
-/// Puts SwiftUI content in the bar's trailing slot as it's drawn, with no glass.
+/// Puts SwiftUI content in the bar's trailing slot as it's drawn, over the bar's glass.
 private struct CustomBarItem<Content: View>: UIViewControllerRepresentable {
     let content: Content
 
@@ -384,7 +392,6 @@ private struct CustomBarItem<Content: View>: UIViewControllerRepresentable {
             hosting.view.backgroundColor = .clear
             hosting.view.frame.size = fittingSize
             let item = UIBarButtonItem(customView: hosting.view)
-            item.hidesSharedBackground = true
             return item
         }()
 
@@ -433,7 +440,7 @@ private struct CustomBarItem<Content: View>: UIViewControllerRepresentable {
 
 extension View {
     /// A list page's bar (Songs, Playlists, episode lists): a tinted Back and, if given, one
-    /// tinted button or menu on the right, instead of the bar's glass. These keep the bar, so
+    /// tinted button or menu on the right, filling the bar's glass. These keep the bar, so
     /// the large title and its collapse work as usual; one item per side sizes correctly.
     func listBar() -> some View {
         modifier(ListBar(trailing: EmptyView()))
@@ -443,7 +450,7 @@ extension View {
         modifier(ListBar(trailing: trailing()))
     }
 
-    /// The system Back, tinted instead of glass.
+    /// The system Back, drawn tinted over the glass iOS keeps behind it.
     func tintedSystemBack() -> some View {
         background(TintedSystemBack())
     }
@@ -460,13 +467,14 @@ private struct ListBar<Trailing: View>: ViewModifier {
                     ToolbarItem(placement: .topBarTrailing) {
                         trailing.buttonStyle(.plain)
                     }
-                    .sharedBackgroundVisibility(.hidden)
                 }
             }
     }
 }
 
-/// Draws the system Back as a `TintedBarIcon` with no glass behind it. Keeping the system
+/// Draws the system Back as a `TintedBarIcon`. iOS still draws its glass behind Back (it
+/// ignores `hidesSharedBackground` there), so a faint rim shows; that's the least glass a
+/// supported Back allows. Keeping the system
 /// Back (rather than hiding it for a button of our own) keeps everything that comes with it:
 /// the edge swipe, iOS 26's swipe from anywhere on the page, and VoiceOver's escape.
 /// The chevron image belongs to the whole bar, so every page in the stack is styled (tab roots
@@ -489,7 +497,7 @@ private struct TintedSystemBack: UIViewControllerRepresentable {
         let scale: CGFloat
 
         @MainActor func render() -> UIImage? {
-            let renderer = ImageRenderer(content: TintedBarIcon(glyph: .back)
+            let renderer = ImageRenderer(content: TintedBarIcon(glyph: .back, glassInset: 0)
                 .environment(\.theme, theme)
                 .environment(\.colorScheme, colorScheme))
             renderer.scale = scale
@@ -520,16 +528,32 @@ private struct TintedSystemBack: UIViewControllerRepresentable {
                 back.hidesSharedBackground = true
                 item.backBarButtonItem = back
             }
+            // The chevron comes from the bar's appearances (SwiftUI sets the bar's and a page's
+            // own), which win over the bar's `backIndicatorImage`, so it's set on each of them.
             let bar = navigation.navigationBar
-            if bar.backIndicatorImage !== image {
-                bar.backIndicatorImage = image
-                bar.backIndicatorTransitionMaskImage = image
+            bar.standardAppearance = tinted(bar.standardAppearance, image) ?? bar.standardAppearance
+            bar.scrollEdgeAppearance = tinted(bar.scrollEdgeAppearance, image)
+            bar.compactAppearance = tinted(bar.compactAppearance, image)
+            for page in navigation.viewControllers {
+                let item = page.navigationItem
+                item.standardAppearance = tinted(item.standardAppearance, image)
+                item.scrollEdgeAppearance = tinted(item.scrollEdgeAppearance, image)
+                item.compactAppearance = tinted(item.compactAppearance, image)
             }
+        }
+
+        /// `appearance` with `image` as its chevron; the same object if it has it already, so
+        /// an update doesn't restyle the bar.
+        private func tinted(_ appearance: UINavigationBarAppearance?, _ image: UIImage) -> UINavigationBarAppearance? {
+            guard let appearance, appearance.backIndicatorImage !== image else { return appearance }
+            let copy = appearance.copy()
+            copy.setBackIndicatorImage(image, transitionMaskImage: image)
+            return copy
         }
     }
 }
 
-/// A tab root's trailing bar buttons in one tinted capsule, instead of the bar's glass.
+/// A tab root's trailing bar buttons in one tinted capsule filling the bar's glass.
 struct TintedBarGroup<Content: View>: ToolbarContent {
     @ViewBuilder let content: Content
 
@@ -537,7 +561,6 @@ struct TintedBarGroup<Content: View>: ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
             TintedBarCapsule { content }
         }
-        .sharedBackgroundVisibility(.hidden)
     }
 }
 
@@ -588,11 +611,10 @@ private struct TabRootChrome<Trailing: View>: ViewModifier {
     func body(content: Content) -> some View {
         content
             .toolbar {
-                // Tinted circles (see `TintedBarIcon`) instead of the bar's glass.
+                // Tinted circles (see `TintedBarIcon`) filling the bar's glass.
                 ToolbarItem(placement: .topBarLeading) {
                     ProfileButton()
                 }
-                .sharedBackgroundVisibility(.hidden)
                 // AirPlay and the screen's buttons share one tinted capsule; alone, it's a circle.
                 TintedBarGroup {
                     AirPlayButton(iconSize: 24, tapSize: Self.itemSize)
