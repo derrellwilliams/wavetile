@@ -165,8 +165,9 @@ struct PlaylistDetailView: View {
                 Divider()
                 Button("Delete Playlist", glyph: .trash, role: .destructive) { confirmDelete = true }
             } label: {
-                Label("More", glyph: .more)
+                TintedBarIcon(glyph: .more)
             }
+            .accessibilityLabel("More")
         }
         .alert("Rename Playlist", isPresented: $showRename) {
             TextField("Name", text: $newName)

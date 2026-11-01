@@ -11,6 +11,8 @@ struct LibraryView: View {
     @Namespace private var zoom
     @State private var path = NavigationPath()
     @State private var recentlyAdded: [AlbumRecord] = []
+    /// `-openSection` fires once per launch.
+    @State private var didOpenSection = false
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -57,7 +59,13 @@ struct LibraryView: View {
             .navigationTitle("Music")
             .tabRootChrome()
             .libraryDestinations(zoom: zoom) { path.append($0) }
-            .task { if let section = DebugFlags.openSection { path.append(LibraryRoute.section(section)) } }
+            .task {
+                // Once per launch, not each time Music shows again.
+                if let section = DebugFlags.openSection, !didOpenSection {
+                    didOpenSection = true
+                    path.append(LibraryRoute.section(section))
+                }
+            }
             .task {
                 do {
                     for try await albums in store.observe(store.database.recentlyAddedAlbums(limit: 12)) {

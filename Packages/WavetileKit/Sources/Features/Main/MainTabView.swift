@@ -252,7 +252,8 @@ struct TintedBarIcon: View {
     var body: some View {
         glyph.image
             .foregroundStyle(theme.palette.accent)
-            .opacity(isEnabled ? 1 : 0.4)
+            // In a capsule, the plain button style dims every item alike (Labels too).
+            .opacity(isEnabled || inGroup ? 1 : 0.4)
             .frame(width: 44, height: 44)
             // In a group, the group's capsule is the fill.
             .background { if !inGroup { TintedBarFill(shape: .circle) } }
@@ -297,35 +298,59 @@ struct TintedBarCapsule<Content: View>: View {
 }
 
 extension View {
-    /// A detail page's bar: a tinted Back on the left and the page's buttons in one tinted
-    /// capsule on the right, instead of the bar's glass. Detail pages hide the bar's background,
-    /// so these float where the bar's items would sit; inside the bar, a capsule is sized to its
-    /// first button and the rest fall off screen, and the system Back can't be restyled.
+    /// A detail page's bar: the tinted system Back on the left and the page's buttons in one
+    /// tinted capsule on the right, instead of the bar's glass. SwiftUI's bar rebuilds an item
+    /// as a bar button (dropping the capsule and every button after the first), and the bar
+    /// takes the taps of anything floated over it, so the capsule is a UIKit custom bar item.
     func detailBarButtons<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         modifier(DetailBar(buttons: content()))
     }
 }
 
 private struct DetailBar<Buttons: View>: ViewModifier {
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.self) private var environment
     let buttons: Buttons
 
     func body(content: Content) -> some View {
         content
-            .navigationBarBackButtonHidden(true)
-            // Hiding the system Back also turns off the edge swipe; this turns it back on.
-            .background(SwipeBackEnabler())
-            .overlay(alignment: .top) {
-                HStack {
-                    Button { dismiss() } label: { TintedBarIcon(glyph: .back) }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Back")
-                    Spacer()
-                    TintedBarCapsule { buttons }
-                }
-                // With no items left, the bar takes no room, so this sits in its row on its own.
-                .padding(.horizontal, 20)
-            }
+            .tintedSystemBack()
+            .background(
+                CustomBarItem(content: TintedBarCapsule { buttons }.environment(\.self, environment))
+            )
+    }
+}
+
+/// Puts SwiftUI content in the bar's trailing slot as it's drawn, with no glass.
+private struct CustomBarItem<Content: View>: UIViewControllerRepresentable {
+    let content: Content
+
+    func makeUIViewController(context: Context) -> Controller { Controller(content: content) }
+    func updateUIViewController(_ controller: Controller, context: Context) {
+        controller.hosting.rootView = content
+    }
+
+    final class Controller: UIViewController {
+        let hosting: UIHostingController<Content>
+        private lazy var item: UIBarButtonItem = {
+            hosting.view.backgroundColor = .clear
+            let item = UIBarButtonItem(customView: hosting.view)
+            item.hidesSharedBackground = true
+            return item
+        }()
+
+        init(content: Content) {
+            hosting = UIHostingController(rootView: content)
+            hosting.sizingOptions = .intrinsicContentSize
+            super.init(nibName: nil, bundle: nil)
+        }
+
+        required init?(coder: NSCoder) { fatalError() }
+
+        override func viewWillAppear(_ animated: Bool) {
+            super.viewWillAppear(animated)
+            // The page's own item, so it slides in and out with the page.
+            parent?.navigationItem.rightBarButtonItem = item
+        }
     }
 }
 
@@ -340,23 +365,20 @@ extension View {
     func listBar<Trailing: View>(@ViewBuilder trailing: () -> Trailing) -> some View {
         modifier(ListBar(trailing: trailing()))
     }
+
+    /// The system Back, tinted instead of glass.
+    fileprivate func tintedSystemBack() -> some View {
+        background(TintedSystemBack())
+    }
 }
 
 private struct ListBar<Trailing: View>: ViewModifier {
-    @Environment(\.dismiss) private var dismiss
     let trailing: Trailing
 
     func body(content: Content) -> some View {
         content
-            .navigationBarBackButtonHidden(true)
-            .background(SwipeBackEnabler())
+            .tintedSystemBack()
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button { dismiss() } label: { TintedBarIcon(glyph: .back) }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Back")
-                }
-                .sharedBackgroundVisibility(.hidden)
                 if Trailing.self != EmptyView.self {
                     ToolbarItem(placement: .topBarTrailing) {
                         trailing.buttonStyle(.plain)
@@ -367,39 +389,52 @@ private struct ListBar<Trailing: View>: ViewModifier {
     }
 }
 
-/// Keeps the edge swipe back working on a screen that hides the system Back button. Gives the
-/// stack's swipe a delegate that allows it whenever there's a screen to go back to, and keeps
-/// it: handing the system's back mid-swipe (the page starts disappearing as the swipe begins)
-/// cancels the swipe, so the page slid a little and snapped back.
-private struct SwipeBackEnabler: UIViewControllerRepresentable {
-    func makeUIViewController(context: Context) -> Controller { Controller() }
-    func updateUIViewController(_ controller: Controller, context: Context) {}
+/// Draws the system Back as a `TintedBarIcon` with no glass behind it. Keeping the system
+/// Back (rather than hiding it for a button of our own) keeps everything that comes with it:
+/// the edge swipe, iOS 26's swipe from anywhere on the page, and VoiceOver's escape.
+private struct TintedSystemBack: View {
+    @Environment(\.theme) private var theme
+    @Environment(\.displayScale) private var displayScale
 
-    final class Controller: UIViewController {
-        override func viewDidAppear(_ animated: Bool) {
-            super.viewDidAppear(animated)
-            guard let navigation = navigationController, let gesture = navigation.interactivePopGestureRecognizer,
-                  !(gesture.delegate is PopGestureDelegate) else { return }
-            let delegate = PopGestureDelegate(navigation: navigation)
-            // The gesture holds its delegate weakly; the stack keeps this one alive.
-            objc_setAssociatedObject(navigation, &PopGestureDelegate.key, delegate, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
-            gesture.delegate = delegate
-            gesture.isEnabled = true
+    var body: some View {
+        Styler(image: image)
+    }
+
+    private var image: UIImage? {
+        let renderer = ImageRenderer(content: TintedBarIcon(glyph: .back).environment(\.theme, theme))
+        renderer.scale = displayScale
+        return renderer.uiImage?.withRenderingMode(.alwaysOriginal)
+    }
+
+    struct Styler: UIViewControllerRepresentable {
+        let image: UIImage?
+        func makeUIViewController(context: Context) -> Controller { Controller() }
+        func updateUIViewController(_ controller: Controller, context: Context) {
+            controller.image = image
+            controller.apply()
         }
     }
-}
 
-private final class PopGestureDelegate: NSObject, UIGestureRecognizerDelegate {
-    nonisolated(unsafe) static var key: UInt8 = 0
-    private weak var navigation: UINavigationController?
+    final class Controller: UIViewController {
+        var image: UIImage?
 
-    init(navigation: UINavigationController) {
-        self.navigation = navigation
-    }
+        override func viewWillAppear(_ animated: Bool) {
+            super.viewWillAppear(animated)
+            apply()
+        }
 
-    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-        guard let navigation else { return false }
-        return navigation.viewControllers.count > 1 && navigation.transitionCoordinator == nil
+        func apply() {
+            guard let image, let navigation = navigationController, let page = parent,
+                  let index = navigation.viewControllers.firstIndex(of: page), index > 0 else { return }
+            // A page's Back is the previous page's back item.
+            let previous = navigation.viewControllers[index - 1].navigationItem
+            previous.backButtonDisplayMode = .minimal
+            let item = UIBarButtonItem(title: "", style: .plain, target: nil, action: nil)
+            item.hidesSharedBackground = true
+            previous.backBarButtonItem = item
+            navigation.navigationBar.backIndicatorImage = image
+            navigation.navigationBar.backIndicatorTransitionMaskImage = image
+        }
     }
 }
 

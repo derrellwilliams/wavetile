@@ -84,8 +84,9 @@ struct ArtistDetailView: View {
             Menu {
                 Button("Start Radio", glyph: .radio) { actions.startRadio(from: artistID, store: store, player: player) }
             } label: {
-                Label("More", glyph: .more)
+                TintedBarIcon(glyph: .more)
             }
+            .accessibilityLabel("More")
         }
         .sheet(isPresented: $showAbout) {
             if let overview = details?.overview {

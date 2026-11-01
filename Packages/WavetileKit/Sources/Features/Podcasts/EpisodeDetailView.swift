@@ -39,8 +39,9 @@ struct EpisodeDetailView: View {
                 Menu {
                     EpisodeMenu(item: item, includeGoToShow: false)
                 } label: {
-                    Label("More", glyph: .more)
+                    TintedBarIcon(glyph: .more)
                 }
+                .accessibilityLabel("More")
             }
         }
         // Show-notes links: timestamps seek; web and mail links open in their apps (never in-app).

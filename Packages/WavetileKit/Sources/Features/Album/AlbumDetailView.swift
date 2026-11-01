@@ -54,8 +54,9 @@ struct AlbumDetailView: View {
                     .disabled(model.tracks.isEmpty)
                 Button("Start Radio", glyph: .radio) { actions.startRadio(from: model.album.id, store: store, player: player) }
             } label: {
-                Label("More", glyph: .more)
+                TintedBarIcon(glyph: .more)
             }
+            .accessibilityLabel("More")
         }
         .task {
             let loaded = try? await store.api.details(itemID: model.album.id)
