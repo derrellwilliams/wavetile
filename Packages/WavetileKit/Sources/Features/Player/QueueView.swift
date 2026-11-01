@@ -47,6 +47,8 @@ struct QueueView: View {
             .environment(\.editMode, .constant(.active))
             .navigationTitle("Queue")
             .navigationBarTitleDisplayMode(.inline)
+            // Brand bar titles and the tinted Back (SwiftUI's own bar appearances ignore the proxy).
+            .tintedSystemBack()
         }
     }
 

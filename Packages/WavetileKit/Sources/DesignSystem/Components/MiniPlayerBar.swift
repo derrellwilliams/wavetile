@@ -49,7 +49,9 @@ public struct MiniPlayerBar: View {
                 if placement != .inline {
                     Text(subtitle)
                         .font(theme.typography.caption)
-                        .foregroundStyle(theme.palette.textSecondary)
+                        // The main tan, like the title: the subtle tan washed out when the glass
+                        // turns light over light artwork.
+                        .foregroundStyle(theme.palette.textPrimary)
                 }
             }
             .lineLimit(1)

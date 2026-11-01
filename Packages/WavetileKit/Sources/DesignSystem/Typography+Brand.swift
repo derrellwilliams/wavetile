@@ -29,18 +29,14 @@ public enum BrandFont {
     }()
 
     /// Brand font that scales with Dynamic Type relative to `style`. `size` overrides the style's default size.
-    public static func font(_ style: Font.TextStyle, size: CGFloat? = nil, weight: Font.Weight = .regular, family: String = family) -> Font {
-        .custom(family, size: size ?? defaultSize(style), relativeTo: style).weight(weight)
-    }
-
-    /// Titles at a Dynamic Type style (the same face as text, kept apart so titles can change alone).
-    public static func display(_ style: Font.TextStyle, weight: Font.Weight = .bold) -> Font {
-        font(style, weight: weight)
+    /// One weight only (Regular), so there's no weight parameter.
+    public static func font(_ style: Font.TextStyle, size: CGFloat? = nil, family: String = family) -> Font {
+        .custom(family, size: size ?? defaultSize(style), relativeTo: style)
     }
 
     /// Fixed-size brand font for graphics that must fit a shape (logo, avatars, badges), not body text.
-    public static func font(fixedSize size: CGFloat, weight: Font.Weight = .regular, family: String = family) -> Font {
-        .custom(family, fixedSize: size).weight(weight)
+    public static func font(fixedSize size: CGFloat, family: String = family) -> Font {
+        .custom(family, fixedSize: size)
     }
 
     /// UIKit equivalent for appearance proxies (navigation bar titles).
@@ -57,6 +53,7 @@ public enum BrandFont {
     /// proxy is set once, so the color resolves per bar from its interface style (which follows
     /// the selected theme), and switching Dark/Light in Settings recolors titles at once.
     public static func applyNavigationBarAppearance() {
+        _ = textSizeObserver
         let dark = UIColor(Theme.dark.palette.textPrimary), light = UIColor(Theme.light.palette.textPrimary)
         let darkSubtle = UIColor(Theme.dark.palette.textSecondary), lightSubtle = UIColor(Theme.light.palette.textSecondary)
         applyNavigationBarAppearance(
@@ -105,6 +102,14 @@ public enum BrandFont {
 
     /// Extra room above and below the large screen titles.
     static let largeTitlePadding: CGFloat = 12
+
+    /// Re-applies the bar fonts when Text Size changes: they're scaled once when built, so they'd
+    /// otherwise keep the launch size. Bars pick them up as they next lay out (`TintedSystemBack`).
+    private static let textSizeObserver: any NSObjectProtocol = NotificationCenter.default.addObserver(
+        forName: UIContentSizeCategory.didChangeNotification, object: nil, queue: .main
+    ) { _ in
+        MainActor.assumeIsolated { applyNavigationBarAppearance() }
+    }
 
     /// The bar title attributes, for appearances SwiftUI makes per bar (which ignore the proxy).
     public private(set) static var largeTitleAttributes: [NSAttributedString.Key: Any] = [:]

@@ -151,6 +151,8 @@ struct AddFeedSheet: View {
             }
             // No automatic clipboard read: it would trigger the system paste prompt.
             .onAppear { focused = true }
+            // Brand bar titles and the tinted Back (SwiftUI's own bar appearances ignore the proxy).
+            .tintedSystemBack()
         }
         .presentationDetents([.medium])
         .presentationBackground(theme.palette.background)

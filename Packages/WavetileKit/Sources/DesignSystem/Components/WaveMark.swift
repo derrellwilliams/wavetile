@@ -25,21 +25,42 @@ public struct WaveMark: View {
     }
 
     private var active: Bool { isAnimating && !reduceMotion }
+    /// When this mark started rippling, and when it stopped (cleared once it has settled).
+    @State private var startedAt: Date?
+    @State private var stoppedAt: Date?
 
     public var body: some View {
-        TimelineView(.animation(paused: !active)) { context in
-            let elapsed = active ? context.date.timeIntervalSince(Self.epoch) : 0
+        TimelineView(.animation(paused: !active && stoppedAt == nil)) { context in
+            let date = context.date
+            // Eases in from the resting line when it starts and back to it when it stops, from
+            // wherever the ripple is; the phase follows the shared epoch so marks stay in step.
+            let level = active
+                ? Self.rampIn(date.timeIntervalSince(startedAt ?? date))
+                : stoppedAt.map { 1 - Self.rampIn(date.timeIntervalSince($0)) } ?? 0
             Canvas { canvas, size in
-                let swell = Self.swell(at: elapsed, strength: strength * Self.rampIn(elapsed))
+                let swell = Self.swell(at: date.timeIntervalSince(Self.epoch), strength: strength * level)
                 Self.draw(in: &canvas, width: size.width, center: CGPoint(x: size.width / 2, y: size.height / 2), swell: swell, color: color ?? theme.palette.accent, lineWidth: lineWidth)
             }
         }
         // Room above and below for the ripple's tallest swell.
         .frame(width: width, height: Self.height(forWidth: width) * (1 + strength))
         .accessibilityHidden(true)
+        .onAppear { if active { startedAt = .now } }
+        .onChange(of: active) { _, isActive in
+            if isActive {
+                startedAt = .now
+                stoppedAt = nil
+            } else {
+                stoppedAt = .now
+            }
+        }
+        .task(id: stoppedAt) {
+            guard stoppedAt != nil, (try? await Task.sleep(for: .seconds(0.4))) != nil else { return }
+            stoppedAt = nil
+        }
     }
 
-    /// Shared start time, so every mark on screen ripples in step.
+    /// Shared phase origin, so every mark on screen ripples in step.
     static let epoch = Date()
 
     /// Seconds for the ripple to cross the line once.
@@ -53,7 +74,7 @@ public struct WaveMark: View {
         WaveShape.lineWidth * width / WaveShape.viewBox.width
     }
 
-    /// Eases the ripple in from the resting line over the first 0.4 s.
+    /// Eases the ripple in from (or, inverted, out to) the resting line over 0.4 s.
     static func rampIn(_ elapsed: TimeInterval) -> Double {
         let x = min(1, max(0, elapsed / 0.4))
         return x * x * (3 - 2 * x)

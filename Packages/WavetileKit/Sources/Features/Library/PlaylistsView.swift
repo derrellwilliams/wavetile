@@ -258,6 +258,8 @@ private struct PlaylistEditor: View {
             .toolbar {
                 TintedSheetButton("Done", glyph: .check, placement: .confirmationAction) { dismiss() }
             }
+            // Brand bar titles and the tinted Back (SwiftUI's own bar appearances ignore the proxy).
+            .tintedSystemBack()
         }
     }
 

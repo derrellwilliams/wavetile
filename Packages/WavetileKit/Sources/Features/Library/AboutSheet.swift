@@ -49,6 +49,8 @@ struct AboutSheet: View {
                 // Read-only, so it closes rather than confirms (Done is for finishing a task).
                 TintedSheetButton("Close", glyph: .close, placement: .cancellationAction) { dismiss() }
             }
+            // Brand bar titles and the tinted Back (SwiftUI's own bar appearances ignore the proxy).
+            .tintedSystemBack()
         }
         .presentationDetents([.medium, .large])
         .presentationBackground(theme.palette.background)

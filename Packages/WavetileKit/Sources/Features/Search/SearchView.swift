@@ -45,7 +45,11 @@ struct SearchView: View {
             }
             // The filter under the title, pinned above the results (in place of the system scope bar).
             .safeAreaInset(edge: .top, spacing: 0) {
-                if podcasts.isEnabled { MediaFilter(selection: $scope, options: MediaKind.allCases) }
+                if podcasts.isEnabled {
+                    // Opaque, so results don't scroll visibly through the translucent capsule.
+                    MediaFilter(selection: $scope, options: MediaKind.allCases)
+                        .background(theme.palette.background)
+                }
             }
             .themedBackground()
             .navigationTitle("Search")

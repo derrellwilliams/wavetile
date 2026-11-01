@@ -75,10 +75,6 @@ struct DownloadedView: View {
         ScrollView {
             VStack(spacing: 0) {
                 filterHeader
-                // Under the filter, not over it.
-                if episodes.isEmpty {
-                    EmptyState("No Downloaded Episodes", message: "Download episodes to listen offline.")
-                }
                 PodcastDownloadsList(items: episodes)
             }
         }
@@ -94,9 +90,6 @@ struct DownloadedView: View {
             ScrollView {
               VStack(spacing: 0) {
                 filterHeader
-                if collections.isEmpty {
-                    EmptyState("No Downloads", message: "Tap Download on an album or playlist to listen offline.")
-                }
                 VStack(alignment: .leading, spacing: theme.spacing.lg) {
                     if !connectivity.isOnline {
                         Label(connectivity.hasNetwork ? "Can't reach your server. Downloaded music still plays." : "You're offline. Downloaded music still plays.", glyph: .offline)

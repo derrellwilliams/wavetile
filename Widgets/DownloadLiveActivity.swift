@@ -38,7 +38,7 @@ struct DownloadLiveActivity: Widget {
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     Text("\(context.state.done)/\(context.state.total)")
-                        .font(BrandFont.font(.caption).monospacedDigit())
+                        .font(BrandFont.font(.caption, family: BrandFont.monoFamily))
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     ProgressView(value: context.state.progress).tint(Theme.dark.palette.textPrimary)

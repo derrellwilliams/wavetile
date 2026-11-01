@@ -259,6 +259,8 @@ struct AddToPlaylistSheet: View {
                     for try await value in store.observe(store.database.playlists()) { playlists = value }
                 } catch { Log.observationFailed(error) }
             }
+            // Brand bar titles and the tinted Back (SwiftUI's own bar appearances ignore the proxy).
+            .tintedSystemBack()
         }
     }
 
@@ -333,6 +335,8 @@ struct AddToCollectionSheet: View {
                     for try await value in store.observe(store.database.collections()) { collections = value }
                 } catch { Log.observationFailed(error) }
             }
+            // Brand bar titles and the tinted Back (SwiftUI's own bar appearances ignore the proxy).
+            .tintedSystemBack()
         }
     }
 

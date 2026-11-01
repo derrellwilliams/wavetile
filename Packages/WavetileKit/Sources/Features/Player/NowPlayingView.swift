@@ -20,8 +20,10 @@ struct NowPlayingView: View {
     @State private var showChapters = false
     @State private var playPausePresses = 0
     @State private var chapters: [Chapter] = []
-    /// The content's natural height; the sheet is sized to it.
-    @State private var contentHeight: CGFloat = 0
+    /// The content's natural height; the sheet is sized to it. Starts from the last height
+    /// measured, so the sheet opens at its size instead of opening tall and jumping down.
+    @State private var contentHeight: CGFloat = Self.lastHeight
+    @MainActor private static var lastHeight: CGFloat = 0
 
     private var isEpisode: Bool { player.current?.isEpisode == true }
 
@@ -30,7 +32,12 @@ struct NowPlayingView: View {
         // than the screen (instead of squeezing and clipping the text).
         ScrollView {
             content
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                    // Ignores sub-point jitter so the sheet only resizes for a real change.
+                    guard abs(height - contentHeight) > 1 else { return }
+                    contentHeight = height
+                    Self.lastHeight = height
+                }
         }
         .scrollIndicators(.hidden)
         .scrollBounceBehavior(.basedOnSize)
@@ -96,16 +103,19 @@ struct NowPlayingView: View {
                 Text(player.current?.title ?? "")
                     .font(theme.typography.title)
                     .foregroundStyle(theme.palette.textPrimary)
-                Text(subtitle)
-                    .font(theme.typography.lead)
-                    .foregroundStyle(theme.palette.textSecondary)
-                if !chapters.isEmpty { CurrentChapterLabel(chapters: chapters) }
-                if let error = player.errorMessage {
-                    Label(error, glyph: .warning)
-                        .font(theme.typography.caption)
-                        .foregroundStyle(theme.palette.textSecondary)
-                        .transition(.opacity)
+                // An error takes the subtitle's line rather than adding one, and episodes always
+                // keep a chapter line (blank until chapters load), so neither changes the sheet's height.
+                Group {
+                    if let error = player.errorMessage {
+                        Label(error, glyph: .warning)
+                            .transition(.opacity)
+                    } else {
+                        Text(subtitle)
+                    }
                 }
+                .font(theme.typography.lead)
+                .foregroundStyle(theme.palette.textSecondary)
+                if isEpisode { CurrentChapterLabel(chapters: chapters) }
             }
             .animation(theme.motion.smooth, value: player.errorMessage)
             .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
@@ -165,10 +175,11 @@ struct NowPlayingView: View {
                 (player.isPlaying ? Glyph.pause : Glyph.play).image
                     .resizable()
                     .frame(width: 28, height: 28)
+                    .id(player.isPlaying)
+                    .transition(.iconSwap)
                     .foregroundStyle(theme.palette.accent)
                     .frame(width: 64, height: 64)
                     .background(theme.palette.tint, in: .circle)
-                    .contentTransition(.symbolEffect(.replace))
             }
             .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
             .animation(theme.motion.snappy, value: player.isPlaying)
@@ -211,7 +222,7 @@ struct NowPlayingView: View {
                 }
             } label: {
                 Text("\(Double(player.podcastRate).formatted())×")
-                    .font(theme.typography.mono(.subheadline))
+                    .font(theme.typography.itemSubtitle)
                     .foregroundStyle(player.podcastRate == 1 ? theme.palette.textSecondary : theme.palette.accent)
                     .frame(minWidth: 44, minHeight: 44)
             }
@@ -476,13 +487,13 @@ private struct CurrentChapterLabel: View {
     let chapters: [Chapter]
 
     var body: some View {
-        if let chapter = chapters.current(at: player.currentTime) {
-            Text(chapter.title)
-                .font(theme.typography.caption)
-                .foregroundStyle(theme.palette.textSecondary)
-                .contentTransition(.opacity)
-                .animation(theme.motion.smooth, value: chapter)
-        }
+        let chapter = chapters.current(at: player.currentTime)
+        // A space keeps the line's height before chapters load or the first one starts.
+        Text(chapter?.title ?? " ")
+            .font(theme.typography.caption)
+            .foregroundStyle(theme.palette.textSecondary)
+            .contentTransition(.opacity)
+            .animation(theme.motion.smooth, value: chapter)
     }
 }
 
@@ -506,6 +517,8 @@ struct ChaptersSheet: View {
             .scrollContentBackground(.hidden)
             .navigationTitle("Chapters")
             .navigationBarTitleDisplayMode(.inline)
+            // Brand bar titles and the tinted Back (SwiftUI's own bar appearances ignore the proxy).
+            .tintedSystemBack()
         }
     }
 }
@@ -529,7 +542,7 @@ struct ChapterRow: View {
                     .foregroundStyle(theme.palette.textSecondary)
                     .frame(minWidth: 52, alignment: .leading)
                 Text(chapter.title)
-                    .font(isCurrent ? theme.typography.body : theme.typography.body)
+                    .font(theme.typography.body)
                     .foregroundStyle(isCurrent ? theme.palette.accent : theme.palette.textPrimary)
                     .multilineTextAlignment(.leading)
                 Spacer(minLength: 0)

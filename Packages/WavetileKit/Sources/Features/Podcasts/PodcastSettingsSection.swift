@@ -92,6 +92,8 @@ struct PodcastSettingsView: View {
             .toolbar {
                 TintedSheetButton("Done", glyph: .check, placement: .confirmationAction) { dismiss() }
             }
+            // Brand bar titles and the tinted Back (SwiftUI's own bar appearances ignore the proxy).
+            .tintedSystemBack()
         }
         .opmlImporter(isPresented: $showImporter, message: $importMessage)
         .confirmationDialog("Remove all downloaded episodes?", isPresented: $confirmRemoveDownloads, titleVisibility: .visible) {

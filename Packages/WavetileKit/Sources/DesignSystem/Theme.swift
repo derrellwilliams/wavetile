@@ -174,6 +174,20 @@ public extension EnvironmentValues {
     @Entry var theme: Theme = .dark
 }
 
+/// A text color dimmed when the view is disabled, for a default foreground style that keeps the
+/// system's disabled look (a plain color would draw disabled rows at full strength).
+public nonisolated struct EnabledAwareColor: ShapeStyle {
+    let color: Color
+
+    public init(_ color: Color) {
+        self.color = color
+    }
+
+    public func resolve(in environment: EnvironmentValues) -> Color {
+        environment.isEnabled ? color : color.opacity(0.4)
+    }
+}
+
 public extension Color {
     /// `Color(hex: 0x151515)`: sRGB from a 24-bit hex literal, matching design-tool values.
     init(hex: UInt32, opacity: Double = 1) {
