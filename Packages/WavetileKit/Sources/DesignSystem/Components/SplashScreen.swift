@@ -45,7 +45,9 @@ public struct WaveBackdrop: View {
     public init() {}
 
     public var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion)) { context in
+        // At 5pt a second, 8 frames a second still reads as smooth, and an empty state can stay
+        // up a long time.
+        TimelineView(.animation(minimumInterval: 1.0 / 8, paused: reduceMotion)) { context in
             let elapsed = reduceMotion ? 0 : context.date.timeIntervalSince(start)
             Canvas { canvas, size in
                 WaveField.draw(in: &canvas, size: size, elapsed: elapsed, color: theme.palette.accent)

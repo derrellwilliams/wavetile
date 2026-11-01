@@ -88,7 +88,8 @@ final class HomeModel {
 
     /// Call after the card has been on screen for a minute; counts once per launch.
     func countWelcomeVisit() {
-        guard showsWelcome, !countedWelcomeVisit else { return }
+        // `-freshHome` shows the card without using up the account's real visit.
+        guard showsWelcome, !countedWelcomeVisit, !DebugFlags.freshHome else { return }
         countedWelcomeVisit = true
         UserDefaults.standard.set(welcomeVisits + 1, forKey: welcomeVisitsKey)
     }

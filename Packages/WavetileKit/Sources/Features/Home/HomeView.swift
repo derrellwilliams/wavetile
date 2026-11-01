@@ -39,7 +39,8 @@ struct HomeView: View {
                     if model.showsWelcome, let stats = model.stats, stats.albums > 0 {
                         WelcomeCard(userName: userName, stats: stats)
                             .task {
-                                try? await Task.sleep(for: .seconds(60))
+                                // Leaving Home first cancels the sleep; that doesn't count.
+                                guard (try? await Task.sleep(for: .seconds(60))) != nil else { return }
                                 model.countWelcomeVisit()
                             }
                     }
