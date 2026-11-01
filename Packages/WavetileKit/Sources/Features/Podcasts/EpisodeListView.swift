@@ -49,10 +49,10 @@ struct EpisodeListView: View {
 
     @ViewBuilder private var emptyState: some View {
         switch list {
-        case .latest: EmptyState("No New Episodes", glyph: .podcasts, message: "New episodes from shows you follow appear here.")
-        case .saved: EmptyState("No Saved Episodes", glyph: .save, message: "Save episodes to find them here later.")
-        case .downloaded: EmptyState("No Downloads", glyph: .downloads, message: "Download episodes to listen offline.")
-        case .history: EmptyState("Nothing Played Yet", glyph: .history, message: "Episodes you listen to appear here.")
+        case .latest: EmptyState("No New Episodes", message: "New episodes from shows you follow appear here.")
+        case .saved: EmptyState("No Saved Episodes", message: "Save episodes to find them here later.")
+        case .downloaded: EmptyState("No Downloads", message: "Download episodes to listen offline.")
+        case .history: EmptyState("Nothing Played Yet", message: "Episodes you listen to appear here.")
         }
     }
 }
@@ -186,23 +186,22 @@ struct PodcastsIntroSheet: View {
     var onImport: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: theme.spacing.xl) {
-            Glyph.podcasts.image
-                .resizable()
-                .frame(width: 44, height: 44)
-                .foregroundStyle(theme.palette.accent)
-                .padding(.top, theme.spacing.xl)
+        VStack(alignment: .leading, spacing: 0) {
             Text("Podcasts, Next to Your Music")
                 .font(theme.typography.largeTitle)
                 .tracking(theme.typography.displayTracking)
                 .lineSpacing(theme.typography.titleLeading)
                 .foregroundStyle(theme.palette.textPrimary)
-            VStack(alignment: .leading, spacing: theme.spacing.lg) {
-                point(.search, "Find any show", "Search Apple Podcasts, browse top charts, or paste a feed link.")
-                point(.address, "Straight from the source", "Your phone downloads episodes directly from each podcast's publisher, which can see your IP address, like in any podcast app.")
-                point(.server, "Synced with Jellyfin", "Shows and progress sync through your Jellyfin account, so they follow you to other devices. Server admins can see the shows you follow. Turn sync off anytime in Settings.")
+                .padding(.top, theme.spacing.xxl)
+                .padding(.bottom, theme.spacing.xxl)
+            // Rows between hairlines, icons in their own column.
+            VStack(alignment: .leading, spacing: 0) {
+                point(.search, "Find any show", "Search, browse the charts or paste a feed link.")
+                point(.address, "Straight from the source", "Episodes download from each publisher, who can see your IP address.")
+                point(.server, "Synced with Jellyfin", "Shows and progress follow you. Server admins can see what you follow.")
             }
-            Spacer(minLength: 0)
+            .overlay(alignment: .bottom) { hairline }
+            Spacer(minLength: theme.spacing.xxl)
             VStack(spacing: theme.spacing.sm) {
                 PrimaryButton("Find Shows") {
                     finish()
@@ -221,10 +220,14 @@ struct PodcastsIntroSheet: View {
                     .frame(maxWidth: .infinity, minHeight: 44)
             }
         }
-        .padding(.horizontal, theme.spacing.xl)
+        .padding(.horizontal, theme.spacing.screenInset)
         .padding(.bottom, theme.spacing.lg)
         .background(theme.palette.background.ignoresSafeArea())
         .interactiveDismissDisabled()
+    }
+
+    private var hairline: some View {
+        Rectangle().fill(theme.palette.separator).frame(height: 1)
     }
 
     private func finish() {
@@ -233,20 +236,24 @@ struct PodcastsIntroSheet: View {
     }
 
     private func point(_ glyph: Glyph, _ title: String, _ message: String) -> some View {
-        HStack(alignment: .top, spacing: theme.spacing.md) {
+        HStack(alignment: .top, spacing: 0) {
             glyph.image
                 .foregroundStyle(theme.palette.accent)
-                .frame(width: 28)
-            VStack(alignment: .leading, spacing: theme.spacing.xxs) {
+                .frame(width: theme.spacing.xxl, alignment: .leading)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: theme.spacing.xs) {
                 Text(title)
                     .font(theme.typography.body)
                     .foregroundStyle(theme.palette.textPrimary)
                 Text(message)
-                    .font(theme.typography.itemSubtitle)
+                    .font(theme.typography.itemTitle)
                     .foregroundStyle(theme.palette.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            Spacer(minLength: 0)
         }
+        .padding(.vertical, theme.spacing.lg)
+        .overlay(alignment: .top) { hairline }
         .accessibilityElement(children: .combine)
     }
 }

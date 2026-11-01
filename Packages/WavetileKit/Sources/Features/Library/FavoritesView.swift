@@ -20,11 +20,8 @@ struct FavoritesView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: theme.spacing.lg) {
-                Picker("Show", selection: $kind) {
-                    ForEach(Kind.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal, theme.spacing.screenInset)
+                SegmentedFilter(selection: $kind, options: Kind.allCases.map { ($0, $0.rawValue) })
+                    .padding(.horizontal, theme.spacing.screenInset)
 
                 switch kind {
                 case .songs: songs
@@ -36,7 +33,7 @@ struct FavoritesView: View {
         }
         .overlay {
             if isEmpty {
-                EmptyState("No Favorites", glyph: .favorite, message: "Tap the heart on songs, albums, and artists to find them here.")
+                EmptyState("No Favorites", message: "Tap the heart on songs, albums, and artists to find them here.")
             }
         }
         .themedBackground()

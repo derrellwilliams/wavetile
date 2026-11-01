@@ -45,7 +45,7 @@ struct CollectionsView: View {
         }
         .overlay {
             if collections.isEmpty {
-                EmptyState("No Collections", glyph: .collection, message: "Group albums into collections. Tap + or use “Add to Collection” on any album.")
+                EmptyState("No Collections", message: "Group albums into collections. Tap + or use “Add to Collection” on any album.")
             }
         }
         .themedBackground()
@@ -128,7 +128,7 @@ struct CollectionDetailView: View {
         }
         .overlay {
             if albums.isEmpty {
-                EmptyState("Empty Collection", glyph: .collection, message: "Use “Add to Collection” on an album to add it here.")
+                EmptyState("Empty Collection", message: "Use “Add to Collection” on an album to add it here.")
             }
         }
         .themedBackground()

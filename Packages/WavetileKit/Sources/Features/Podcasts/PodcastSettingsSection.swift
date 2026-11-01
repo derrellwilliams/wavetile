@@ -139,12 +139,8 @@ struct MediaFilter: View {
     var options: [MediaKind] = [.music, .podcasts]
 
     var body: some View {
-        Picker("Show", selection: $selection.animation(theme.motion.snappy)) {
-            ForEach(options, id: \.self) { Text($0.title).tag($0) }
-        }
-        .pickerStyle(.segmented)
-        .padding(.horizontal, theme.spacing.screenInset)
-        .padding(.vertical, theme.spacing.sm)
-        .sensoryFeedback(.selection, trigger: selection)
+        SegmentedFilter(selection: $selection, options: options.map { ($0, $0.title) })
+            .padding(.horizontal, theme.spacing.screenInset)
+            .padding(.vertical, theme.spacing.sm)
     }
 }

@@ -107,10 +107,20 @@ struct PodcastsView: View {
 
     private var emptyState: some View {
         // Feed links and OPML import live in the + menu and Podcast Settings.
-        EmptyState("Find Your Shows", glyph: .podcasts, message: "Search Apple Podcasts and follow a show to see its episodes here.") {
+        // Flush left on the screen margin, like the shelves below; no glyph.
+        VStack(alignment: .leading, spacing: theme.spacing.xs) {
+            Text("Find Your Shows")
+                .font(theme.typography.title)
+                .foregroundStyle(theme.palette.textPrimary)
+                .accessibilityAddTraits(.isHeader)
+            Text("Follow a show to see its episodes here.")
+                .font(theme.typography.body)
+                .foregroundStyle(theme.palette.textSecondary)
             PrimaryButton("Find Shows") { openPodcastSearch() }
-                .frame(maxWidth: 280)
+                .padding(.top, theme.spacing.lg)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, theme.spacing.screenInset)
     }
 }
 

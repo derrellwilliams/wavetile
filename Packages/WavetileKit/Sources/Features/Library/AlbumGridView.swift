@@ -78,7 +78,7 @@ struct LibraryEmptyState: View {
                     .foregroundStyle(theme.palette.textSecondary)
             }
         } else {
-            EmptyState("Nothing Here", glyph: .album, message: "No matching items in your library.")
+            EmptyState("Nothing Here", message: "No matching items in your library.")
         }
     }
 }

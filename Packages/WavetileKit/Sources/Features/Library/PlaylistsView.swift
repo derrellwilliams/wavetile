@@ -43,7 +43,7 @@ struct PlaylistsView: View {
         .overlay {
             if playlists.isEmpty {
                 if store.hasSyncedOnce {
-                    EmptyState("No Playlists", glyph: .playlist, message: "Tap + to create one, or long-press any song and choose “Add to Playlist”.")
+                    EmptyState("No Playlists", message: "Tap + to create one, or long-press any song and choose “Add to Playlist”.")
                 } else {
                     LibraryEmptyState()
                 }

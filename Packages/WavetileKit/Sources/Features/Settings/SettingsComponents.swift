@@ -52,10 +52,11 @@ struct SettingsValue: View {
 /// Profile avatar: the Phosphor `user-circle` glyph in the text color.
 struct Avatar: View {
     @Environment(\.theme) private var theme
-    var size: CGFloat = 52
+    var size: CGFloat = 32
 
     var body: some View {
-        Glyph.profile.image
+        // The same glyph as the bar's profile button that opens the drawer.
+        Glyph.user.image
             .resizable()
             .scaledToFit()
             .frame(width: size, height: size)

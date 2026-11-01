@@ -8,7 +8,7 @@ import SwiftUI
 
 /// Offline full-text search over the synced library. The search field itself is attached here
 /// (scoped to this tab); `.tabViewSearchActivation` on the TabView makes the tab detach.
-/// With podcasts on, All | Music | Podcasts search scopes appear (All is the default). All shows
+/// With podcasts on, an All | Music | Podcasts filter sits under the title (All is the default). All shows
 /// music plus followed podcasts from the device, and Apple Podcasts shows only when they match
 /// what was typed. Privacy: with podcasts on, All and Podcasts send the typed text to Apple's
 /// directory after typing pauses; Music never leaves the device, nor does anything with podcasts off.
@@ -43,6 +43,10 @@ struct SearchView: View {
                 case .music: musicResults
                 }
             }
+            // The filter under the title, pinned above the results (in place of the system scope bar).
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if podcasts.isEnabled { MediaFilter(selection: $scope, options: MediaKind.allCases) }
+            }
             .themedBackground()
             .navigationTitle("Search")
             .tabRootChrome()
@@ -51,8 +55,9 @@ struct SearchView: View {
         }
         // Scoped to this tab's stack so the field doesn't leak into other tabs' navigation bars.
         .searchable(text: $text, prompt: prompt)
+        // Keeps the bar (title, profile, wave) while searching, like every other tab; iOS hides it by default.
+        .searchPresentationToolbarBehavior(.avoidHidingContent)
         .searchSuggestions { recentSuggestions }
-        .modifier(MediaScopes(scope: $scope, isEnabled: podcasts.isEnabled))
         .onSubmit(of: .search) { recents.add(text) }
         // Opening a result from the search root keeps the query.
         .onChange(of: path.count) { old, new in
@@ -114,11 +119,10 @@ struct SearchView: View {
         .listStyle(.plain)
         .scrollDismissesKeyboard(.immediately)
         .overlay {
-            if trimmedText.isEmpty {
-                EmptyState("Search Everything", glyph: .search, message: "Find artists, albums, songs, and the podcasts you follow.")
-            } else if searchedText == text, appleSearchedText == trimmedText,
+            // Nothing before typing: the title and field say what this is.
+            if !trimmedText.isEmpty, searchedText == text, appleSearchedText == trimmedText,
                       results.isEmpty, podcastResults.isEmpty, appleShows.isEmpty {
-                EmptyState("No Results", glyph: .search, message: "Nothing in your library, your podcasts, or Apple Podcasts matches “\(text)”.")
+                EmptyState("No Results", message: "Nothing in your library, your podcasts, or Apple Podcasts matches “\(text)”.")
             }
         }
     }
@@ -226,27 +230,9 @@ struct SearchView: View {
     }
 
     @ViewBuilder private var emptyState: some View {
-        if text.trimmingCharacters(in: .whitespaces).isEmpty {
-            EmptyState("Search Your Library", glyph: .search, message: "Find artists, albums, and songs, even offline.")
-        } else if searchedText == text, results.isEmpty {
-            EmptyState("No Results", glyph: .search, message: "Nothing in your library matches “\(text)”.")
-        }
-    }
-}
-
-/// The system scope bar under the search field, only when podcasts are on (music-only users
-/// have nothing to choose between).
-private struct MediaScopes: ViewModifier {
-    @Binding var scope: MediaKind
-    let isEnabled: Bool
-
-    func body(content: Content) -> some View {
-        if isEnabled {
-            content.searchScopes($scope, activation: .onSearchPresentation) {
-                ForEach(MediaKind.allCases, id: \.self) { Text($0.title).tag($0) }
-            }
-        } else {
-            content
+        // Nothing before typing: the title and field say what this is.
+        if !text.trimmingCharacters(in: .whitespaces).isEmpty, searchedText == text, results.isEmpty {
+            EmptyState("No Results", message: "Nothing in your library matches “\(text)”.")
         }
     }
 }

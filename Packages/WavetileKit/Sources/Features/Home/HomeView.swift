@@ -149,7 +149,7 @@ struct HomeView: View {
         if model.isLoading {
             LoadingMark()
         } else if let error = model.errorMessage {
-            EmptyState("Nothing Here Yet", glyph: .album, message: error) {
+            EmptyState("Nothing Here Yet", message: error) {
                 Button("Retry") { Task { await model.load() } }
                     .buttonStyle(.tinted)
             }

@@ -135,7 +135,7 @@ struct AlbumDetailView: View {
         if model.isLoading {
             LoadingMark().padding(theme.spacing.xxl)
         } else if let error = model.errorMessage {
-            EmptyState("Something Went Wrong", glyph: .warning, message: error) {
+            EmptyState("Something Went Wrong", message: error) {
                 Button("Retry") { Task { await model.load() } }
                     .buttonStyle(.tinted)
             }

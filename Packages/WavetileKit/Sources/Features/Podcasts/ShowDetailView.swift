@@ -177,7 +177,7 @@ struct ShowDetailView: View {
         if isLoading && episodes.isEmpty {
             LoadingMark().padding(theme.spacing.xxl)
         } else if let errorMessage, episodes.isEmpty {
-            EmptyState("Couldn't Load Show", glyph: .warning, message: errorMessage) {
+            EmptyState("Couldn't Load Show", message: errorMessage) {
                 Button("Retry") {
                     self.errorMessage = nil
                     isLoading = true
@@ -371,7 +371,7 @@ struct AllShowsView: View {
         }
         .overlay {
             if shows.isEmpty {
-                EmptyState("No Shows", glyph: .podcasts, message: "Shows you follow appear here.")
+                EmptyState("No Shows", message: "Shows you follow appear here.")
             }
         }
         .themedBackground()

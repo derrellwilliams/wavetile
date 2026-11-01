@@ -160,41 +160,41 @@ public struct GlyphButton: View {
     }
 }
 
-/// Empty and error states with a large Phosphor glyph (replaces `ContentUnavailableView(_:systemImage:)`).
+/// Empty and error states: a 22pt title and a subtle line, flush left on the screen margin and
+/// hung 64pt below whatever's above (two grid steps, so it reads as its own block, not a caption
+/// to the header), with any actions below. No glyph, so they sit on the same grid as content.
 public struct EmptyState<Actions: View>: View {
     @Environment(\.theme) private var theme
-    @ScaledMetric(relativeTo: .largeTitle) private var glyphSize: CGFloat = 48
     private let title: String
-    private let glyph: Glyph
     private let message: String?
     private let actions: Actions
 
-    public init(_ title: String, glyph: Glyph, message: String? = nil, @ViewBuilder actions: () -> Actions = { EmptyView() }) {
+    public init(_ title: String, message: String? = nil, @ViewBuilder actions: () -> Actions = { EmptyView() }) {
         self.title = title
-        self.glyph = glyph
         self.message = message
         self.actions = actions()
     }
 
     public var body: some View {
-        ContentUnavailableView {
-            SwiftUI.Label {
-                // System copy, so the text style rather than a title.
-                Text(title).font(BrandFont.font(.title2))
-            } icon: {
-                glyph.image
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: glyphSize, height: glyphSize)
-                    .foregroundStyle(theme.palette.textSecondary)
-            }
-        } description: {
+        VStack(alignment: .leading, spacing: theme.spacing.xs) {
+            Text(title)
+                .font(theme.typography.title)
+                .foregroundStyle(theme.palette.textPrimary)
+                .accessibilityAddTraits(.isHeader)
             if let message {
-                Text(message).font(theme.typography.body)
+                Text(message)
+                    .font(theme.typography.body)
+                    .foregroundStyle(theme.palette.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-        } actions: {
-            actions
+            VStack(alignment: .leading, spacing: theme.spacing.sm) {
+                actions
+            }
+            .padding(.top, theme.spacing.lg)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(.horizontal, theme.spacing.screenInset)
+        .padding(.top, theme.spacing.xxl * 2)
     }
 }
 

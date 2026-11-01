@@ -20,19 +20,21 @@ struct NowPlayingView: View {
     @State private var showChapters = false
     @State private var playPausePresses = 0
     @State private var chapters: [Chapter] = []
+    /// The content's natural height; the sheet is sized to it.
+    @State private var contentHeight: CGFloat = 0
 
     private var isEpisode: Bool { player.current?.isEpisode == true }
 
     var body: some View {
-        // Fixed, full-screen layout when it fits; scrolls when large text makes it taller than
-        // the screen (instead of squeezing and clipping the text).
-        ViewThatFits(in: .vertical) {
-            content(scrolling: false)
-            ScrollView {
-                content(scrolling: true)
-            }
-            .scrollIndicators(.hidden)
+        // Fixed spacing, with the sheet sized to fit; scrolls only when large text makes it taller
+        // than the screen (instead of squeezing and clipping the text).
+        ScrollView {
+            content
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
         }
+        .scrollIndicators(.hidden)
+        .scrollBounceBehavior(.basedOnSize)
+        .presentationDetents(contentHeight > 0 ? [.height(contentHeight)] : [.large])
         .background(theme.palette.background.ignoresSafeArea())
         .sheet(isPresented: $showQueue) {
             QueueView()
@@ -58,76 +60,74 @@ struct NowPlayingView: View {
         chapters = loaded
     }
 
-    private func content(scrolling: Bool) -> some View {
-        VStack(spacing: theme.spacing.xl) {
+    /// One column on the screen margins with fixed gaps: the top bar, the artwork at full column
+    /// width, the info and playback controls, then the secondary controls in a capsule.
+    private var content: some View {
+        VStack(alignment: .leading, spacing: 0) {
             header
-
-            if !scrolling { Spacer(minLength: 0) }
-
             artwork
-
-            if !scrolling { Spacer(minLength: 0) }
-
-            HStack(alignment: .center, spacing: theme.spacing.md) {
-                VStack(alignment: .leading, spacing: theme.spacing.xs) {
-                    Text(player.current?.title ?? "")
-                        .font(theme.typography.title)
-                        .foregroundStyle(theme.palette.textPrimary)
-                    Text((isEpisode ? player.current?.albumTitle : player.current?.artist) ?? "")
-                        .font(theme.typography.lead)
-                        .foregroundStyle(theme.palette.textPrimary)
-                    if !chapters.isEmpty { CurrentChapterLabel(chapters: chapters) }
-                    if let error = player.errorMessage {
-                        Label(error, glyph: .warning)
-                            .font(theme.typography.caption)
-                            .foregroundStyle(theme.palette.textSecondary)
-                            .transition(.opacity)
-                    }
-                }
-                .animation(theme.motion.smooth, value: player.errorMessage)
-                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
-                .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                if let track = player.current {
-                    if track.isEpisode {
-                        SaveEpisodeButton(episodeID: track.trackID, size: 28)
-                    } else {
-                        FavoriteButton(itemID: track.trackID, size: 28)
-                    }
-                }
+                .padding(.vertical, theme.spacing.xl)
+            VStack(alignment: .leading, spacing: theme.spacing.xl) {
+                info
+                Scrubber(chapterStarts: chapters.map(\.start))
+                transport
             }
-            .contentTransition(.opacity)
-            .animation(theme.motion.smooth, value: player.current?.queueID)
-
-            Scrubber(chapterStarts: chapters.map(\.start))
-
-            transport
-
+            .padding(.bottom, theme.spacing.xl)
             secondaryControls
+                .padding(.horizontal, theme.spacing.xl)
+                .background(theme.palette.tint, in: .capsule)
         }
-        .padding(.horizontal, theme.spacing.xl)
+        .padding(.horizontal, theme.spacing.screenInset)
         .padding(.bottom, theme.spacing.lg)
     }
 
+    /// Two levels, as in other players: the title (22, main tan), then artist and album, or the
+    /// show for an episode (18, subtle).
+    private var subtitle: String {
+        guard let track = player.current else { return "" }
+        if track.isEpisode { return track.albumTitle }
+        return [track.artist, track.albumTitle].filter { !$0.isEmpty }.joined(separator: " — ")
+    }
+
+    private var info: some View {
+        HStack(alignment: .bottom, spacing: theme.spacing.md) {
+            VStack(alignment: .leading, spacing: theme.spacing.xs) {
+                Text(player.current?.title ?? "")
+                    .font(theme.typography.title)
+                    .foregroundStyle(theme.palette.textPrimary)
+                Text(subtitle)
+                    .font(theme.typography.lead)
+                    .foregroundStyle(theme.palette.textSecondary)
+                if !chapters.isEmpty { CurrentChapterLabel(chapters: chapters) }
+                if let error = player.errorMessage {
+                    Label(error, glyph: .warning)
+                        .font(theme.typography.caption)
+                        .foregroundStyle(theme.palette.textSecondary)
+                        .transition(.opacity)
+                }
+            }
+            .animation(theme.motion.smooth, value: player.errorMessage)
+            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if let track = player.current {
+                if track.isEpisode {
+                    SaveEpisodeButton(episodeID: track.trackID, size: 28)
+                } else {
+                    FavoriteButton(itemID: track.trackID, size: 28)
+                }
+            }
+        }
+        .contentTransition(.opacity)
+        .animation(theme.motion.smooth, value: player.current?.queueID)
+    }
+
+    /// Close only; what's playing reads in the info block and the queue is in the capsule.
     private var header: some View {
         HStack {
             Button("Close", glyph: .dismiss) { dismiss() }
             Spacer()
-            VStack(spacing: 2) {
-                Text("PLAYING FROM")
-                    .font(theme.typography.caption)
-                    .kerning(1)
-                    .foregroundStyle(theme.palette.textSecondary)
-                Text(player.current?.albumTitle ?? "")
-                    .font(theme.typography.itemTitle)
-                    .foregroundStyle(theme.palette.textPrimary)
-                    // Two lines normally; unlimited at accessibility sizes.
-                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer()
-            Button("Queue", glyph: .queue) { showQueue = true }
         }
         .labelStyle(.iconOnly)
         .buttonStyle(.plain)
@@ -147,19 +147,30 @@ struct NowPlayingView: View {
             .transition(.opacity)
     }
 
+    /// Back and forward on the column edges, lined up with the controls under the hairline.
     private var transport: some View {
         HStack {
-            Spacer()
             if isEpisode {
                 SkipButton(seconds: player.skipBackInterval, forward: false) { player.skip(by: -player.skipBackInterval) }
             } else {
                 GlyphButton("Previous", glyph: .previous, size: 34) { player.previous() }
             }
             Spacer()
-            GlyphButton(player.isPlaying ? "Pause" : "Play", glyph: player.isPlaying ? .pause : .play, size: 60) {
+            // The main control: a tinted circle like the other tinted buttons, its icon at a normal
+            // size so the stroke matches every other icon.
+            Button {
                 playPausePresses += 1
                 player.togglePlayPause()
+            } label: {
+                (player.isPlaying ? Glyph.pause : Glyph.play).image
+                    .resizable()
+                    .frame(width: 28, height: 28)
+                    .foregroundStyle(theme.palette.accent)
+                    .frame(width: 64, height: 64)
+                    .background(theme.palette.tint, in: .circle)
+                    .contentTransition(.symbolEffect(.replace))
             }
+            .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
             .animation(theme.motion.snappy, value: player.isPlaying)
             .overlay(alignment: .bottom) {
                 if player.isBuffering { ProgressView().offset(y: 28) }
@@ -170,12 +181,20 @@ struct NowPlayingView: View {
             } else {
                 GlyphButton("Next", glyph: .next, size: 34) { player.next() }
             }
-            Spacer()
         }
         .buttonStyle(.pressable)
         .foregroundStyle(theme.palette.accent)
+        // The 34pt icons sit centered in 44pt tap areas; pull them out so their edges meet the margins.
+        .padding(.horizontal, isEpisode ? 0 : -5)
         // On the tap only: isPlaying also flips for interruptions and AirPods/Lock Screen commands.
         .sensoryFeedback(.impact(weight: .medium), trigger: playPausePresses)
+    }
+
+    /// Last in the capsule, as in other players; in the main tan like AirPlay (an action, not a toggle).
+    private var queueButton: some View {
+        Button("Queue", glyph: .queue) { showQueue = true }
+            .foregroundStyle(theme.palette.accent)
+            .frame(minWidth: 44, minHeight: 44)
     }
 
     @ViewBuilder private var secondaryControls: some View {
@@ -207,6 +226,8 @@ struct NowPlayingView: View {
                 .foregroundStyle(chapters.isEmpty ? theme.palette.textSecondary.opacity(0.4) : theme.palette.accent)
                 .disabled(chapters.isEmpty)
                 .frame(minWidth: 44, minHeight: 44)
+            Spacer()
+            queueButton
         }
         .labelStyle(.iconOnly)
         .buttonStyle(.plain)
@@ -227,6 +248,8 @@ struct NowPlayingView: View {
             Button("Repeat", glyph: player.queue.repeatMode == .one ? .repeatOne : .repeat) { player.cycleRepeat() }
                 .foregroundStyle(player.queue.repeatMode == .off ? theme.palette.textSecondary : theme.palette.accent)
                 .accessibilityValue(player.queue.repeatMode.rawValue)
+            Spacer()
+            queueButton
         }
         .labelStyle(.iconOnly)
         .buttonStyle(.plain)
