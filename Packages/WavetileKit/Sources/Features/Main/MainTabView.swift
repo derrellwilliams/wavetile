@@ -349,15 +349,12 @@ extension View {
 }
 
 private struct DetailBar<Buttons: View>: ViewModifier {
-    @Environment(\.self) private var environment
     let buttons: Buttons
 
     func body(content: Content) -> some View {
         content
             .tintedSystemBack()
-            .background(
-                CustomBarItem(content: TintedBarCapsule { buttons }.environment(\.self, environment))
-            )
+            .background(CustomBarItem(content: TintedBarCapsule { buttons }))
     }
 }
 
@@ -365,32 +362,71 @@ private struct DetailBar<Buttons: View>: ViewModifier {
 private struct CustomBarItem<Content: View>: UIViewControllerRepresentable {
     let content: Content
 
-    func makeUIViewController(context: Context) -> Controller { Controller(content: content) }
+    func makeUIViewController(context: Context) -> Controller {
+        Controller(content: Hosted(content: content, environment: context.environment))
+    }
+
     func updateUIViewController(_ controller: Controller, context: Context) {
-        controller.hosting.rootView = content
+        // The hosting controller sits outside this view tree, so it gets the environment
+        // (theme, stores) passed in; read here, so only this item updates when it changes.
+        controller.update(Hosted(content: content, environment: context.environment))
+    }
+
+    struct Hosted: View {
+        let content: Content
+        let environment: EnvironmentValues
+        var body: some View { content.environment(\.self, environment) }
     }
 
     final class Controller: UIViewController {
-        let hosting: UIHostingController<Content>
+        private let hosting: UIHostingController<Hosted>
         private lazy var item: UIBarButtonItem = {
             hosting.view.backgroundColor = .clear
+            hosting.view.frame.size = fittingSize
             let item = UIBarButtonItem(customView: hosting.view)
             item.hidesSharedBackground = true
             return item
         }()
 
-        init(content: Content) {
+        init(content: Hosted) {
             hosting = UIHostingController(rootView: content)
             hosting.sizingOptions = .intrinsicContentSize
+            // Not a child view controller: its view lives in the bar, outside this one's, and
+            // UIKit throws on that hierarchy. The environment, passed in, carries traits.
             super.init(nibName: nil, bundle: nil)
         }
 
         required init?(coder: NSCoder) { fatalError() }
 
+        private var fittingSize: CGSize { hosting.sizeThatFits(in: UIView.layoutFittingExpandedSize) }
+
+        func update(_ content: Hosted) {
+            hosting.rootView = content
+            // Buttons can arrive after the page loads (an episode, a show's settings); the bar
+            // sizes a custom view once, so resize it when its width changes.
+            let size = fittingSize
+            if hosting.view.frame.size != size {
+                hosting.view.frame.size = size
+                hosting.view.invalidateIntrinsicContentSize()
+            }
+            install()
+        }
+
         override func viewWillAppear(_ animated: Bool) {
             super.viewWillAppear(animated)
-            // The page's own item, so it slides in and out with the page.
-            parent?.navigationItem.rightBarButtonItem = item
+            install()
+        }
+
+        override func viewDidLayoutSubviews() {
+            super.viewDidLayoutSubviews()
+            install()
+        }
+
+        /// The page's own item, so it slides in and out with the page. SwiftUI also writes the
+        /// page's bar items (its toolbar), so this puts the capsule back if they replaced it.
+        private func install() {
+            guard let page = parent, page.navigationItem.rightBarButtonItem !== item else { return }
+            page.navigationItem.rightBarButtonItem = item
         }
     }
 }
@@ -408,7 +444,7 @@ extension View {
     }
 
     /// The system Back, tinted instead of glass.
-    fileprivate func tintedSystemBack() -> some View {
+    func tintedSystemBack() -> some View {
         background(TintedSystemBack())
     }
 }
@@ -433,31 +469,38 @@ private struct ListBar<Trailing: View>: ViewModifier {
 /// Draws the system Back as a `TintedBarIcon` with no glass behind it. Keeping the system
 /// Back (rather than hiding it for a button of our own) keeps everything that comes with it:
 /// the edge swipe, iOS 26's swipe from anywhere on the page, and VoiceOver's escape.
-private struct TintedSystemBack: View {
-    @Environment(\.theme) private var theme
-    @Environment(\.displayScale) private var displayScale
+/// The chevron image belongs to the whole bar, so every page in the stack is styled (tab roots
+/// too, via `tabRootChrome`), each before anything is pushed from it.
+private struct TintedSystemBack: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> Controller { Controller() }
 
-    var body: some View {
-        Styler(image: image)
+    func updateUIViewController(_ controller: Controller, context: Context) {
+        controller.style = Style(
+            theme: context.environment.theme,
+            colorScheme: context.environment.colorScheme,
+            scale: context.environment.displayScale
+        )
+        controller.apply()
     }
 
-    private var image: UIImage? {
-        let renderer = ImageRenderer(content: TintedBarIcon(glyph: .back).environment(\.theme, theme))
-        renderer.scale = displayScale
-        return renderer.uiImage?.withRenderingMode(.alwaysOriginal)
-    }
+    struct Style: Hashable {
+        let theme: Theme
+        let colorScheme: ColorScheme
+        let scale: CGFloat
 
-    struct Styler: UIViewControllerRepresentable {
-        let image: UIImage?
-        func makeUIViewController(context: Context) -> Controller { Controller() }
-        func updateUIViewController(_ controller: Controller, context: Context) {
-            controller.image = image
-            controller.apply()
+        @MainActor func render() -> UIImage? {
+            let renderer = ImageRenderer(content: TintedBarIcon(glyph: .back)
+                .environment(\.theme, theme)
+                .environment(\.colorScheme, colorScheme))
+            renderer.scale = scale
+            return renderer.uiImage?.withRenderingMode(.alwaysOriginal)
         }
     }
 
     final class Controller: UIViewController {
-        var image: UIImage?
+        var style: Style?
+        /// Rendered once per style, not on every update.
+        private var rendered: (style: Style, image: UIImage)?
 
         override func viewWillAppear(_ animated: Bool) {
             super.viewWillAppear(animated)
@@ -465,16 +508,23 @@ private struct TintedSystemBack: View {
         }
 
         func apply() {
-            guard let image, let navigation = navigationController, let page = parent,
-                  let index = navigation.viewControllers.firstIndex(of: page), index > 0 else { return }
+            guard let style, let navigation = navigationController else { return }
+            if rendered?.style != style, let image = style.render() { rendered = (style, image) }
+            guard let image = rendered?.image else { return }
             // A page's Back is the previous page's back item.
-            let previous = navigation.viewControllers[index - 1].navigationItem
-            previous.backButtonDisplayMode = .minimal
-            let item = UIBarButtonItem(title: "", style: .plain, target: nil, action: nil)
-            item.hidesSharedBackground = true
-            previous.backBarButtonItem = item
-            navigation.navigationBar.backIndicatorImage = image
-            navigation.navigationBar.backIndicatorTransitionMaskImage = image
+            for page in navigation.viewControllers {
+                let item = page.navigationItem
+                guard item.backBarButtonItem?.hidesSharedBackground != true else { continue }
+                item.backButtonDisplayMode = .minimal
+                let back = UIBarButtonItem(title: "", style: .plain, target: nil, action: nil)
+                back.hidesSharedBackground = true
+                item.backBarButtonItem = back
+            }
+            let bar = navigation.navigationBar
+            if bar.backIndicatorImage !== image {
+                bar.backIndicatorImage = image
+                bar.backIndicatorTransitionMaskImage = image
+            }
         }
     }
 }
@@ -551,6 +601,8 @@ private struct TabRootChrome<Trailing: View>: ViewModifier {
             }
             // Keeps the scrolled-up title at the leading edge on every tab, not centered on some.
             .toolbarRole(centersTitle ? .automatic : .browser)
+            // Styles the root's back item before anything is pushed from it.
+            .tintedSystemBack()
             // Pushing a screen makes the root disappear; returning makes it reappear.
             .onAppear { reporter.report(true) }
             .onDisappear { reporter.report(false) }

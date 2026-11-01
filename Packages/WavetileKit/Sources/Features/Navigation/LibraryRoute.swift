@@ -185,7 +185,7 @@ private struct AlbumDestination: View {
         if let model {
             AlbumDetailView(model: model)
         } else {
-            Color.clear.themedBackground().onAppear { model = AlbumDetailModel(album: album, store: store) }
+            Color.clear.themedBackground().tintedSystemBack().onAppear { model = AlbumDetailModel(album: album, store: store) }
         }
     }
 }

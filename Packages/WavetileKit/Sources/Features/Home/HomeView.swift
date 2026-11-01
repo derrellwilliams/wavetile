@@ -8,6 +8,7 @@ import SwiftUI
 struct HomeView: View {
     @ObserveInjection var inject
     @Environment(\.theme) private var theme
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(PodcastsStore.self) private var podcasts
     @Environment(LibraryStore.self) private var store
     @State var model: HomeModel
@@ -38,11 +39,6 @@ struct HomeView: View {
                     // shelves follow Recently Added (the card only for the first visit).
                     if model.showsWelcome, let stats = model.stats, stats.albums > 0 {
                         WelcomeCard(userName: userName, stats: stats)
-                            .task {
-                                // Leaving Home first cancels the sleep; that doesn't count.
-                                guard (try? await Task.sleep(for: .seconds(60))) != nil else { return }
-                                model.countWelcomeVisit()
-                            }
                     }
                     if !hasRecentlyPlayed {
                         podcastUpNextShelf
@@ -100,6 +96,13 @@ struct HomeView: View {
             .libraryDestinations(zoom: zoom) { path.append($0) }
             .podcastDestinations(zoom: zoom) { path.append($0) }
             // On the always-present scroll view: a task on a shelf that isn't shown never runs.
+            // Here, not on the card: a lazy row's task is cancelled once it scrolls off. Leaving
+            // Home or the app first cancels the sleep, so that minute doesn't count.
+            .task(id: model.showsWelcome && scenePhase == .active) {
+                guard model.showsWelcome, scenePhase == .active,
+                      (try? await Task.sleep(for: .seconds(60))) != nil else { return }
+                model.countWelcomeVisit()
+            }
             .task(id: podcasts.isEnabled) { await observePodcasts(podcasts.database.upNextShelf()) { podcastUpNext = $0 } }
             .markRefreshable {
                 await model.loadDiscovery()
