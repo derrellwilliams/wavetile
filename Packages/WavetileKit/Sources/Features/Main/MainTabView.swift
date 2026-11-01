@@ -228,8 +228,7 @@ extension MainTabView {
     }
 }
 
-/// Profile button at top left. A plain bar item, so it gets the same system glass and icon
-/// size as the buttons on pushed screens.
+/// Profile button at top left, a tinted circle like every other bar button.
 struct ProfileButton: View {
     @Environment(\.openProfile) private var openProfile
 
@@ -240,7 +239,7 @@ struct ProfileButton: View {
     }
 }
 
-/// A tab root's bar button icon in the tinted circle the main buttons use (Play, Shuffle),
+/// A bar button's icon in the tinted circle the main buttons use (Play, Shuffle),
 /// instead of the bar's glass. Drawn inside the label: the bar ignores backgrounds added
 /// outside a button, and turns an item holding a menu into that menu's button.
 struct TintedBarIcon: View {
@@ -252,7 +251,7 @@ struct TintedBarIcon: View {
     var body: some View {
         glyph.image
             .foregroundStyle(theme.palette.accent)
-            // In a capsule, the plain button style dims every item alike (Labels too).
+            // In a capsule, the plain button style and `DimmingMenuStyle` dim each item.
             .opacity(isEnabled || inGroup ? 1 : 0.4)
             .frame(width: 44, height: 44)
             // In a group, the group's capsule is the fill.
@@ -314,10 +313,28 @@ struct TintedBarCapsule<Content: View>: View {
             .frame(width: CGFloat(items.count) * 44, height: 44)
         }
         .buttonStyle(.plain)
+        .menuStyle(DimmingMenuStyle())
         .labelStyle(.iconOnly)
         .foregroundStyle(theme.palette.accent)
         .environment(\.barIconInGroup, true)
         .background { TintedBarFill(shape: .capsule) }
+    }
+}
+
+/// Dims a disabled menu the way the plain button style dims a disabled button, so every item
+/// in a capsule dims alike.
+private struct DimmingMenuStyle: MenuStyle {
+    func makeBody(configuration: MenuStyleConfiguration) -> some View {
+        DimmingMenu(configuration: configuration)
+    }
+}
+
+private struct DimmingMenu: View {
+    @Environment(\.isEnabled) private var isEnabled
+    let configuration: MenuStyleConfiguration
+
+    var body: some View {
+        Menu(configuration).opacity(isEnabled ? 1 : 0.4)
     }
 }
 

@@ -3,7 +3,7 @@ import Persistence
 import SwiftUI
 
 /// Download control for an album or playlist (`EpisodeDownloadButton` is the episode twin): download → progress ring → downloaded (menu to remove).
-/// Icon-only, for the navigation bar (which supplies the glass); the label is read by VoiceOver.
+/// Icon-only, for a tinted bar capsule (see `TintedBarCapsule`); the label is read by VoiceOver.
 struct DownloadButton: View {
     @Environment(\.theme) private var theme
     @Environment(LibraryStore.self) private var library
