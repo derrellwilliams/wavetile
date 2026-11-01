@@ -110,7 +110,7 @@ public extension Theme {
         typography: .init(
             largeTitle: BrandFont.display(.largeTitle),
             title: BrandFont.display(.title2),
-            sectionHeader: BrandFont.font(.title3, weight: .semibold),
+            sectionHeader: BrandFont.font(.title3, weight: .medium),
             body: BrandFont.font(.body),
             itemTitle: BrandFont.font(.subheadline, weight: .medium),
             itemSubtitle: BrandFont.font(.subheadline),
