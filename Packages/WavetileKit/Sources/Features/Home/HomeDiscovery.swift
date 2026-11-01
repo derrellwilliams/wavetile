@@ -95,7 +95,8 @@ struct PlaylistLink: View {
             AlbumTile(
                 title: playlist.name,
                 subtitle: "\(playlist.trackCount) song\(playlist.trackCount == 1 ? "" : "s")",
-                artwork: store.artwork(itemID: playlist.id, tag: playlist.imageTag, maxPixelWidth: 480)
+                artwork: store.artwork(itemID: playlist.id, tag: playlist.imageTag, maxPixelWidth: 480),
+                subtitleIsMetadata: true
             )
         }
         .buttonStyle(.pressable)

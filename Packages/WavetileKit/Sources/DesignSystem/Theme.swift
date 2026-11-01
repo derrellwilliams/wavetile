@@ -58,8 +58,10 @@ public struct Theme: Sendable, Identifiable, Hashable {
         public var body: Font
         /// 14: names under artwork and in rows.
         public var itemTitle: Font
-        /// 14, mono: the line under an item (artist, show, counts).
+        /// 14: the name under an item (artist, author, server) and short notes.
         public var itemSubtitle: Font
+        /// 14, mono: metadata under or beside an item (counts, durations, dates, status).
+        public var itemMetadata: Font
         /// 12: labels and fine print.
         public var caption: Font
         /// 36, mono: Quick Connect codes.
@@ -139,7 +141,8 @@ public extension Theme {
             lead: BrandFont.font(.title3, size: 18),
             body: BrandFont.font(.body, size: 17),
             itemTitle: BrandFont.font(.subheadline, size: 14),
-            itemSubtitle: BrandFont.font(.subheadline, size: 14, family: BrandFont.monoFamily),
+            itemSubtitle: BrandFont.font(.subheadline, size: 14),
+            itemMetadata: BrandFont.font(.subheadline, size: 14, family: BrandFont.monoFamily),
             caption: BrandFont.font(.caption, size: 12),
             code: BrandFont.font(.largeTitle, size: 36, family: BrandFont.monoFamily)
         ),

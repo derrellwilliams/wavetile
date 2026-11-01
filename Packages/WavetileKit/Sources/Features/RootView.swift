@@ -49,8 +49,8 @@ public struct RootView: View {
         .background(app.theme.palette.background.ignoresSafeArea())
         .onAppear { app.restore() }
         .task {
-            // One quarter turn and a beat to read the name, then reveal the app.
-            try? await Task.sleep(for: .seconds(WavetileMark.move + WavetileMark.hold + 0.15))
+            // Two quarter turns and a beat to read the name, then reveal the app.
+            try? await Task.sleep(for: .seconds(2 * (WavetileMark.move + WavetileMark.hold) + 0.15))
             withAnimation(app.theme.motion.smooth) { showsSplash = false }
         }
         .enableInjection()

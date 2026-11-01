@@ -229,7 +229,7 @@ struct AddToPlaylistSheet: View {
                             VStack(alignment: .leading) {
                                 Text(playlist.name).font(theme.typography.body)
                                 Text("\(playlist.trackCount) songs")
-                                    .font(theme.typography.itemSubtitle)
+                                    .font(theme.typography.itemMetadata)
                                     .foregroundStyle(theme.palette.textSecondary)
                             }
                         }
@@ -305,7 +305,7 @@ struct AddToCollectionSheet: View {
                             VStack(alignment: .leading) {
                                 Text(collection.name).font(theme.typography.body)
                                 Text("\(collection.albumCount) albums")
-                                    .font(theme.typography.itemSubtitle)
+                                    .font(theme.typography.itemMetadata)
                                     .foregroundStyle(theme.palette.textSecondary)
                             }
                         }

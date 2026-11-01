@@ -47,7 +47,7 @@ public struct TrackRow: View {
                 // At accessibility sizes the duration moves under the title instead of squeezing it.
                 if isAccessibilitySize, let duration {
                     Text(duration, format: .time(pattern: .minuteSecond))
-                        .font(theme.typography.itemSubtitle)
+                        .font(theme.typography.itemMetadata)
                         .foregroundStyle(theme.palette.textSecondary)
                 }
             }
@@ -60,7 +60,7 @@ public struct TrackRow: View {
             }
             if !isAccessibilitySize, let duration {
                 Text(duration, format: .time(pattern: .minuteSecond))
-                    .font(theme.typography.itemSubtitle)
+                    .font(theme.typography.itemMetadata)
                     .foregroundStyle(theme.palette.textSecondary)
             }
         }
@@ -85,7 +85,7 @@ public struct TrackRow: View {
                         .foregroundStyle(theme.palette.textSecondary)
                 }
             }
-            .font(theme.typography.itemSubtitle)
+            .font(theme.typography.itemMetadata)
             .id(isPlaying)
             .transition(.iconSwap)
             .animation(theme.motion.snappy, value: isPlaying)

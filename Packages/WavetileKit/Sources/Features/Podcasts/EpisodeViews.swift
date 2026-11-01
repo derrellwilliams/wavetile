@@ -258,7 +258,7 @@ struct EpisodeCard: View {
                 }
                 // Time left as plain text, matching album tiles; tapping the card opens the episode.
                 Text(EpisodeFormat.status(item.episode))
-                    .font(theme.typography.itemSubtitle)
+                    .font(theme.typography.itemMetadata)
                     .foregroundStyle(theme.palette.textSecondary)
             }
             .contentShape(.rect)

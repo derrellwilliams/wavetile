@@ -268,9 +268,19 @@ struct TintedBarIcon: View {
 /// Bar button metrics.
 enum TintedBar {
     static let size: CGFloat = 44
+    /// iOS 27 lets an item draw past its frame, so the fill can cover the glass the bar draws
+    /// around it. iOS 26 clips an item to its frame, leaving glass showing on both sides of
+    /// the fill, so there the bar's glass is hidden and the fill is the whole button.
+    static var fillsGlass: Bool {
+        if #available(iOS 27, *) { true } else { false }
+    }
+
     /// How much wider than an item the bar draws its glass, on each side. Measured on iOS 27,
     /// not API: if the glass shows a thick rim or the fill spills past it, re-measure this.
-    static let glassInset: CGFloat = 4
+    static var glassInset: CGFloat { fillsGlass ? 4 : 0 }
+
+    /// The bar's glass behind a tinted item: kept where the fill covers it (see `fillsGlass`).
+    static var glass: Visibility { fillsGlass ? .automatic : .hidden }
 }
 
 /// Sizes an item so the bar's glass around it is `width` wide, and fills that glass with the
@@ -314,6 +324,7 @@ struct TintedSheetButton: ToolbarContent {
                 .buttonStyle(.plain)
                 .accessibilityLabel(title)
         }
+        .sharedBackgroundVisibility(TintedBar.glass)
     }
 }
 
@@ -421,7 +432,9 @@ private struct CustomBarItem<Content: View>: UIViewControllerRepresentable {
             hosting.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
             container.addSubview(hosting.view)
             resize()
-            return UIBarButtonItem(customView: container)
+            let item = UIBarButtonItem(customView: container)
+            item.hidesSharedBackground = !TintedBar.fillsGlass
+            return item
         }()
 
         init(content: Hosted) {
@@ -519,6 +532,7 @@ private struct ListBar<Trailing: View>: ViewModifier {
                     ToolbarItem(placement: .topBarTrailing) {
                         trailing.buttonStyle(.plain)
                     }
+                    .sharedBackgroundVisibility(TintedBar.glass)
                 }
             }
     }
@@ -587,16 +601,23 @@ private struct TintedSystemBack: UIViewControllerRepresentable {
             // The chevron comes from the bar's appearances (SwiftUI sets the bar's and a page's
             // own), which win over `backIndicatorImage`, so it's set on each of them. Each is
             // written only when its chevron differs, so updates don't restyle the bar.
-            if let new = tinted(bar.standardAppearance, image) { bar.standardAppearance = new }
-            if let new = tinted(bar.scrollEdgeAppearance, image) { bar.scrollEdgeAppearance = new }
-            if let new = tinted(bar.compactAppearance, image) { bar.compactAppearance = new }
+            var changed = false
+            if let new = tinted(bar.standardAppearance, image) { bar.standardAppearance = new; changed = true }
+            if let new = tinted(bar.scrollEdgeAppearance, image) { bar.scrollEdgeAppearance = new; changed = true }
+            if let new = tinted(bar.compactAppearance, image) { bar.compactAppearance = new; changed = true }
             for page in navigation.viewControllers {
                 let item = page.navigationItem
                 // A page's Back is the previous page's back item: the chevron alone.
                 if item.backButtonDisplayMode != .minimal { item.backButtonDisplayMode = .minimal }
-                if let new = tinted(item.standardAppearance, image) { item.standardAppearance = new }
-                if let new = tinted(item.scrollEdgeAppearance, image) { item.scrollEdgeAppearance = new }
-                if let new = tinted(item.compactAppearance, image) { item.compactAppearance = new }
+                if let new = tinted(item.standardAppearance, image) { item.standardAppearance = new; changed = true }
+                if let new = tinted(item.scrollEdgeAppearance, image) { item.scrollEdgeAppearance = new; changed = true }
+                if let new = tinted(item.compactAppearance, image) { item.compactAppearance = new; changed = true }
+            }
+            // A swap mid-transition could leave the large title laid out without its side margin
+            // until the next layout pass; lay the bar out again right away.
+            if changed {
+                bar.setNeedsLayout()
+                bar.layoutIfNeeded()
             }
         }
 
@@ -625,6 +646,7 @@ struct TintedBarGroup<Content: View>: ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
             TintedBarCapsule { content }
         }
+        .sharedBackgroundVisibility(TintedBar.glass)
     }
 }
 
@@ -647,19 +669,21 @@ extension View {
     /// Chrome for a tab's root screen, applied to the content *inside* its `NavigationStack`:
     /// the profile button at top left (opens the drawer), and root reporting so the drawer's
     /// edge swipe only works at the root, never fighting the system back gesture.
-    /// `trailing` adds screen buttons next to AirPlay; give them `TintedBarIcon` labels.
-    func tabRootChrome() -> some View {
-        modifier(TabRootChrome(trailing: EmptyView()))
+    /// `showsWave` centers the wave in the bar (Home only). `trailing` adds screen buttons next
+    /// to AirPlay; give them `TintedBarIcon` labels.
+    func tabRootChrome(showsWave: Bool = false) -> some View {
+        modifier(TabRootChrome(showsWave: showsWave, trailing: EmptyView()))
     }
 
-    func tabRootChrome<Trailing: View>(@ViewBuilder trailing: () -> Trailing) -> some View {
-        modifier(TabRootChrome(trailing: trailing()))
+    func tabRootChrome<Trailing: View>(showsWave: Bool = false, @ViewBuilder trailing: () -> Trailing) -> some View {
+        modifier(TabRootChrome(showsWave: showsWave, trailing: trailing()))
     }
 }
 
 private struct TabRootChrome<Trailing: View>: ViewModifier {
     @Environment(\.theme) private var theme
     @Environment(\.tabRootReporter) private var reporter
+    let showsWave: Bool
     let trailing: Trailing
 
     private static var itemSize: CGFloat { 44 }
@@ -671,11 +695,14 @@ private struct TabRootChrome<Trailing: View>: ViewModifier {
                 ToolbarItem(placement: .topBarLeading) {
                     ProfileButton()
                 }
-                // The wave, centered in every tab's bar.
-                ToolbarItem(placement: .principal) {
-                    WaveMark(width: 104)
-                        .accessibilityElement()
-                        .accessibilityLabel("Wavetile")
+                .sharedBackgroundVisibility(TintedBar.glass)
+                // The wave, centered in Home's bar.
+                if showsWave {
+                    ToolbarItem(placement: .principal) {
+                        WaveMark(width: 104)
+                            .accessibilityElement()
+                            .accessibilityLabel("Wavetile")
+                    }
                 }
                 // AirPlay and the screen's buttons share one tinted capsule; alone, it's a circle.
                 TintedBarGroup {

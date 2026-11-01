@@ -29,7 +29,7 @@ struct CollectionsView: View {
                                 .font(theme.typography.itemTitle)
                                 .foregroundStyle(theme.palette.textPrimary)
                             Text("\(collection.albumCount) album\(collection.albumCount == 1 ? "" : "s")")
-                                .font(theme.typography.itemSubtitle)
+                                .font(theme.typography.itemMetadata)
                                 .foregroundStyle(theme.palette.textSecondary)
                         }
                         .lineLimit(1)

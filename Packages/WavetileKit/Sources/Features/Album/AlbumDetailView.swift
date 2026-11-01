@@ -110,7 +110,7 @@ struct AlbumDetailView: View {
         if let date = details?.premiereDate {
             // Jellyfin stores release dates at midnight UTC; local time would show the day before.
             Text(date.formatted(Date.FormatStyle(date: .long, time: .omitted, timeZone: .gmt)))
-                .font(theme.typography.itemSubtitle)
+                .font(theme.typography.itemMetadata)
                 .foregroundStyle(theme.palette.textSecondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, theme.spacing.screenInset)

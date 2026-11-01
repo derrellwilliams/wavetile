@@ -27,7 +27,7 @@ struct PlaylistsView: View {
                                 .font(theme.typography.body)
                                 .foregroundStyle(theme.palette.textPrimary)
                             Text("\(playlist.trackCount) songs")
-                                .font(theme.typography.itemSubtitle)
+                                .font(theme.typography.itemMetadata)
                                 .foregroundStyle(theme.palette.textSecondary)
                         }
                         .lineLimit(1)

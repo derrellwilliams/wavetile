@@ -7,11 +7,15 @@ public struct AlbumTile: View {
     private let title: String
     private let subtitle: String
     private let artwork: ArtworkSource
+    private let subtitleIsMetadata: Bool
 
-    public init(title: String, subtitle: String, artwork: ArtworkSource) {
+    /// `subtitle` is a name (artist, author) in Inter; `subtitleIsMetadata` sets it in mono
+    /// instead, for counts.
+    public init(title: String, subtitle: String, artwork: ArtworkSource, subtitleIsMetadata: Bool = false) {
         self.title = title
         self.subtitle = subtitle
         self.artwork = artwork
+        self.subtitleIsMetadata = subtitleIsMetadata
     }
 
     public var body: some View {
@@ -31,7 +35,7 @@ public struct AlbumTile: View {
                 .foregroundStyle(theme.palette.textPrimary)
                 .accessibilityIdentifier("albumTile")
             Text(subtitle)
-                .font(theme.typography.itemSubtitle)
+                .font(subtitleIsMetadata ? theme.typography.itemMetadata : theme.typography.itemSubtitle)
                 .foregroundStyle(theme.palette.textSecondary)
         }
         .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
