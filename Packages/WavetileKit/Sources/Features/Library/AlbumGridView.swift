@@ -38,20 +38,18 @@ struct AlbumGridView: View {
         }
         .themedBackground()
         .navigationTitle(title)
-        .listBar {
-            if source == .all {
-                Menu {
-                    Picker("Sort", selection: $sort) {
-                        Text("Title").tag(LibraryDatabase.AlbumSort.title)
-                        Text("Artist").tag(LibraryDatabase.AlbumSort.artist)
-                        Text("Year").tag(LibraryDatabase.AlbumSort.year)
-                        Text("Recently Added").tag(LibraryDatabase.AlbumSort.recentlyAdded)
-                    }
-                } label: {
-                    TintedBarIcon(glyph: .sort)
+        .listBar(showsTrailing: source == .all) {
+            Menu {
+                Picker("Sort", selection: $sort) {
+                    Text("Title").tag(LibraryDatabase.AlbumSort.title)
+                    Text("Artist").tag(LibraryDatabase.AlbumSort.artist)
+                    Text("Year").tag(LibraryDatabase.AlbumSort.year)
+                    Text("Recently Added").tag(LibraryDatabase.AlbumSort.recentlyAdded)
                 }
-                .accessibilityLabel("Sort")
+            } label: {
+                TintedBarIcon(glyph: .sort)
             }
+            .accessibilityLabel("Sort")
         }
         .task(id: sort) {
             let observation = switch source {

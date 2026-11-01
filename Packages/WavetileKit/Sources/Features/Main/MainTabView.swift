@@ -248,19 +248,49 @@ struct TintedBarIcon: View {
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.barIconInGroup) private var inGroup
     let glyph: Glyph
-    /// How far the bar's glass reaches past the item on each side; 0 draws the full circle.
-    var glassInset = TintedBarFill<Circle>.glassInset
 
     var body: some View {
+        icon
+            // In a group, the group's capsule is the fill.
+            .modifier(FillingBarGlass(shape: .circle, width: TintedBar.size, isOn: !inGroup))
+    }
+
+    /// The icon on a plain 44pt square, for drawing it outside the bar (the system Back).
+    var icon: some View {
         glyph.image
             .foregroundStyle(theme.palette.accent)
             // In a capsule, the plain button style and `DimmingMenuStyle` dim each item.
             .opacity(isEnabled || inGroup ? 1 : 0.4)
-            // Narrower by the glass's inset, so the glass around it is a 44pt circle like Back's.
-            .frame(width: 44 - 2 * (inGroup ? 0 : glassInset), height: 44)
-            // In a group, the group's capsule is the fill.
-            .background { if !inGroup { TintedBarFill(shape: .circle).padding(.horizontal, -glassInset) } }
-            .contentShape(.circle)
+            .frame(width: TintedBar.size, height: TintedBar.size)
+    }
+}
+
+/// Bar button metrics.
+enum TintedBar {
+    static let size: CGFloat = 44
+    /// How much wider than an item the bar draws its glass, on each side. Measured on iOS 27,
+    /// not API: if the glass shows a thick rim or the fill spills past it, re-measure this.
+    static let glassInset: CGFloat = 4
+}
+
+/// Sizes an item so the bar's glass around it is `width` wide, and fills that glass with the
+/// tint, leaving only its rim, as on the system Back. The item keeps its full width: the
+/// frame is narrowed by negative padding, so taps across the whole fill still land.
+private struct FillingBarGlass<S: Shape>: ViewModifier {
+    let shape: S
+    let width: CGFloat
+    var isOn = true
+
+    func body(content: Content) -> some View {
+        if isOn {
+            content
+                .frame(width: width, height: TintedBar.size)
+                .background { TintedBarFill(shape: shape) }
+                .contentShape(shape)
+                .padding(.horizontal, -TintedBar.glassInset)
+        } else {
+            content
+        }
     }
 }
 
@@ -290,9 +320,6 @@ struct TintedSheetButton: ToolbarContent {
 /// The main buttons' tint as it shows on the page background, but opaque, so bar buttons over
 /// artwork (album and artist pages) read the same as on a plain screen.
 struct TintedBarFill<S: Shape>: View {
-    /// The bar's glass is this much wider than an item on each side.
-    static var glassInset: CGFloat { 4 }
-
     @Environment(\.theme) private var theme
     let shape: S
 
@@ -311,21 +338,20 @@ struct TintedBarCapsule<Content: View>: View {
         // An explicit size: the bar sizes custom items from what they report, and a stack of
         // buttons and menus reports only its first, pushing the rest off the screen.
         Group(subviews: content) { items in
-            HStack(spacing: 0) {
-                ForEach(items) { item in
-                    item.frame(width: 44, height: 44)
+            if !items.isEmpty {
+                HStack(spacing: 0) {
+                    ForEach(items) { item in
+                        item.frame(width: TintedBar.size, height: TintedBar.size)
+                    }
                 }
+                .modifier(FillingBarGlass(shape: .capsule, width: CGFloat(items.count) * TintedBar.size))
             }
-            // Narrower by the glass's inset (the buttons overhang it), so the fill below
-            // covers the glass the way the system Back's circle does.
-            .frame(width: CGFloat(items.count) * 44 - 2 * TintedBarFill<Capsule>.glassInset, height: 44)
         }
         .buttonStyle(.plain)
         .menuStyle(DimmingMenuStyle())
         .labelStyle(.iconOnly)
         .foregroundStyle(theme.palette.accent)
         .environment(\.barIconInGroup, true)
-        .background { TintedBarFill(shape: .capsule).padding(.horizontal, -TintedBarFill<Capsule>.glassInset) }
     }
 }
 
@@ -388,11 +414,14 @@ private struct CustomBarItem<Content: View>: UIViewControllerRepresentable {
 
     final class Controller: UIViewController {
         private let hosting: UIHostingController<Hosted>
+        private let container = GlassOverhangView()
         private lazy var item: UIBarButtonItem = {
             hosting.view.backgroundColor = .clear
-            hosting.view.frame.size = fittingSize
-            let item = UIBarButtonItem(customView: hosting.view)
-            return item
+            // Follows the container wherever the bar places and sizes it.
+            hosting.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            container.addSubview(hosting.view)
+            resize()
+            return UIBarButtonItem(customView: container)
         }()
 
         init(content: Hosted) {
@@ -411,12 +440,15 @@ private struct CustomBarItem<Content: View>: UIViewControllerRepresentable {
             hosting.rootView = content
             // Buttons can arrive after the page loads (an episode, a show's settings); the bar
             // sizes a custom view once, so resize it when its width changes.
-            let size = fittingSize
-            if hosting.view.frame.size != size {
-                hosting.view.frame.size = size
-                hosting.view.invalidateIntrinsicContentSize()
-            }
+            if container.size != fittingSize { resize() }
             install()
+        }
+
+        /// The bar sizes the glass from the container; the hosting view is wider by the glass's
+        /// inset, as the capsule's fill is, so taps out to the fill's edge reach the buttons.
+        private func resize() {
+            container.size = fittingSize
+            hosting.view.frame = container.bounds.insetBy(dx: -TintedBar.glassInset, dy: 0)
         }
 
         override func viewWillAppear(_ animated: Bool) {
@@ -432,9 +464,26 @@ private struct CustomBarItem<Content: View>: UIViewControllerRepresentable {
         /// The page's own item, so it slides in and out with the page. SwiftUI also writes the
         /// page's bar items (its toolbar), so this puts the capsule back if they replaced it.
         private func install() {
-            guard let page = parent, page.navigationItem.rightBarButtonItem !== item else { return }
-            page.navigationItem.rightBarButtonItem = item
+            guard let page = parent else { return }
+            // No buttons (an episode still loading): no item, so no empty glass.
+            let wanted = fittingSize.width > 0 ? item : nil
+            guard page.navigationItem.rightBarButtonItem !== wanted else { return }
+            page.navigationItem.rightBarButtonItem = wanted
         }
+    }
+}
+
+/// Takes taps out to its glass's edge, past its own width.
+private final class GlassOverhangView: UIView {
+    /// What the bar sizes the item (and its glass) from.
+    var size: CGSize = .zero {
+        didSet { frame.size = size; invalidateIntrinsicContentSize() }
+    }
+
+    override var intrinsicContentSize: CGSize { size }
+
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        bounds.insetBy(dx: -TintedBar.glassInset, dy: 0).contains(point)
     }
 }
 
@@ -446,8 +495,10 @@ extension View {
         modifier(ListBar(trailing: EmptyView()))
     }
 
-    func listBar<Trailing: View>(@ViewBuilder trailing: () -> Trailing) -> some View {
-        modifier(ListBar(trailing: trailing()))
+    /// `showsTrailing` false leaves the right side empty (an `if` in the builder would still
+    /// make an item, and the bar would draw empty glass for it).
+    func listBar<Trailing: View>(showsTrailing: Bool = true, @ViewBuilder trailing: () -> Trailing) -> some View {
+        modifier(ListBar(trailing: trailing(), showsTrailing: showsTrailing))
     }
 
     /// The system Back, drawn tinted over the glass iOS keeps behind it.
@@ -458,12 +509,13 @@ extension View {
 
 private struct ListBar<Trailing: View>: ViewModifier {
     let trailing: Trailing
+    var showsTrailing = true
 
     func body(content: Content) -> some View {
         content
             .tintedSystemBack()
             .toolbar {
-                if Trailing.self != EmptyView.self {
+                if showsTrailing, Trailing.self != EmptyView.self {
                     ToolbarItem(placement: .topBarTrailing) {
                         trailing.buttonStyle(.plain)
                     }
@@ -474,8 +526,8 @@ private struct ListBar<Trailing: View>: ViewModifier {
 
 /// Draws the system Back as a `TintedBarIcon`. iOS still draws its glass behind Back (it
 /// ignores `hidesSharedBackground` there), so a faint rim shows; that's the least glass a
-/// supported Back allows. Keeping the system
-/// Back (rather than hiding it for a button of our own) keeps everything that comes with it:
+/// supported Back allows. Keeping the system Back (rather than hiding it for a button of our
+/// own) keeps everything that comes with it:
 /// the edge swipe, iOS 26's swipe from anywhere on the page, and VoiceOver's escape.
 /// The chevron image belongs to the whole bar, so every page in the stack is styled (tab roots
 /// too, via `tabRootChrome`), each before anything is pushed from it.
@@ -497,7 +549,8 @@ private struct TintedSystemBack: UIViewControllerRepresentable {
         let scale: CGFloat
 
         @MainActor func render() -> UIImage? {
-            let renderer = ImageRenderer(content: TintedBarIcon(glyph: .back, glassInset: 0)
+            let renderer = ImageRenderer(content: TintedBarIcon(glyph: .back).icon
+                .background { TintedBarFill(shape: .circle) }
                 .environment(\.theme, theme)
                 .environment(\.colorScheme, colorScheme))
             renderer.scale = scale
@@ -515,37 +568,42 @@ private struct TintedSystemBack: UIViewControllerRepresentable {
             apply()
         }
 
+        /// Again once the push lands, in case SwiftUI rewrote the page's appearances meanwhile.
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            apply()
+        }
+
         func apply() {
             guard let style, let navigation = navigationController else { return }
             if rendered?.style != style, let image = style.render() { rendered = (style, image) }
             guard let image = rendered?.image else { return }
-            // A page's Back is the previous page's back item.
-            for page in navigation.viewControllers {
-                let item = page.navigationItem
-                guard item.backBarButtonItem?.hidesSharedBackground != true else { continue }
-                item.backButtonDisplayMode = .minimal
-                let back = UIBarButtonItem(title: "", style: .plain, target: nil, action: nil)
-                back.hidesSharedBackground = true
-                item.backBarButtonItem = back
+            let bar = navigation.navigationBar
+            // For any page without appearances of its own, and any bar appearance left unset.
+            if bar.backIndicatorImage !== image {
+                bar.backIndicatorImage = image
+                bar.backIndicatorTransitionMaskImage = image
             }
             // The chevron comes from the bar's appearances (SwiftUI sets the bar's and a page's
-            // own), which win over the bar's `backIndicatorImage`, so it's set on each of them.
-            let bar = navigation.navigationBar
-            bar.standardAppearance = tinted(bar.standardAppearance, image) ?? bar.standardAppearance
-            bar.scrollEdgeAppearance = tinted(bar.scrollEdgeAppearance, image)
-            bar.compactAppearance = tinted(bar.compactAppearance, image)
+            // own), which win over `backIndicatorImage`, so it's set on each of them. Each is
+            // written only when its chevron differs, so updates don't restyle the bar.
+            if let new = tinted(bar.standardAppearance, image) { bar.standardAppearance = new }
+            if let new = tinted(bar.scrollEdgeAppearance, image) { bar.scrollEdgeAppearance = new }
+            if let new = tinted(bar.compactAppearance, image) { bar.compactAppearance = new }
             for page in navigation.viewControllers {
                 let item = page.navigationItem
-                item.standardAppearance = tinted(item.standardAppearance, image)
-                item.scrollEdgeAppearance = tinted(item.scrollEdgeAppearance, image)
-                item.compactAppearance = tinted(item.compactAppearance, image)
+                // A page's Back is the previous page's back item: the chevron alone.
+                if item.backButtonDisplayMode != .minimal { item.backButtonDisplayMode = .minimal }
+                if let new = tinted(item.standardAppearance, image) { item.standardAppearance = new }
+                if let new = tinted(item.scrollEdgeAppearance, image) { item.scrollEdgeAppearance = new }
+                if let new = tinted(item.compactAppearance, image) { item.compactAppearance = new }
             }
         }
 
-        /// `appearance` with `image` as its chevron; the same object if it has it already, so
-        /// an update doesn't restyle the bar.
+        /// A copy of `appearance` with `image` as its chevron, or nil if it has it already (or
+        /// there's no appearance).
         private func tinted(_ appearance: UINavigationBarAppearance?, _ image: UIImage) -> UINavigationBarAppearance? {
-            guard let appearance, appearance.backIndicatorImage !== image else { return appearance }
+            guard let appearance, appearance.backIndicatorImage !== image else { return nil }
             let copy = appearance.copy()
             copy.setBackIndicatorImage(image, transitionMaskImage: image)
             return copy
