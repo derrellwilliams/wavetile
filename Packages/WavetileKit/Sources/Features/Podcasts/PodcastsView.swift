@@ -57,6 +57,15 @@ struct PodcastsView: View {
             }
             .padding(.vertical, theme.spacing.lg)
         }
+        // With no shows yet, the splash's waves sit behind the title and the empty state.
+        .background(alignment: .top) {
+            if !hasShows {
+                WaveBackdrop()
+                    .frame(height: 520)
+                    .ignoresSafeArea(edges: .top)
+                    .transition(.opacity)
+            }
+        }
         .themedBackground()
         .navigationTitle("Podcasts")
         .markRefreshable { await podcasts.refreshAll() }
@@ -105,16 +114,10 @@ struct PodcastsView: View {
     }
 
     private var emptyState: some View {
-        EmptyState("Find Your Shows", glyph: .podcasts, message: "Search Apple Podcasts, paste a feed link, or import your subscriptions from another app.") {
-            VStack(spacing: theme.spacing.sm) {
-                PrimaryButton("Find Shows") { openPodcastSearch() }
-                HStack(spacing: theme.spacing.sm) {
-                    Button("Add by Link") { showAddFeed = true }
-                    Button("Import OPML") { showImporter = true }
-                }
-                .buttonStyle(.tinted)
-            }
-            .frame(maxWidth: 280)
+        // Feed links and OPML import live in the + menu and Podcast Settings.
+        EmptyState("Find Your Shows", glyph: .podcasts, message: "Search Apple Podcasts and follow a show to see its episodes here.") {
+            PrimaryButton("Find Shows") { openPodcastSearch() }
+                .frame(maxWidth: 280)
         }
     }
 }

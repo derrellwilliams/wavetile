@@ -35,6 +35,33 @@ public struct SplashScreen: View {
     }
 }
 
+/// The splash's faint drifting waves behind a section (an empty state's top of screen),
+/// fading out at the top and bottom. Reduce Motion keeps them still.
+public struct WaveBackdrop: View {
+    @Environment(\.theme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var start = Date.now
+
+    public init() {}
+
+    public var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion)) { context in
+            let elapsed = reduceMotion ? 0 : context.date.timeIntervalSince(start)
+            Canvas { canvas, size in
+                WaveField.draw(in: &canvas, size: size, elapsed: elapsed, color: theme.palette.accent)
+            }
+        }
+        .mask {
+            LinearGradient(
+                stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.15), .init(color: .black, location: 0.65), .init(color: .clear, location: 1)],
+                startPoint: .top, endPoint: .bottom
+            )
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
 /// Faint rows of waves filling the screen, drifting sideways slowly. Laid out from the screen's
 /// center, as the launch image is (it's centered), so the first frame lines up on every iPhone.
 enum WaveField {
