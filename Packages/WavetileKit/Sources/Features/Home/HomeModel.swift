@@ -56,6 +56,12 @@ final class HomeModel {
         didSet { UserDefaults.standard.set(Array(hiddenRecents), forKey: hiddenRecentsKey) }
     }
     @ObservationIgnored private let hiddenRecentsKey: String
+    /// Visits (a minute or more on Home) that have shown the welcome card, per account.
+    @ObservationIgnored private let welcomeVisitsKey: String
+    /// Read once per launch, so the card never disappears in the middle of a visit.
+    @ObservationIgnored private let welcomeVisits: Int
+    @ObservationIgnored private var countedWelcomeVisit = false
+    private static let welcomeVisitLimit = 1
 
     /// Shelves are computed from the local database synchronously, so Home is populated on the
     /// first frame (and offline); `load()` then refreshes them from the server.
@@ -64,12 +70,27 @@ final class HomeModel {
         self.database = database
         hiddenRecentsKey = "hiddenRecentlyPlayed.\(userID)"
         hiddenRecents = Set(UserDefaults.standard.stringArray(forKey: hiddenRecentsKey) ?? [])
+        welcomeVisitsKey = "welcomeVisits.\(userID)"
+        welcomeVisits = UserDefaults.standard.integer(forKey: welcomeVisitsKey)
         loadLocal()
     }
 
     /// Little play history yet: Home leads with the welcome card, genres and playlists.
     var isNewListener: Bool {
         (shelves.first { $0.kind == .recentlyPlayed }?.albums.count ?? 0) < 6
+    }
+
+    /// The welcome card: for a new listener's first visit. Only a minute or more on Home
+    /// counts as a visit, so a quick open doesn't use it up and a long first session keeps it.
+    var showsWelcome: Bool {
+        isNewListener && (welcomeVisits < Self.welcomeVisitLimit || DebugFlags.freshHome)
+    }
+
+    /// Call after the card has been on screen for a minute; counts once per launch.
+    func countWelcomeVisit() {
+        guard showsWelcome, !countedWelcomeVisit else { return }
+        countedWelcomeVisit = true
+        UserDefaults.standard.set(welcomeVisits + 1, forKey: welcomeVisitsKey)
     }
 
     func removeFromRecentlyPlayed(_ albumID: String) {
@@ -97,6 +118,8 @@ final class HomeModel {
         self.database = nil
         self.hiddenRecentsKey = ""
         self.hiddenRecents = []
+        self.welcomeVisitsKey = ""
+        self.welcomeVisits = 0
         self.shelves = previewShelves
     }
 

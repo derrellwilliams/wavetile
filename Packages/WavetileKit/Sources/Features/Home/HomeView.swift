@@ -35,9 +35,13 @@ struct HomeView: View {
                     // From Your Library, Artist Spotlight. Up Next appears only when podcasts are
                     // on and it has episodes. (Continue Listening lives at the top of the Podcasts
                     // tab.) With little play history, a welcome card leads and genre and playlist
-                    // shelves follow Recently Added.
-                    if model.isNewListener, let stats = model.stats, stats.albums > 0 {
+                    // shelves follow Recently Added (the card only for the first visit).
+                    if model.showsWelcome, let stats = model.stats, stats.albums > 0 {
                         WelcomeCard(userName: userName, stats: stats)
+                            .task {
+                                try? await Task.sleep(for: .seconds(60))
+                                model.countWelcomeVisit()
+                            }
                     }
                     if !hasRecentlyPlayed {
                         podcastUpNextShelf
