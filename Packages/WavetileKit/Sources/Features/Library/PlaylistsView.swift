@@ -256,9 +256,7 @@ private struct PlaylistEditor: View {
             .navigationTitle("Edit Songs")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done", glyph: .check) { dismiss() }
-                }
+                TintedSheetButton("Done", glyph: .check, placement: .confirmationAction) { dismiss() }
             }
         }
     }

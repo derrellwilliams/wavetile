@@ -47,7 +47,7 @@ struct AboutSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 // Read-only, so it closes rather than confirms (Done is for finishing a task).
-                ToolbarItem(placement: .cancellationAction) { Button("Close", glyph: .close) { dismiss() } }
+                TintedSheetButton("Close", glyph: .close, placement: .cancellationAction) { dismiss() }
             }
         }
         .presentationDetents([.medium, .large])

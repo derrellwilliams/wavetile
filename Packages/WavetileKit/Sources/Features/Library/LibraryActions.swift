@@ -242,7 +242,7 @@ struct AddToPlaylistSheet: View {
             .navigationTitle(trackIDs.count == 1 ? "Add to Playlist" : "Add \(trackIDs.count) Songs")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                TintedSheetButton("Cancel", glyph: .close, placement: .cancellationAction) { dismiss() }
             }
             .alert("New Playlist", isPresented: $showNew) {
                 TextField("Name", text: $newName)
@@ -316,7 +316,7 @@ struct AddToCollectionSheet: View {
             .navigationTitle("Add to Collection")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                TintedSheetButton("Cancel", glyph: .close, placement: .cancellationAction) { dismiss() }
             }
             .alert("New Collection", isPresented: $showNew) {
                 TextField("Name", text: $newName)

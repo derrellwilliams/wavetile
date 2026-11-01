@@ -90,9 +90,7 @@ struct PodcastSettingsView: View {
             .navigationTitle("Podcast Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done", glyph: .check) { dismiss() }
-                }
+                TintedSheetButton("Done", glyph: .check, placement: .confirmationAction) { dismiss() }
             }
         }
         .opmlImporter(isPresented: $showImporter, message: $importMessage)

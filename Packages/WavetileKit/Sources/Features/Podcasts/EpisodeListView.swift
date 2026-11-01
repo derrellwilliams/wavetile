@@ -147,9 +147,7 @@ struct AddFeedSheet: View {
             .navigationTitle("Add by Link")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", glyph: .close) { dismiss() }
-                }
+                TintedSheetButton("Cancel", glyph: .close, placement: .cancellationAction) { dismiss() }
             }
             // No automatic clipboard read: it would trigger the system paste prompt.
             .onAppear { focused = true }

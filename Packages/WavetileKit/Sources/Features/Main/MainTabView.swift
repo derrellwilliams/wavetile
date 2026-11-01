@@ -261,6 +261,30 @@ struct TintedBarIcon: View {
     }
 }
 
+/// A sheet's Close, Cancel or Done as a tinted circle instead of the bar's glass.
+struct TintedSheetButton: ToolbarContent {
+    let title: String
+    let glyph: Glyph
+    let placement: ToolbarItemPlacement
+    let action: () -> Void
+
+    init(_ title: String, glyph: Glyph, placement: ToolbarItemPlacement, action: @escaping () -> Void) {
+        self.title = title
+        self.glyph = glyph
+        self.placement = placement
+        self.action = action
+    }
+
+    var body: some ToolbarContent {
+        ToolbarItem(placement: placement) {
+            Button(action: action) { TintedBarIcon(glyph: glyph) }
+                .buttonStyle(.plain)
+                .accessibilityLabel(title)
+        }
+        .sharedBackgroundVisibility(.hidden)
+    }
+}
+
 /// The main buttons' tint as it shows on the page background, but opaque, so bar buttons over
 /// artwork (album and artist pages) read the same as on a plain screen.
 struct TintedBarFill<S: Shape>: View {
