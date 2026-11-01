@@ -3,6 +3,7 @@ import GRDB
 import Library
 import Podcasts
 import SwiftUI
+import UIKit
 
 struct MainTabView: View {
     @ObserveInjection var inject
@@ -233,7 +234,184 @@ struct ProfileButton: View {
     @Environment(\.openProfile) private var openProfile
 
     var body: some View {
-        Button("Profile and Settings", glyph: .user, action: openProfile)
+        Button(action: openProfile) { TintedBarIcon(glyph: .user) }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Profile and Settings")
+    }
+}
+
+/// A tab root's bar button icon in the tinted circle the main buttons use (Play, Shuffle),
+/// instead of the bar's glass. Drawn inside the label: the bar ignores backgrounds added
+/// outside a button, and turns an item holding a menu into that menu's button.
+struct TintedBarIcon: View {
+    @Environment(\.theme) private var theme
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.barIconInGroup) private var inGroup
+    let glyph: Glyph
+
+    var body: some View {
+        glyph.image
+            .foregroundStyle(theme.palette.accent)
+            .opacity(isEnabled ? 1 : 0.4)
+            .frame(width: 44, height: 44)
+            // In a group, the group's capsule is the fill.
+            .background { if !inGroup { TintedBarFill(shape: .circle) } }
+            .contentShape(.circle)
+    }
+}
+
+/// The main buttons' tint as it shows on the page background, but opaque, so bar buttons over
+/// artwork (album and artist pages) read the same as on a plain screen.
+struct TintedBarFill<S: Shape>: View {
+    @Environment(\.theme) private var theme
+    let shape: S
+
+    var body: some View {
+        shape.fill(theme.palette.background)
+            .overlay(shape.fill(theme.palette.tint))
+    }
+}
+
+/// Bar buttons side by side in one tinted capsule, each with a 44pt tap area.
+struct TintedBarCapsule<Content: View>: View {
+    @Environment(\.theme) private var theme
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        // An explicit size: the bar sizes custom items from what they report, and a stack of
+        // buttons and menus reports only its first, pushing the rest off the screen.
+        Group(subviews: content) { items in
+            HStack(spacing: 0) {
+                ForEach(items) { item in
+                    item.frame(width: 44, height: 44)
+                }
+            }
+            .frame(width: CGFloat(items.count) * 44, height: 44)
+        }
+        .buttonStyle(.plain)
+        .labelStyle(.iconOnly)
+        .foregroundStyle(theme.palette.accent)
+        .environment(\.barIconInGroup, true)
+        .background { TintedBarFill(shape: .capsule) }
+    }
+}
+
+extension View {
+    /// A detail page's bar: a tinted Back on the left and the page's buttons in one tinted
+    /// capsule on the right, instead of the bar's glass. Detail pages hide the bar's background,
+    /// so these float where the bar's items would sit; inside the bar, a capsule is sized to its
+    /// first button and the rest fall off screen, and the system Back can't be restyled.
+    func detailBarButtons<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        modifier(DetailBar(buttons: content()))
+    }
+}
+
+private struct DetailBar<Buttons: View>: ViewModifier {
+    @Environment(\.dismiss) private var dismiss
+    let buttons: Buttons
+
+    func body(content: Content) -> some View {
+        content
+            .navigationBarBackButtonHidden(true)
+            // Hiding the system Back also turns off the edge swipe; this turns it back on.
+            .background(SwipeBackEnabler())
+            .overlay(alignment: .top) {
+                HStack {
+                    Button { dismiss() } label: { TintedBarIcon(glyph: .back) }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Back")
+                    Spacer()
+                    TintedBarCapsule { buttons }
+                }
+                // With no items left, the bar takes no room, so this sits in its row on its own.
+                .padding(.horizontal, 20)
+            }
+    }
+}
+
+extension View {
+    /// A list page's bar (Songs, Playlists, episode lists): a tinted Back and, if given, one
+    /// tinted button or menu on the right, instead of the bar's glass. These keep the bar, so
+    /// the large title and its collapse work as usual; one item per side sizes correctly.
+    func listBar() -> some View {
+        modifier(ListBar(trailing: EmptyView()))
+    }
+
+    func listBar<Trailing: View>(@ViewBuilder trailing: () -> Trailing) -> some View {
+        modifier(ListBar(trailing: trailing()))
+    }
+}
+
+private struct ListBar<Trailing: View>: ViewModifier {
+    @Environment(\.dismiss) private var dismiss
+    let trailing: Trailing
+
+    func body(content: Content) -> some View {
+        content
+            .navigationBarBackButtonHidden(true)
+            .background(SwipeBackEnabler())
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { dismiss() } label: { TintedBarIcon(glyph: .back) }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Back")
+                }
+                .sharedBackgroundVisibility(.hidden)
+                if Trailing.self != EmptyView.self {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        trailing.buttonStyle(.plain)
+                    }
+                    .sharedBackgroundVisibility(.hidden)
+                }
+            }
+    }
+}
+
+/// Keeps the edge swipe back working on a screen that hides the system Back button. Gives the
+/// stack's swipe a delegate that allows it whenever there's a screen to go back to, and keeps
+/// it: handing the system's back mid-swipe (the page starts disappearing as the swipe begins)
+/// cancels the swipe, so the page slid a little and snapped back.
+private struct SwipeBackEnabler: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> Controller { Controller() }
+    func updateUIViewController(_ controller: Controller, context: Context) {}
+
+    final class Controller: UIViewController {
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            guard let navigation = navigationController, let gesture = navigation.interactivePopGestureRecognizer,
+                  !(gesture.delegate is PopGestureDelegate) else { return }
+            let delegate = PopGestureDelegate(navigation: navigation)
+            // The gesture holds its delegate weakly; the stack keeps this one alive.
+            objc_setAssociatedObject(navigation, &PopGestureDelegate.key, delegate, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+            gesture.delegate = delegate
+            gesture.isEnabled = true
+        }
+    }
+}
+
+private final class PopGestureDelegate: NSObject, UIGestureRecognizerDelegate {
+    nonisolated(unsafe) static var key: UInt8 = 0
+    private weak var navigation: UINavigationController?
+
+    init(navigation: UINavigationController) {
+        self.navigation = navigation
+    }
+
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard let navigation else { return false }
+        return navigation.viewControllers.count > 1 && navigation.transitionCoordinator == nil
+    }
+}
+
+/// A tab root's trailing bar buttons in one tinted capsule, instead of the bar's glass.
+struct TintedBarGroup<Content: View>: ToolbarContent {
+    @ViewBuilder let content: Content
+
+    var body: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            TintedBarCapsule { content }
+        }
+        .sharedBackgroundVisibility(.hidden)
     }
 }
 
@@ -248,13 +426,15 @@ extension EnvironmentValues {
     @Entry var openProfile: () -> Void = {}
     /// Presents the Now Playing sheet.
     @Entry var openNowPlaying: () -> Void = {}
+    /// A `TintedBarIcon` inside a shared tinted capsule draws no circle of its own.
+    @Entry var barIconInGroup = false
 }
 
 extension View {
     /// Chrome for a tab's root screen, applied to the content *inside* its `NavigationStack`:
     /// the profile button at top left (opens the drawer), and root reporting so the drawer's
     /// edge swipe only works at the root, never fighting the system back gesture.
-    /// `trailing` adds screen buttons (plain `Label`s) next to AirPlay in the top-right capsule.
+    /// `trailing` adds screen buttons next to AirPlay; give them `TintedBarIcon` labels.
     /// `centersTitle` keeps the title centered (Home's wordmark); other tabs keep theirs leading.
     func tabRootChrome(centersTitle: Bool = false) -> some View {
         modifier(TabRootChrome(centersTitle: centersTitle) { EmptyView() })
@@ -266,6 +446,7 @@ extension View {
 }
 
 private struct TabRootChrome<Trailing: View>: ViewModifier {
+    @Environment(\.theme) private var theme
     @Environment(\.tabRootReporter) private var reporter
     var centersTitle = false
     let trailing: Trailing
@@ -276,16 +457,19 @@ private struct TabRootChrome<Trailing: View>: ViewModifier {
         self.trailing = trailing()
     }
 
+    private static var itemSize: CGFloat { 44 }
+
     func body(content: Content) -> some View {
         content
             .toolbar {
+                // Tinted circles (see `TintedBarIcon`) instead of the bar's glass.
                 ToolbarItem(placement: .topBarLeading) {
                     ProfileButton()
                 }
-                // AirPlay and the screen's buttons share one capsule of the bar's glass,
-                // like the trailing buttons on pushed screens.
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    AirPlayButton(iconSize: 24, tapSize: nil)
+                .sharedBackgroundVisibility(.hidden)
+                // AirPlay and the screen's buttons share one tinted capsule; alone, it's a circle.
+                TintedBarGroup {
+                    AirPlayButton(iconSize: 24, tapSize: Self.itemSize)
                     trailing
                 }
             }
@@ -320,6 +504,8 @@ enum DebugFlags {
     static let freshHome = ProcessInfo.processInfo.arguments.contains("-freshHome")
     /// `-openArtist` (with `-openFirstAlbum`) goes on to that album's artist page.
     static let openArtist = ProcessInfo.processInfo.arguments.contains("-openArtist")
+    /// `-openSection albums` (with `-tab music`) opens that Music section.
+    static let openSection = UserDefaults.standard.string(forKey: "openSection").flatMap(LibrarySection.init)
     #else
     static let freshHome = false
     static let openSettings = false
@@ -334,5 +520,6 @@ enum DebugFlags {
     static let playLatestEpisode = false
     static let openLatestEpisode = false
     static let openArtist = false
+    static let openSection: LibrarySection? = nil
     #endif
 }

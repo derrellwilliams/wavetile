@@ -41,8 +41,9 @@ struct DownloadedView: View {
                 Menu {
                     Button("Remove All Downloads", glyph: .trash, role: .destructive) { confirmRemoveAll = true }
                 } label: {
-                    Label("More", glyph: .more)
+                    TintedBarIcon(glyph: .more)
                 }
+                .accessibilityLabel("More")
                 .disabled(showsPodcasts ? episodes.isEmpty : collections.isEmpty)
             }
             .libraryDestinations(zoom: zoom) { path.append($0) }

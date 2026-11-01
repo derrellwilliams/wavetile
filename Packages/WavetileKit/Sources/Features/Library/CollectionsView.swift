@@ -50,10 +50,9 @@ struct CollectionsView: View {
         }
         .themedBackground()
         .navigationTitle("Collections")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("New Collection", glyph: .add) { showNew = true }
-            }
+        .listBar {
+            Button { showNew = true } label: { TintedBarIcon(glyph: .add) }
+                .accessibilityLabel("New Collection")
         }
         .alert("New Collection", isPresented: $showNew) {
             TextField("Name", text: $newName)
@@ -134,14 +133,13 @@ struct CollectionDetailView: View {
         }
         .themedBackground()
         .navigationTitle(collection.name)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button("Delete Collection", glyph: .trash, role: .destructive) { confirmDelete = true }
-                } label: {
-                    Label("More", glyph: .more)
-                }
+        .listBar {
+            Menu {
+                Button("Delete Collection", glyph: .trash, role: .destructive) { confirmDelete = true }
+            } label: {
+                TintedBarIcon(glyph: .more)
             }
+            .accessibilityLabel("More")
         }
         .confirmationDialog("Delete “\(collection.name)”?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete Collection", role: .destructive) {

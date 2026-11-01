@@ -29,6 +29,7 @@ struct EpisodeListView: View {
         }
         .themedBackground()
         .navigationTitle(list.title)
+        .listBar()
         .markRefreshable { if list == .latest { await podcasts.refreshAll() } }
         .task {
             let observation = switch list {

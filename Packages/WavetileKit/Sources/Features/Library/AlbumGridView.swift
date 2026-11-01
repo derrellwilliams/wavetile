@@ -38,20 +38,19 @@ struct AlbumGridView: View {
         }
         .themedBackground()
         .navigationTitle(title)
-        .toolbar {
+        .listBar {
             if source == .all {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Picker("Sort", selection: $sort) {
-                            Text("Title").tag(LibraryDatabase.AlbumSort.title)
-                            Text("Artist").tag(LibraryDatabase.AlbumSort.artist)
-                            Text("Year").tag(LibraryDatabase.AlbumSort.year)
-                            Text("Recently Added").tag(LibraryDatabase.AlbumSort.recentlyAdded)
-                        }
-                    } label: {
-                        Label("Sort", glyph: .sort)
+                Menu {
+                    Picker("Sort", selection: $sort) {
+                        Text("Title").tag(LibraryDatabase.AlbumSort.title)
+                        Text("Artist").tag(LibraryDatabase.AlbumSort.artist)
+                        Text("Year").tag(LibraryDatabase.AlbumSort.year)
+                        Text("Recently Added").tag(LibraryDatabase.AlbumSort.recentlyAdded)
                     }
+                } label: {
+                    TintedBarIcon(glyph: .sort)
                 }
+                .accessibilityLabel("Sort")
             }
         }
         .task(id: sort) {

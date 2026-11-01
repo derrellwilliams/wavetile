@@ -32,20 +32,14 @@ struct EpisodeDetailView: View {
             }
         }
         .detailPageChrome()
-        .toolbar {
+        .detailBarButtons {
             if let item {
-                ToolbarItem(placement: .topBarTrailing) {
-                    EpisodeDownloadButton(item: item)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    SaveEpisodeButton(episodeID: item.id)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        EpisodeMenu(item: item, includeGoToShow: false)
-                    } label: {
-                        Label("More", glyph: .more)
-                    }
+                EpisodeDownloadButton(item: item)
+                SaveEpisodeButton(episodeID: item.id)
+                Menu {
+                    EpisodeMenu(item: item, includeGoToShow: false)
+                } label: {
+                    Label("More", glyph: .more)
                 }
             }
         }

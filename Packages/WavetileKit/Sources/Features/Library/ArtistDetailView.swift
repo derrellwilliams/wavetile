@@ -79,16 +79,12 @@ struct ArtistDetailView: View {
         }
         // Full-bleed art: no bar background or blur band under the navigation bar.
         .detailPageChrome()
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                FavoriteButton(itemID: artistID)
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button("Start Radio", glyph: .radio) { actions.startRadio(from: artistID, store: store, player: player) }
-                } label: {
-                    Label("More", glyph: .more)
-                }
+        .detailBarButtons {
+            FavoriteButton(itemID: artistID)
+            Menu {
+                Button("Start Radio", glyph: .radio) { actions.startRadio(from: artistID, store: store, player: player) }
+            } label: {
+                Label("More", glyph: .more)
             }
         }
         .sheet(isPresented: $showAbout) {

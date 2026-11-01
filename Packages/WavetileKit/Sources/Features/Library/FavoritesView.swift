@@ -41,6 +41,7 @@ struct FavoritesView: View {
         }
         .themedBackground()
         .navigationTitle("Favorites")
+        .listBar()
         .task { await observe() }
         .enableInjection()
     }

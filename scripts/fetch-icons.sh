@@ -15,7 +15,7 @@ ICONS=(
   play pause skip-forward skip-back
   gear-six sign-out palette hard-drives globe x
   shuffle sort-ascending
-  repeat repeat-once queue caret-down speaker-hifi dots-three list-plus arrow-bend-down-right
+  repeat repeat-once queue caret-down caret-left speaker-hifi dots-three list-plus arrow-bend-down-right
   check-circle cloud-slash trash download-simple
   heart heart:fill squares-four plus pencil-simple user
   microphone arrow-counter-clockwise arrow-clockwise moon list-bullets bookmark-simple bookmark-simple:fill

@@ -39,6 +39,7 @@ public enum Glyph: String, CaseIterable, Sendable {
     case repeatOne = "repeat-once"
     case queue
     case dismiss = "caret-down"
+    case back = "caret-left"
     case airplay = "speaker-hifi"
     case more = "dots-three"
     case addToQueue = "list-plus"

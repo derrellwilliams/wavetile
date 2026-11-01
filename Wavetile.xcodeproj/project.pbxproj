@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		197535260D47403824DD5ACF /* HomeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EB333D4B5F2B7A38F00ECED /* HomeTests.swift */; };
+		1E19719FB13A52E83D169D59 /* BackNavigationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1431B850CBF58DA7C98C473F /* BackNavigationTests.swift */; };
 		293B76453F4541068AF94637 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 600A6831CAFBA608604EC65C /* SwiftUI.framework */; };
 		29FA4F497E1E129557617FC8 /* NowPlayingWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51107A7FCB5C0404CF98041F /* NowPlayingWidget.swift */; };
 		7177EF3BFB2405CBE4A0D6A8 /* WavetileWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = BE64D9F3EAE7A406F7322312 /* WavetileWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -64,6 +65,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		1431B850CBF58DA7C98C473F /* BackNavigationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackNavigationTests.swift; sourceTree = "<group>"; };
 		1486760D06D1462A54B2382C /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		174498F652785AFB46720C5B /* SongsActionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongsActionsTests.swift; sourceTree = "<group>"; };
 		25966CED5BFCB0211FD41404 /* Wavetile.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Wavetile.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -133,6 +135,7 @@
 			isa = PBXGroup;
 			children = (
 				C23EB66484AE2A1A9B71AA29 /* AccessibilityAuditTests.swift */,
+				1431B850CBF58DA7C98C473F /* BackNavigationTests.swift */,
 				5EB333D4B5F2B7A38F00ECED /* HomeTests.swift */,
 				9B3DBC04AB9BCCD7E614F3F9 /* SearchTypingTests.swift */,
 				174498F652785AFB46720C5B /* SongsActionsTests.swift */,
@@ -364,6 +367,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				EEDB361FA4C75D9B7969F9A0 /* AccessibilityAuditTests.swift in Sources */,
+				1E19719FB13A52E83D169D59 /* BackNavigationTests.swift in Sources */,
 				197535260D47403824DD5ACF /* HomeTests.swift in Sources */,
 				BFE7CD2369681FAAE8091B79 /* SearchTypingTests.swift in Sources */,
 				EF1E33EDFAA08C60822CD5FB /* SongsActionsTests.swift in Sources */,

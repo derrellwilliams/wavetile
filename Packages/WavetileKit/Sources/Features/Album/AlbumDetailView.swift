@@ -37,30 +37,24 @@ struct AlbumDetailView: View {
         }
         // Full-bleed art: no bar background or blur band under the navigation bar.
         .detailPageChrome()
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                DownloadButton(collectionID: model.album.id) {
-                    downloads.download(album: model.album, trackIDs: model.tracks.map(\.id))
-                }
-                .disabled(model.tracks.isEmpty)
+        .detailBarButtons {
+            DownloadButton(collectionID: model.album.id) {
+                downloads.download(album: model.album, trackIDs: model.tracks.map(\.id))
             }
-            ToolbarItem(placement: .topBarTrailing) {
-                FavoriteButton(itemID: model.album.id)
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button("Add to Playlist", glyph: .addToQueue) { actions.addToPlaylist(model.tracks.map(\.id)) }
-                        .disabled(model.tracks.isEmpty)
-                    Button("Add to Collection", glyph: .collection) { actions.addToCollection([model.album.id]) }
-                    Divider()
-                    Button("Play Next", glyph: .playNext) { player.playNext(queue()) }
-                        .disabled(model.tracks.isEmpty)
-                    Button("Add to Queue", glyph: .queue) { player.addToQueue(queue()) }
-                        .disabled(model.tracks.isEmpty)
-                    Button("Start Radio", glyph: .radio) { actions.startRadio(from: model.album.id, store: store, player: player) }
-                } label: {
-                    Label("More", glyph: .more)
-                }
+            .disabled(model.tracks.isEmpty)
+            FavoriteButton(itemID: model.album.id)
+            Menu {
+                Button("Add to Playlist", glyph: .addToQueue) { actions.addToPlaylist(model.tracks.map(\.id)) }
+                    .disabled(model.tracks.isEmpty)
+                Button("Add to Collection", glyph: .collection) { actions.addToCollection([model.album.id]) }
+                Divider()
+                Button("Play Next", glyph: .playNext) { player.playNext(queue()) }
+                    .disabled(model.tracks.isEmpty)
+                Button("Add to Queue", glyph: .queue) { player.addToQueue(queue()) }
+                    .disabled(model.tracks.isEmpty)
+                Button("Start Radio", glyph: .radio) { actions.startRadio(from: model.album.id, store: store, player: player) }
+            } label: {
+                Label("More", glyph: .more)
             }
         }
         .task {

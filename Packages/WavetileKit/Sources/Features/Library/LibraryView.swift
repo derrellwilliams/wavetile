@@ -57,6 +57,7 @@ struct LibraryView: View {
             .navigationTitle("Music")
             .tabRootChrome()
             .libraryDestinations(zoom: zoom) { path.append($0) }
+            .task { if let section = DebugFlags.openSection { path.append(LibraryRoute.section(section)) } }
             .task {
                 do {
                     for try await albums in store.observe(store.database.recentlyAddedAlbums(limit: 12)) {

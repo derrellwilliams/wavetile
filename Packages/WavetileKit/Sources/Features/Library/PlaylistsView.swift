@@ -51,10 +51,9 @@ struct PlaylistsView: View {
         }
         .themedBackground()
         .navigationTitle("Playlists")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("New Playlist", glyph: .add) { showNew = true }
-            }
+        .listBar {
+            Button { showNew = true } label: { TintedBarIcon(glyph: .add) }
+                .accessibilityLabel("New Playlist")
         }
         .alert("New Playlist", isPresented: $showNew) {
             TextField("Name", text: $newName)
@@ -151,26 +150,22 @@ struct PlaylistDetailView: View {
         }
         // Full-bleed art: no bar background or blur band under the navigation bar.
         .detailPageChrome()
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                DownloadButton(collectionID: playlist.id) {
-                    downloads.download(playlist: playlist, trackIDs: tracks.map(\.id), albumIDs: tracks.compactMap(\.albumID))
-                }
-                .disabled(items.isEmpty)
+        .detailBarButtons {
+            DownloadButton(collectionID: playlist.id) {
+                downloads.download(playlist: playlist, trackIDs: tracks.map(\.id), albumIDs: tracks.compactMap(\.albumID))
             }
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button("Rename", glyph: .edit) {
-                        newName = playlist.name
-                        showRename = true
-                    }
-                    Button("Edit Songs", glyph: .playlist) { showEditor = true }
-                        .disabled(items.isEmpty)
-                    Divider()
-                    Button("Delete Playlist", glyph: .trash, role: .destructive) { confirmDelete = true }
-                } label: {
-                    Label("More", glyph: .more)
+            .disabled(items.isEmpty)
+            Menu {
+                Button("Rename", glyph: .edit) {
+                    newName = playlist.name
+                    showRename = true
                 }
+                Button("Edit Songs", glyph: .playlist) { showEditor = true }
+                    .disabled(items.isEmpty)
+                Divider()
+                Button("Delete Playlist", glyph: .trash, role: .destructive) { confirmDelete = true }
+            } label: {
+                Label("More", glyph: .more)
             }
         }
         .alert("Rename Playlist", isPresented: $showRename) {

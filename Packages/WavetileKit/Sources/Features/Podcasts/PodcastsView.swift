@@ -29,7 +29,8 @@ struct PodcastsView: View {
             page
                 .tabRootChrome {
                     AddPodcastMenu(showAddFeed: $showAddFeed, showImporter: $showImporter)
-                    Button("Podcast Settings", glyph: .settings) { showSettings = true }
+                    Button { showSettings = true } label: { TintedBarIcon(glyph: .settings) }
+                        .accessibilityLabel("Podcast Settings")
                 }
                 .podcastDestinations(zoom: zoom) { path.append($0) }
         }
@@ -136,8 +137,9 @@ struct AddPodcastMenu: View {
             Button("Add Show by Link", glyph: .feed) { showAddFeed = true }
             Button("Import OPML", glyph: .download) { showImporter = true }
         } label: {
-            Label("Add Podcast", glyph: .add)
+            TintedBarIcon(glyph: .add)
         }
+        .accessibilityLabel("Add Podcast")
     }
 }
 

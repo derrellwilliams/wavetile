@@ -30,6 +30,7 @@ struct GenresView: View {
         }
         .themedBackground()
         .navigationTitle("Genres")
+        .listBar()
         .task {
             do {
                 for try await value in store.observe(store.database.genres()) { genres = value }

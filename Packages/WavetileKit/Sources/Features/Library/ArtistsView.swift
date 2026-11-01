@@ -41,6 +41,7 @@ struct ArtistsView: View {
         }
         .themedBackground()
         .navigationTitle("Artists")
+        .listBar()
         .task {
             do {
                 for try await artists in store.observe(store.database.artists()) {

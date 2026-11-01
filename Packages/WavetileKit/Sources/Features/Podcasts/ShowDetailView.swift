@@ -44,11 +44,9 @@ struct ShowDetailView: View {
         }
         // The blurred art runs under the navigation bar: no bar background or blur band.
         .detailPageChrome()
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) { followButton }
-            if let show {
-                ToolbarItem(placement: .topBarTrailing) { settingsMenu(show) }
-            }
+        .detailBarButtons {
+            followButton
+            if let show { settingsMenu(show) }
         }
         .confirmationDialog("Mark every episode as played?", isPresented: $confirmMarkAll, titleVisibility: .visible) {
             Button("Mark All as Played") { if let show { podcasts.markAllPlayed(show) } }
@@ -378,6 +376,7 @@ struct AllShowsView: View {
         }
         .themedBackground()
         .navigationTitle("Shows")
+        .listBar()
         .task {
             do {
                 for try await value in podcasts.observe(podcasts.database.followedShows()) { shows = value }

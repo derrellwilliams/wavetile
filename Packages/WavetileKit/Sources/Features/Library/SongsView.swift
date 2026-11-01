@@ -40,6 +40,7 @@ struct SongsView: View {
         }
         .themedBackground()
         .navigationTitle("Songs")
+        .listBar()
         .task {
             do {
                 for try await value in store.observe(store.database.allTracks()) { list = value }
