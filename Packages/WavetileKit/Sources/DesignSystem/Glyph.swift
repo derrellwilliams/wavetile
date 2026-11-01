@@ -179,8 +179,8 @@ public struct EmptyState<Actions: View>: View {
     public var body: some View {
         ContentUnavailableView {
             SwiftUI.Label {
-                // System copy, so the text face; Stack Sans Notch is for screen and content titles.
-                Text(title).font(BrandFont.font(.title2, weight: .bold))
+                // System copy, so the text style rather than a title.
+                Text(title).font(BrandFont.font(.title2))
             } icon: {
                 glyph.image
                     .resizable()

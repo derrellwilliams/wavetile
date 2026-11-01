@@ -37,6 +37,12 @@ public struct RootView: View {
         }
         .animation(app.theme.motion.smooth, value: phaseKey)
         .environment(\.theme, app.theme)
+        // Inter at body size for anything without a font of its own (form rows and headers,
+        // toggles, pickers, text fields), so nothing falls back to the system face.
+        .font(app.theme.typography.body)
+        .lineSpacing(app.theme.typography.textLeading)
+        // The main tan for anything without a color of its own (form rows, values), never white.
+        .foregroundStyle(app.theme.palette.textPrimary)
         .tint(app.theme.palette.accent)
         .preferredColorScheme(app.theme.colorScheme)
         .background(app.theme.palette.background.ignoresSafeArea())

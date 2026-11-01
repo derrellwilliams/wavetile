@@ -11,7 +11,7 @@ public struct Badge: View {
 
     public var body: some View {
         Text(text)
-            .font(theme.typography.caption.weight(.bold))
+            .font(theme.typography.caption)
             .monospacedDigit()
             .foregroundStyle(theme.palette.background)
             .padding(.horizontal, theme.spacing.sm)

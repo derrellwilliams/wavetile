@@ -75,7 +75,7 @@ targets:
         # Static launch screen: the mark at rest, handed off to the animated splash in RootView.
         UILaunchScreen:
           UIColorName: LaunchBackground
-          UIImageName: LaunchMark
+          UIImageName: LaunchSplash
         # Only HTTPS (exempt) encryption; skips the export compliance question on every upload.
         ITSAppUsesNonExemptEncryption: false
         # Download progress Live Activity.

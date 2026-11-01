@@ -195,6 +195,7 @@ struct PodcastsIntroSheet: View {
             Text("Podcasts, Next to Your Music")
                 .font(theme.typography.largeTitle)
                 .tracking(theme.typography.displayTracking)
+                .lineSpacing(theme.typography.titleLeading)
                 .foregroundStyle(theme.palette.textPrimary)
             VStack(alignment: .leading, spacing: theme.spacing.lg) {
                 point(.search, "Find any show", "Search Apple Podcasts, browse top charts, or paste a feed link.")
@@ -211,7 +212,7 @@ struct PodcastsIntroSheet: View {
                     finish()
                     onImport()
                 }
-                .font(theme.typography.body.weight(.semibold))
+                .font(theme.typography.body)
                 .foregroundStyle(theme.palette.accent)
                 .frame(maxWidth: .infinity, minHeight: 44)
                 Button("Not Now") { finish() }
@@ -238,7 +239,7 @@ struct PodcastsIntroSheet: View {
                 .frame(width: 28)
             VStack(alignment: .leading, spacing: theme.spacing.xxs) {
                 Text(title)
-                    .font(theme.typography.body.weight(.semibold))
+                    .font(theme.typography.body)
                     .foregroundStyle(theme.palette.textPrimary)
                 Text(message)
                     .font(theme.typography.itemSubtitle)

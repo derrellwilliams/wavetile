@@ -144,7 +144,7 @@ struct AlbumDetailView: View {
                 ForEach(model.discs, id: \.number) { disc in
                     if let number = disc.number {
                         Text("Disc \(number)")
-                            .font(theme.typography.caption.weight(.semibold))
+                            .font(theme.typography.caption)
                             .foregroundStyle(theme.palette.textSecondary)
                             .padding(.horizontal, theme.spacing.screenInset)
                             .padding(.top, theme.spacing.lg)

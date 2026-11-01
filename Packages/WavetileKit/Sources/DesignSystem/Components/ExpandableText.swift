@@ -45,7 +45,7 @@ public struct ExpandableText: View {
             withAnimation(theme.motion.smooth) { isExpanded = true }
         } label: {
             Text("Read More")
-                .font(theme.typography.body.weight(.semibold))
+                .font(theme.typography.body)
                 .foregroundStyle(theme.palette.accent)
                 // A wide fade, so the words under it trail off instead of being cut mid-letter.
                 .padding(.leading, 56)

@@ -22,7 +22,7 @@ struct AboutSheet: View {
                     ForEach(sections) { section in
                         VStack(alignment: .leading, spacing: theme.spacing.sm) {
                             Text(section.title)
-                                .font(theme.typography.headline)
+                                .font(theme.typography.title)
                                 .foregroundStyle(theme.palette.textPrimary)
                                 .accessibilityAddTraits(.isHeader)
                             Text(section.text)

@@ -28,7 +28,7 @@ struct NowPlayingWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: WidgetKind.nowPlaying, provider: NowPlayingProvider()) { entry in
             NowPlayingWidgetView(entry: entry)
-                .containerBackground(Color(hex: 0x1A1A1A), for: .widget)
+                .containerBackground(Theme.dark.palette.background, for: .widget)
                 .widgetURL(WidgetLink.nowPlaying)
         }
         .configurationDisplayName("Now Playing")
@@ -50,10 +50,10 @@ struct NowPlayingWidgetView: View {
             }
         } else {
             VStack(spacing: 6) {
-                Glyph.waveform.image.foregroundStyle(.white)
+                Glyph.waveform.image.foregroundStyle(Theme.dark.palette.textPrimary)
                 Text("Nothing playing")
-                    .font(BrandFont.font(.caption, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .font(BrandFont.font(.caption))
+                    .foregroundStyle(Theme.dark.palette.textSecondary)
             }
         }
     }
@@ -83,7 +83,7 @@ struct NowPlayingWidgetView: View {
                         Glyph.next.image.resizable().frame(width: 22, height: 22)
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.dark.palette.textPrimary)
                     .accessibilityLabel("Next")
                 }
             }
@@ -93,8 +93,8 @@ struct NowPlayingWidgetView: View {
 
     private func rectangular(_ snapshot: NowPlayingSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text(snapshot.title).font(.headline).widgetAccentable()
-            Text(snapshot.artist).font(.caption)
+            Text(snapshot.title).font(BrandFont.font(.headline)).widgetAccentable()
+            Text(snapshot.artist).font(BrandFont.font(.caption))
         }
         .lineLimit(1)
     }
@@ -102,11 +102,11 @@ struct NowPlayingWidgetView: View {
     private func titles(_ snapshot: NowPlayingSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(snapshot.title)
-                .font(BrandFont.font(.subheadline, weight: .semibold))
-                .foregroundStyle(.white)
+                .font(BrandFont.font(.subheadline))
+                .foregroundStyle(Theme.dark.palette.textPrimary)
             Text(snapshot.artist)
                 .font(BrandFont.font(.caption))
-                .foregroundStyle(.white.opacity(0.6))
+                .foregroundStyle(Theme.dark.palette.textSecondary)
         }
         .lineLimit(1)
     }
@@ -120,9 +120,9 @@ private struct PlayPauseButton: View {
             (isPlaying ? Glyph.pause : Glyph.play).image
                 .resizable()
                 .frame(width: 18, height: 18)
-                .foregroundStyle(.black)
+                .foregroundStyle(Theme.dark.palette.background)
                 .frame(width: 36, height: 36)
-                .background(.white, in: .circle)
+                .background(Theme.dark.palette.textPrimary, in: .circle)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(isPlaying ? "Pause" : "Play")

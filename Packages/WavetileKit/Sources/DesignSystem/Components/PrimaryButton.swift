@@ -31,13 +31,13 @@ public struct TintedButtonStyle: ButtonStyle {
         switch size {
         case .regular:
             label
-                .font(theme.typography.body.weight(.semibold))
+                .font(theme.typography.body)
                 // md, not lg: three capsules (Play, Shuffle, About) share a row.
                 .padding(.horizontal, theme.spacing.md)
                 .frame(minHeight: 48)
         case .small:
             label
-                .font(theme.typography.caption.weight(.semibold))
+                .font(theme.typography.caption)
                 .padding(.horizontal, theme.spacing.md)
                 .frame(minHeight: 28)
         }
@@ -59,7 +59,7 @@ public struct TextButtonStyle: ButtonStyle {
 
     public func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(theme.typography.body.weight(.semibold))
+            .font(theme.typography.body)
             .foregroundStyle(theme.palette.accent)
             .frame(minHeight: 44)
             .contentShape(.rect)

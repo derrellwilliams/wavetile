@@ -19,7 +19,7 @@ struct WelcomeCard: View {
             HStack(spacing: theme.spacing.sm) {
                 hand
                 Text("Hi, \(greetingName)!")
-                    .font(theme.typography.headline)
+                    .font(theme.typography.title)
                     .foregroundStyle(theme.palette.textPrimary)
             }
             .accessibilityElement(children: .ignore)
@@ -110,18 +110,11 @@ struct ArtistSpotlightShelf: View {
 
     var body: some View {
         ShelfSection(items: spotlight.albums) {
-            VStack(alignment: .leading, spacing: theme.spacing.xxs) {
-                Text("Artist Spotlight")
-                    .font(theme.typography.caption.weight(.semibold))
-                    .textCase(.uppercase)
-                    .foregroundStyle(theme.palette.accent)
-                Text(spotlight.name)
-                    .font(theme.typography.sectionHeader)
-                    .foregroundStyle(theme.palette.textPrimary)
-                    .lineLimit(1)
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityAddTraits(.isHeader)
+            Text(spotlight.name)
+                .font(theme.typography.sectionHeader)
+                .foregroundStyle(theme.palette.textPrimary)
+                .lineLimit(1)
+                .accessibilityAddTraits(.isHeader)
         } tile: { album in
             AlbumLink(album: album, context: "spotlight")
         }

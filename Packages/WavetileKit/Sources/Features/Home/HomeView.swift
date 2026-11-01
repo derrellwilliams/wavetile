@@ -82,17 +82,8 @@ struct HomeView: View {
             }
             .overlay { overlay }
             .themedBackground()
-            .navigationTitle("Home")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    WaveMark(width: 104)
-                        .accessibilityElement()
-                        .accessibilityLabel("Wavetile")
-                        .accessibilityAddTraits(.isHeader)
-                }
-            }
-            .tabRootChrome(centersTitle: true)
+            .navigationTitle("Wavetile")
+            .tabRootChrome()
             .libraryDestinations(zoom: zoom) { path.append($0) }
             .podcastDestinations(zoom: zoom) { path.append($0) }
             // On the always-present scroll view: a task on a shelf that isn't shown never runs.

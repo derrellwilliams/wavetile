@@ -30,32 +30,57 @@ public struct Theme: Sendable, Identifiable, Hashable {
         public var tintPressed: Color { accent.opacity(0.2) }
         public var background: Color
         public var surface: Color
+        /// The main tan (in Dark): titles and primary text. Text is only ever this or `textSecondary`,
+        /// never white.
         public var textPrimary: Color
+        /// The subtle tan: the main tan 60% of the way from the background, as a solid color so it
+        /// reads the same over artwork and glass.
         public var textSecondary: Color
         public var separator: Color
         /// Placeholder tones for artwork that hasn't loaded yet.
         public var artworkPlaceholder: [Color]
     }
 
-    /// Built on Dynamic Type text styles so every token scales with the user's text size (HIG).
+    /// One weight (Inter Regular), six sizes: 12 · 14 · 17 · 18 · 22 · 36. Hierarchy comes from size,
+    /// color and the mono face, never weight. Every token scales with Dynamic Type (HIG).
     public struct Typography: Sendable, Equatable {
+        public static let scale = (caption: CGFloat(12), small: CGFloat(14), body: CGFloat(17), lead: CGFloat(18), title: CGFloat(22), display: CGFloat(36))
+
+        /// 36: screen and detail-page titles.
         public var largeTitle: Font
+        /// 22: titles inside a screen (Now Playing, sheets, empty states, episodes).
         public var title: Font
+        /// 18: shelf and section titles.
         public var sectionHeader: Font
-        public var body: Font
-        public var itemTitle: Font
-        public var itemSubtitle: Font
-        public var caption: Font
-        /// Bold text-face heading: the Now Playing title, the welcome greeting, About sheet sections.
-        public var headline: Font
-        /// Larger reading text: the Now Playing artist, the About sheet, a detail page's artist or show.
+        /// 18: secondary names under a title (a detail page's artist or show, the Now Playing artist).
         public var lead: Font
+        /// 17: reading text, rows and buttons.
+        public var body: Font
+        /// 14: names under artwork and in rows.
+        public var itemTitle: Font
+        /// 14, mono: the line under an item (artist, show, counts).
+        public var itemSubtitle: Font
+        /// 12: labels and fine print.
+        public var caption: Font
+        /// 36, mono: Quick Connect codes.
         public var code: Font
-        /// Long content titles in the text face (podcast episodes): a step above `headline`.
-        public var compactTitle: Font = BrandFont.font(.title2, size: 24, weight: .bold)
-        /// Letter-spacing for large display titles: big type reads loose, so it's tightened.
-        /// (Body text stays at 0; system fonts do this automatically, custom faces don't.)
+        /// Letter-spacing for 36pt titles: big type reads loose, so it's tightened.
         public var displayTracking: CGFloat = -0.5
+        /// Extra space between wrapped lines. Inter sets lines at about 1.21× its size, so text gets
+        /// 3pt more (about 1.4× at body size, set app-wide in `RootView`) and titles none (about 1.2×).
+        public var textLeading: CGFloat = 3
+        public var titleLeading: CGFloat = 0
+
+        /// Metadata (years, counts, durations, times) in the mono face: `.caption` is 12, `.body` 17,
+        /// anything else 14.
+        public func mono(_ style: Font.TextStyle) -> Font {
+            let size = switch style {
+            case .caption, .caption2, .footnote: Self.scale.caption
+            case .body, .callout, .headline: Self.scale.body
+            default: Self.scale.small
+            }
+            return BrandFont.font(style, size: size, family: BrandFont.monoFamily)
+        }
     }
 
     public struct Spacing: Sendable, Equatable {
@@ -93,9 +118,9 @@ public struct Theme: Sendable, Identifiable, Hashable {
 
 public extension Theme {
     /// Default brand: #1A1A1A canvas, light tan (#ECE4D2) type, logo, icons and controls,
-    /// Stack Sans Notch for the logo and titles, Familjen Grotesk for text.
+    /// Inter throughout; Geist Mono for codes.
     /// The id stays "wavetile" so existing saved theme choices still resolve.
-    static let dark = Theme(
+    public static let dark = Theme(
         id: "wavetile",
         name: "Dark",
         palette: .init(
@@ -103,21 +128,20 @@ public extension Theme {
             background: Color(hex: 0x1A1A1A),
             surface: Color(hex: 0x262626),
             textPrimary: Color(hex: 0xECE4D2),
-            textSecondary: Color(hex: 0xECE4D2).opacity(0.6),
-            separator: .white.opacity(0.12),
+            textSecondary: Color(hex: 0x989388),
+            separator: Color(hex: 0xECE4D2).opacity(0.12),
             artworkPlaceholder: [Color(hex: 0x2E2E2E), Color(hex: 0x222222)]
         ),
         typography: .init(
-            largeTitle: BrandFont.display(.largeTitle),
-            title: BrandFont.display(.title2),
-            sectionHeader: BrandFont.font(.title3, weight: .medium),
-            body: BrandFont.font(.body),
-            itemTitle: BrandFont.font(.subheadline, weight: .medium),
-            itemSubtitle: BrandFont.font(.subheadline),
-            caption: BrandFont.font(.caption),
-            headline: BrandFont.font(.title2, weight: .bold),
-            lead: BrandFont.font(.title3),
-            code: .system(.largeTitle, design: .monospaced).weight(.semibold)
+            largeTitle: BrandFont.font(.largeTitle, size: 36),
+            title: BrandFont.font(.title2, size: 22),
+            sectionHeader: BrandFont.font(.title3, size: 18),
+            lead: BrandFont.font(.title3, size: 18),
+            body: BrandFont.font(.body, size: 17),
+            itemTitle: BrandFont.font(.subheadline, size: 14),
+            itemSubtitle: BrandFont.font(.subheadline, size: 14, family: BrandFont.monoFamily),
+            caption: BrandFont.font(.caption, size: 12),
+            code: BrandFont.font(.largeTitle, size: 36, family: BrandFont.monoFamily)
         ),
         spacing: .init(),
         radius: .init(),
@@ -136,7 +160,7 @@ public extension Theme {
         theme.palette.background = Color(hex: 0xECE4D2)
         theme.palette.surface = Color(hex: 0xE0D7C3)
         theme.palette.textPrimary = Color(hex: 0x1A1A1A)
-        theme.palette.textSecondary = Color(hex: 0x262626).opacity(0.6)
+        theme.palette.textSecondary = Color(hex: 0x75726B)
         theme.palette.separator = .black.opacity(0.12)
         theme.palette.artworkPlaceholder = [Color(hex: 0xD9CFB9), Color(hex: 0xE3DAC6)]
         theme.colorScheme = .light

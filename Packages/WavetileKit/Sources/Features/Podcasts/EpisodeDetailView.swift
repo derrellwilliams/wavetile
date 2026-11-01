@@ -265,7 +265,7 @@ private struct PersonView: View {
             .frame(width: 80, height: 80)
             .clipShape(.circle)
             Text(person.name)
-                .font(theme.typography.itemSubtitle.weight(.semibold))
+                .font(theme.typography.itemSubtitle)
                 .foregroundStyle(theme.palette.textPrimary)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
@@ -304,7 +304,7 @@ private struct TranscriptSheet: View {
                                     }
                                     if let speaker = paragraph.speaker {
                                         Text(speaker)
-                                            .font(theme.typography.caption.weight(.semibold))
+                                            .font(theme.typography.caption)
                                             .foregroundStyle(theme.palette.textSecondary)
                                     }
                                 }

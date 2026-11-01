@@ -11,13 +11,16 @@ public struct WaveMark: View {
     private let isAnimating: Bool
     private let width: CGFloat
     private let strength: Double
+    private let lineWidth: CGFloat?
     private let color: Color?
 
-    /// `strength` is how far the ripple swells each lobe (0.32 = 32%); `color` defaults to the accent.
-    public init(isAnimating: Bool = false, width: CGFloat = 92, strength: Double = 0.32, color: Color? = nil) {
+    /// `strength` is how far the ripple swells each lobe (0.32 = 32%); `lineWidth` defaults to the
+    /// drawn stroke at `width`; `color` defaults to the accent.
+    public init(isAnimating: Bool = false, width: CGFloat = 92, strength: Double = 0.32, lineWidth: CGFloat? = nil, color: Color? = nil) {
         self.isAnimating = isAnimating
         self.width = width
         self.strength = strength
+        self.lineWidth = lineWidth
         self.color = color
     }
 
@@ -28,7 +31,7 @@ public struct WaveMark: View {
             let elapsed = active ? context.date.timeIntervalSince(Self.epoch) : 0
             Canvas { canvas, size in
                 let swell = Self.swell(at: elapsed, strength: strength * Self.rampIn(elapsed))
-                Self.draw(in: &canvas, width: size.width, center: CGPoint(x: size.width / 2, y: size.height / 2), swell: swell, color: color ?? theme.palette.accent)
+                Self.draw(in: &canvas, width: size.width, center: CGPoint(x: size.width / 2, y: size.height / 2), swell: swell, color: color ?? theme.palette.accent, lineWidth: lineWidth)
             }
         }
         // Room above and below for the ripple's tallest swell.
@@ -72,11 +75,11 @@ public struct WaveMark: View {
     }
 
     /// Strokes the wave into a canvas.
-    public static func draw(in canvas: inout GraphicsContext, width: CGFloat, center: CGPoint, swell: [CGFloat], color: Color) {
+    public static func draw(in canvas: inout GraphicsContext, width: CGFloat, center: CGPoint, swell: [CGFloat], color: Color, lineWidth: CGFloat? = nil) {
         canvas.stroke(
             path(width: width, center: center, swell: swell),
             with: .color(color),
-            style: StrokeStyle(lineWidth: lineWidth(forWidth: width), lineCap: .round)
+            style: StrokeStyle(lineWidth: lineWidth ?? Self.lineWidth(forWidth: width), lineCap: .round)
         )
     }
 }

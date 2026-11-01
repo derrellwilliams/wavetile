@@ -58,15 +58,6 @@ struct PodcastsView: View {
             }
             .padding(.vertical, theme.spacing.lg)
         }
-        // With no shows yet, the splash's waves sit behind the title and the empty state.
-        .background(alignment: .top) {
-            if !hasShows {
-                WaveBackdrop()
-                    .frame(height: 520)
-                    .ignoresSafeArea(edges: .top)
-                    .transition(.opacity)
-            }
-        }
         .themedBackground()
         .navigationTitle("Podcasts")
         .markRefreshable { await podcasts.refreshAll() }

@@ -34,7 +34,7 @@ struct WidgetArtwork: View {
                 if let image = widgetArtwork(file) {
                     image.resizable().scaledToFill()
                 } else {
-                    Glyph.song.image.foregroundStyle(.white.opacity(0.4))
+                    Glyph.song.image.foregroundStyle(Theme.dark.palette.textSecondary)
                 }
             }
             .clipped()

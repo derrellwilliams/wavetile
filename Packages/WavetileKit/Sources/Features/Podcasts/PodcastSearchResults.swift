@@ -37,7 +37,7 @@ struct PodcastSearchResults: View {
                     } label: {
                         Label("Open Feed Link", glyph: .feed)
                             .labelStyle(.tintedIcon)
-                            .font(theme.typography.body.weight(.semibold))
+                            .font(theme.typography.body)
                     }
                     .listRowBackground(Color.clear)
                 }

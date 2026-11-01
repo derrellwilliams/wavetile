@@ -64,7 +64,7 @@ public struct ArtworkView: View {
         return LinearGradient(colors: tones, startPoint: .topLeading, endPoint: .bottomTrailing)
             .overlay {
                 Glyph.song.image
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(theme.palette.textSecondary)
             }
     }
 }

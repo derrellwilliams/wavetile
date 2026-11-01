@@ -10,30 +10,30 @@ struct DownloadLiveActivity: Widget {
             // Lock Screen / banner
             HStack(spacing: 12) {
                 (context.state.isComplete ? Glyph.downloaded : Glyph.downloads).image
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.dark.palette.textPrimary)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(context.attributes.name)
-                        .font(BrandFont.font(.subheadline, weight: .semibold))
+                        .font(BrandFont.font(.subheadline))
                         .lineLimit(1)
                     Text(status(context.state))
                         .font(BrandFont.font(.caption))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(Theme.dark.palette.textSecondary)
                     ProgressView(value: context.state.progress)
-                        .tint(.white)
+                        .tint(Theme.dark.palette.textPrimary)
                 }
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(Theme.dark.palette.textPrimary)
             .padding()
-            .activityBackgroundTint(Color(hex: 0x1A1A1A))
-            .activitySystemActionForegroundColor(.white)
+            .activityBackgroundTint(Theme.dark.palette.background)
+            .activitySystemActionForegroundColor(Theme.dark.palette.textPrimary)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Glyph.downloads.image.foregroundStyle(.white)
+                    Glyph.downloads.image.foregroundStyle(Theme.dark.palette.textPrimary)
                 }
                 DynamicIslandExpandedRegion(.center) {
                     Text(context.attributes.name)
-                        .font(BrandFont.font(.subheadline, weight: .semibold))
+                        .font(BrandFont.font(.subheadline))
                         .lineLimit(1)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
@@ -41,19 +41,19 @@ struct DownloadLiveActivity: Widget {
                         .font(BrandFont.font(.caption).monospacedDigit())
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    ProgressView(value: context.state.progress).tint(.white)
+                    ProgressView(value: context.state.progress).tint(Theme.dark.palette.textPrimary)
                 }
             } compactLeading: {
-                Glyph.downloads.image.foregroundStyle(.white)
+                Glyph.downloads.image.foregroundStyle(Theme.dark.palette.textPrimary)
             } compactTrailing: {
                 ProgressView(value: context.state.progress)
                     .progressViewStyle(.circular)
-                    .tint(.white)
+                    .tint(Theme.dark.palette.textPrimary)
                     .frame(width: 18, height: 18)
             } minimal: {
                 ProgressView(value: context.state.progress)
                     .progressViewStyle(.circular)
-                    .tint(.white)
+                    .tint(Theme.dark.palette.textPrimary)
             }
         }
     }

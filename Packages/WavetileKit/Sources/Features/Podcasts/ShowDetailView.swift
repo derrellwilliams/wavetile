@@ -195,7 +195,7 @@ struct ShowDetailView: View {
                     Spacer()
                     if show?.hidePlayed == true {
                         Text("Unplayed")
-                            .font(theme.typography.caption.weight(.semibold))
+                            .font(theme.typography.caption)
                             .foregroundStyle(theme.palette.textSecondary)
                     }
                     if !seasons.isEmpty { seasonMenu }

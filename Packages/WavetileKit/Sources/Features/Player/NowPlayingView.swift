@@ -71,7 +71,7 @@ struct NowPlayingView: View {
             HStack(alignment: .center, spacing: theme.spacing.md) {
                 VStack(alignment: .leading, spacing: theme.spacing.xs) {
                     Text(player.current?.title ?? "")
-                        .font(theme.typography.headline)
+                        .font(theme.typography.title)
                         .foregroundStyle(theme.palette.textPrimary)
                     Text((isEpisode ? player.current?.albumTitle : player.current?.artist) ?? "")
                         .font(theme.typography.lead)
@@ -115,7 +115,7 @@ struct NowPlayingView: View {
             Spacer()
             VStack(spacing: 2) {
                 Text("PLAYING FROM")
-                    .font(theme.typography.caption.weight(.semibold))
+                    .font(theme.typography.caption)
                     .kerning(1)
                     .foregroundStyle(theme.palette.textSecondary)
                 Text(player.current?.albumTitle ?? "")
@@ -192,7 +192,7 @@ struct NowPlayingView: View {
                 }
             } label: {
                 Text("\(Double(player.podcastRate).formatted())×")
-                    .font(theme.typography.itemTitle.monospacedDigit())
+                    .font(theme.typography.mono(.subheadline))
                     .foregroundStyle(player.podcastRate == 1 ? theme.palette.textSecondary : theme.palette.accent)
                     .frame(minWidth: 44, minHeight: 44)
             }
@@ -286,7 +286,7 @@ struct Scrubber: View {
                 Spacer()
                 Text("-" + Duration.seconds(max(duration - progress * duration, 0)).formatted(.time(pattern: .minuteSecond)))
             }
-            .font(theme.typography.caption.monospacedDigit())
+            .font(theme.typography.mono(.caption))
             .foregroundStyle(theme.palette.textSecondary)
         }
         .accessibilityElement()
@@ -360,7 +360,7 @@ struct SkipButton: View {
                     .resizable()
                     .frame(width: 40, height: 40)
                 Text("\(Int(seconds))")
-                    .font(.system(size: 11, weight: .bold).monospacedDigit())
+                    .font(BrandFont.font(fixedSize: Theme.Typography.scale.caption, family: BrandFont.monoFamily))
                     .offset(y: 1)
             }
             .frame(width: 60, height: 60)
@@ -392,7 +392,7 @@ struct SleepTimerMenu: View {
                 Glyph.sleepTimer.image
                 if case let .at(date) = player.sleepTimer {
                     Text(timerInterval: Date.now ... max(date, .now), countsDown: true)
-                        .font(theme.typography.caption.monospacedDigit())
+                        .font(theme.typography.mono(.caption))
                         .frame(maxWidth: 48)
                 }
             }
@@ -455,7 +455,7 @@ private struct CurrentChapterLabel: View {
     var body: some View {
         if let chapter = chapters.current(at: player.currentTime) {
             Text(chapter.title)
-                .font(theme.typography.caption.weight(.semibold))
+                .font(theme.typography.caption)
                 .foregroundStyle(theme.palette.textSecondary)
                 .contentTransition(.opacity)
                 .animation(theme.motion.smooth, value: chapter)
@@ -502,11 +502,11 @@ struct ChapterRow: View {
         Button(action: action) {
             HStack(alignment: .firstTextBaseline, spacing: theme.spacing.md) {
                 Text(Duration.seconds(chapter.start), format: .time(pattern: chapter.start >= 3600 ? .hourMinuteSecond : .minuteSecond))
-                    .font(theme.typography.caption.monospacedDigit())
+                    .font(theme.typography.mono(.caption))
                     .foregroundStyle(theme.palette.textSecondary)
                     .frame(minWidth: 52, alignment: .leading)
                 Text(chapter.title)
-                    .font(isCurrent ? theme.typography.body.weight(.semibold) : theme.typography.body)
+                    .font(isCurrent ? theme.typography.body : theme.typography.body)
                     .foregroundStyle(isCurrent ? theme.palette.accent : theme.palette.textPrimary)
                     .multilineTextAlignment(.leading)
                 Spacer(minLength: 0)

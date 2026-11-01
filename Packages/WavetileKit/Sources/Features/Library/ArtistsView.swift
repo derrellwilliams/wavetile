@@ -29,7 +29,7 @@ struct ArtistsView: View {
                     }
                 } header: {
                     Text(section.letter)
-                        .font(theme.typography.caption.weight(.semibold))
+                        .font(theme.typography.caption)
                 }
                 .sectionIndexLabel(section.letter)
             }

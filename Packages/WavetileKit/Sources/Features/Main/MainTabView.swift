@@ -600,12 +600,18 @@ private struct TintedSystemBack: UIViewControllerRepresentable {
             }
         }
 
-        /// A copy of `appearance` with `image` as its chevron, or nil if it has it already (or
-        /// there's no appearance).
+        /// A copy of `appearance` with `image` as its chevron and the brand titles (SwiftUI's
+        /// appearances ignore the title proxy), or nil if it has both already (or there's no appearance).
         private func tinted(_ appearance: UINavigationBarAppearance?, _ image: UIImage) -> UINavigationBarAppearance? {
-            guard let appearance, appearance.backIndicatorImage !== image else { return nil }
+            let largeTitleFont = BrandFont.largeTitleAttributes[.font] as? UIFont
+            guard let appearance,
+                  appearance.backIndicatorImage !== image
+                  || appearance.largeTitleTextAttributes[.font] as? UIFont != largeTitleFont
+            else { return nil }
             let copy = appearance.copy()
             copy.setBackIndicatorImage(image, transitionMaskImage: image)
+            copy.largeTitleTextAttributes = BrandFont.largeTitleAttributes
+            copy.titleTextAttributes = BrandFont.titleAttributes
             return copy
         }
     }
@@ -642,9 +648,8 @@ extension View {
     /// the profile button at top left (opens the drawer), and root reporting so the drawer's
     /// edge swipe only works at the root, never fighting the system back gesture.
     /// `trailing` adds screen buttons next to AirPlay; give them `TintedBarIcon` labels.
-    /// `centersTitle` keeps the title centered (Home's wordmark); other tabs keep theirs leading.
-    func tabRootChrome(centersTitle: Bool = false) -> some View {
-        modifier(TabRootChrome(centersTitle: centersTitle) { EmptyView() })
+    func tabRootChrome() -> some View {
+        modifier(TabRootChrome(trailing: EmptyView()))
     }
 
     func tabRootChrome<Trailing: View>(@ViewBuilder trailing: () -> Trailing) -> some View {
@@ -655,14 +660,7 @@ extension View {
 private struct TabRootChrome<Trailing: View>: ViewModifier {
     @Environment(\.theme) private var theme
     @Environment(\.tabRootReporter) private var reporter
-    var centersTitle = false
     let trailing: Trailing
-
-    init(trailing: Trailing) { self.trailing = trailing }
-    init(centersTitle: Bool = false, @ViewBuilder trailing: () -> Trailing) {
-        self.centersTitle = centersTitle
-        self.trailing = trailing()
-    }
 
     private static var itemSize: CGFloat { 44 }
 
@@ -673,14 +671,18 @@ private struct TabRootChrome<Trailing: View>: ViewModifier {
                 ToolbarItem(placement: .topBarLeading) {
                     ProfileButton()
                 }
+                // The wave, centered in every tab's bar.
+                ToolbarItem(placement: .principal) {
+                    WaveMark(width: 104)
+                        .accessibilityElement()
+                        .accessibilityLabel("Wavetile")
+                }
                 // AirPlay and the screen's buttons share one tinted capsule; alone, it's a circle.
                 TintedBarGroup {
                     AirPlayButton(iconSize: 24, tapSize: Self.itemSize)
                     trailing
                 }
             }
-            // Keeps the scrolled-up title at the leading edge on every tab, not centered on some.
-            .toolbarRole(centersTitle ? .automatic : .browser)
             // Styles the root's back item before anything is pushed from it.
             .tintedSystemBack()
             // Pushing a screen makes the root disappear; returning makes it reappear.

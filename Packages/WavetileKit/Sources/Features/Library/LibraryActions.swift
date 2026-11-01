@@ -215,7 +215,7 @@ struct AddToPlaylistSheet: View {
             List {
                 Button { showNew = true } label: {
                     Label("New Playlist", glyph: .add)
-                        .font(theme.typography.body.weight(.semibold))
+                        .font(theme.typography.body)
                         .labelStyle(.tintedIcon)
                 }
                 .listRowBackground(Color.clear)
@@ -289,7 +289,7 @@ struct AddToCollectionSheet: View {
             List {
                 Button { showNew = true } label: {
                     Label("New Collection", glyph: .add)
-                        .font(theme.typography.body.weight(.semibold))
+                        .font(theme.typography.body)
                         .labelStyle(.tintedIcon)
                 }
                 .listRowBackground(Color.clear)

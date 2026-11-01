@@ -27,7 +27,7 @@ struct RecentlyPlayedWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: WidgetKind.recentlyPlayed, provider: RecentsProvider()) { entry in
             RecentsView(entry: entry)
-                .containerBackground(Color(hex: 0x1A1A1A), for: .widget)
+                .containerBackground(Theme.dark.palette.background, for: .widget)
         }
         .configurationDisplayName("Recently Played")
         .description("Jump back into albums you've been playing.")
@@ -45,12 +45,12 @@ struct RecentsView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Recently Played")
                 .font(BrandFont.display(.subheadline))
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.dark.palette.textPrimary)
             if albums.isEmpty {
                 Spacer()
                 Text("Play some music to see it here.")
                     .font(BrandFont.font(.caption))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(Theme.dark.palette.textSecondary)
                 Spacer()
             } else {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {

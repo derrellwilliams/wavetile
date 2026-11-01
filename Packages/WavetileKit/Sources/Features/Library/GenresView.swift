@@ -18,7 +18,7 @@ struct GenresView: View {
                         .foregroundStyle(theme.palette.textPrimary)
                     Spacer()
                     Text("\(genre.albumCount)")
-                        .font(theme.typography.itemSubtitle.monospacedDigit())
+                        .font(theme.typography.mono(.subheadline))
                         .foregroundStyle(theme.palette.textSecondary)
                 }
             }

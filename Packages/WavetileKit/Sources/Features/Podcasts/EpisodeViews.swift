@@ -22,11 +22,11 @@ struct EpisodeRow: View {
             }
             VStack(alignment: .leading, spacing: theme.spacing.xs) {
                 Text(caption)
-                    .font(theme.typography.caption.weight(.semibold))
+                    .font(theme.typography.caption)
                     .foregroundStyle(theme.palette.textSecondary)
                     .textCase(.uppercase)
                 Text(item.episode.title)
-                    .font(theme.typography.body.weight(.semibold))
+                    .font(theme.typography.body)
                     .foregroundStyle(theme.palette.textPrimary)
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                 if !item.episode.summary.isEmpty {
@@ -246,7 +246,7 @@ struct EpisodeCard: View {
                 // Show and title read as one unit, so they sit closer than the rest of the card.
                 VStack(alignment: .leading, spacing: theme.spacing.xs) {
                     Text(item.show.title)
-                        .font(theme.typography.caption.weight(.semibold))
+                        .font(theme.typography.caption)
                         .foregroundStyle(theme.palette.textSecondary)
                         .textCase(.uppercase)
                         .lineLimit(1)
@@ -258,9 +258,8 @@ struct EpisodeCard: View {
                 }
                 // Time left as plain text, matching album tiles; tapping the card opens the episode.
                 Text(EpisodeFormat.status(item.episode))
-                    .font(theme.typography.itemSubtitle)
+                    .font(theme.typography.mono(.subheadline))
                     .foregroundStyle(theme.palette.textSecondary)
-                    .monospacedDigit()
             }
             .contentShape(.rect)
             .zoomSource(sourceID, in: zoom)

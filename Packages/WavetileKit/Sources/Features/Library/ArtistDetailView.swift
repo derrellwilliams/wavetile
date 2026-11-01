@@ -35,12 +35,12 @@ struct ArtistDetailView: View {
                     Text(name)
                         .font(theme.typography.largeTitle)
                         .tracking(theme.typography.displayTracking)
+                        .lineSpacing(theme.typography.titleLeading)
                         .foregroundStyle(theme.palette.textPrimary)
-                        .multilineTextAlignment(.center)
                         .lineLimit(2)
                         .minimumScaleFactor(0.6)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, theme.spacing.screenInset)
-                        .frame(maxWidth: .infinity)
                     playButtons
                     // The start of the bio; Read More opens the whole thing in a sheet.
                     if let overview = details?.overview {
