@@ -125,7 +125,6 @@ struct AlbumDetailView: View {
         var parts: [String] = []
         if let year = model.album.year { parts.append(String(year)) }
         if !model.tracks.isEmpty {
-            parts.append("\(model.tracks.count) songs")
             parts.append(model.totalDuration.formatted(.units(allowed: [.hours, .minutes], width: .abbreviated)))
         }
         return parts.joined(separator: " · ")

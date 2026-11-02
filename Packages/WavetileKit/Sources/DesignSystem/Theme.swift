@@ -41,10 +41,10 @@ public struct Theme: Sendable, Identifiable, Hashable {
         public var artworkPlaceholder: [Color]
     }
 
-    /// One weight (Inter Regular), six sizes: 12 · 14 · 18 · 20 · 22 · 36. Hierarchy comes from size,
+    /// One weight (Inter Regular), seven sizes: 12 · 14 · 16 · 18 · 20 · 22 · 36. Hierarchy comes from size,
     /// color and the mono face, never weight. Every token scales with Dynamic Type (HIG).
     public struct Typography: Sendable, Equatable {
-        public static let scale = (caption: CGFloat(12), small: CGFloat(14), body: CGFloat(18), lead: CGFloat(20), title: CGFloat(22), display: CGFloat(36))
+        public static let scale = (caption: CGFloat(12), small: CGFloat(14), body: CGFloat(16), large: CGFloat(18), lead: CGFloat(20), title: CGFloat(22), display: CGFloat(36))
 
         /// 36: screen and detail-page titles.
         public var largeTitle: Font
@@ -54,7 +54,7 @@ public struct Theme: Sendable, Identifiable, Hashable {
         public var sectionHeader: Font
         /// 20: secondary names under a title (a detail page's artist or show, the Now Playing artist).
         public var lead: Font
-        /// 18: reading text, rows and buttons.
+        /// 16: reading text, rows and buttons.
         public var body: Font
         /// 14: names under artwork and in rows.
         public var itemTitle: Font
@@ -73,7 +73,7 @@ public struct Theme: Sendable, Identifiable, Hashable {
         public var textLeading: CGFloat = 3
         public var titleLeading: CGFloat = 0
 
-        /// Metadata (years, counts, durations, times) in the mono face: `.caption` is 12, `.body` 18,
+        /// Metadata (years, counts, durations, times) in the mono face: `.caption` is 12, `.body` 16,
         /// anything else 14.
         public func mono(_ style: Font.TextStyle) -> Font {
             let size = switch style {
@@ -139,7 +139,7 @@ public extension Theme {
             title: BrandFont.font(.title2, size: 22),
             sectionHeader: BrandFont.font(.title3, size: 20),
             lead: BrandFont.font(.title3, size: 20),
-            body: BrandFont.font(.body, size: 18),
+            body: BrandFont.font(.body, size: 16),
             itemTitle: BrandFont.font(.subheadline, size: 14),
             itemSubtitle: BrandFont.font(.subheadline, size: 14),
             itemMetadata: BrandFont.font(.subheadline, size: 14, family: BrandFont.monoFamily),
