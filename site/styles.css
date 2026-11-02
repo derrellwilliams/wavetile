@@ -251,7 +251,8 @@ a.button:active { scale: 0.97; background: var(--tint-pressed); }
 .guide .title { margin: 0; text-wrap: balance; }
 .guide .meta { grid-column: 1 / span 6; margin: 0; font-size: 16px; line-height: 1.4; color: var(--ink-2); max-width: 44ch; text-wrap: pretty; }
 .guide__head .guide__action { grid-column: 1 / -1; margin: 12px 0 0; }
-.guide__head .guide__intro { grid-column: 7 / -1; align-self: end; max-width: 52ch; margin: 0; color: var(--ink-2); }
+/* The intro sits in column one, under the subtitle, at every width. */
+.guide__head .guide__intro { grid-column: 1 / span 6; max-width: 52ch; margin: 0; color: var(--ink-2); }
 .guide__row {
   display: grid; grid-template-columns: subgrid; align-items: baseline;
   padding-block: clamp(24px, 3vw, 40px); border-top: 1px solid rgb(236 228 210 / 0.12);
@@ -264,7 +265,7 @@ a.button:active { scale: 0.97; background: var(--tint-pressed); }
 /* Tablet: heading and text share the row, the number sits above the heading. */
 @media (max-width: 1100px) {
   .guide__head > *, .guide .meta { grid-column: 1 / -1; }
-  .guide__head .guide__intro { grid-column: 1 / span 9; }
+  .guide__head .guide__intro { grid-column: 1 / -1; }
   .guide__num { grid-column: 1 / span 4; grid-row: 1; margin-bottom: 12px; }
   .guide h2 { grid-column: 1 / span 4; grid-row: 2; }
   .guide__body { grid-column: 6 / -1; grid-row: 1 / span 2; align-self: start; }
