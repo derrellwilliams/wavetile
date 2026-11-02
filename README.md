@@ -1,8 +1,8 @@
 # Wavetile
 
-**Your Jellyfin music and your podcasts, in one app.** Wavetile is a native iPhone client for Jellyfin (iOS 26.1+) with a full podcast player built in.
+**Your Jellyfin music and your podcasts, in one app.** Wavetile is a native iPhone client for Jellyfin with a podcast player built in.
 
-**Public beta:** [join on TestFlight](https://testflight.apple.com/join/pk9dyfMq) · [wavetile.com](https://wavetile.com) · [download and setup guide](https://wavetile.com/getting-started) · [support](https://wavetile.com/support)
+**Public beta:** [join on TestFlight](https://testflight.apple.com/join/pk9dyfMq) · [wavetile.com](https://wavetile.com)
 
 You need an iPhone on iOS 26.1 or later and a Jellyfin server with a music library. Wavetile collects no data: no account, no analytics, no tracking ([privacy policy](https://wavetile.com/privacy)). Bug reports and feature ideas are welcome in [Issues](https://github.com/derrellwilliams/wavetile/issues).
 
@@ -20,39 +20,6 @@ You need an iPhone on iOS 26.1 or later and a Jellyfin server with a music libra
 | System | Now Playing and Recently Played widgets, download Live Activity, Siri, CarPlay |
 | Themes | Dark (default) and Light |
 
-## Setup
-Requires Xcode 26 and iOS 26.1+ (iPhone only).
-```sh
-brew install xcodegen
-xcodegen generate        # re-run after adding/removing files in App/ or changing project.yml
-open Wavetile.xcodeproj
-```
-`Wavetile.xcodeproj` is generated from `project.yml`. Edit the spec, not the project.
-
-| Task | Command |
-|---|---|
-| Build | `xcodebuild -project Wavetile.xcodeproj -scheme Wavetile -destination 'platform=iOS Simulator,name=iPhone 18 Pro' -derivedDataPath build build` |
-| Package tests | Scheme `WavetileKit-Package` (includes a 50k-track performance suite) |
-| UI tests | `UITests/`, run from the `Wavetile` scheme |
-| TestFlight | `scripts/testflight.sh` (build number defaults to a timestamp) |
-| New icon | Add the Phosphor name to `scripts/fetch-icons.sh` and run it |
-
-## Layout
-| Path | What |
-|---|---|
-| `App/` | Thin app target (`@main`, assets, CarPlay scene, Siri intents) |
-| `Widgets/`, `Shared/` | Widget extension; playback intents shared with the app |
-| `UITests/` | UI and accessibility audit tests |
-| `Packages/WavetileKit/Sources/JellyfinKit` | API client, auth, Quick Connect, Keychain |
-| `…/Persistence` | GRDB library database and queries |
-| `…/Library` | Library sync and record → UI mapping |
-| `…/Playback` | Play queue and gapless audio player |
-| `…/Downloads` | Background download manager |
-| `…/Podcasts` | Feeds, podcast database, directory search, chapters, transcripts, OPML |
-| `…/DesignSystem` | Theme tokens, icons, motion, components |
-| `…/WidgetShared` | Lightweight types shared with the widget extension |
-| `…/PreviewSupport` | Fixtures for previews |
-| `…/Features` | Screens and view models, one folder per area |
 
 ## License
 Wavetile is free and open source under the [Mozilla Public License 2.0](LICENSE).
