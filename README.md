@@ -25,7 +25,7 @@ You need a Jellyfin server with a music library. Wavetile collects no data: no a
 Wavetile is free and open source under the [Mozilla Public License 2.0](LICENSE).
 
 Not covered by that license:
-- Fonts: Familjen Grotesk, Stack Sans Notch and Stack Sans Headline are under the SIL Open Font License (license files sit next to the fonts).
+- Fonts: [Inter](https://rsms.me/inter) and [Geist Mono](https://vercel.com/font) are under the SIL Open Font License (license files sit next to the fonts).
 - Icons: [Phosphor](https://phosphoricons.com) (MIT).
 - Album and podcast artwork in screenshots belongs to its owners.
 
