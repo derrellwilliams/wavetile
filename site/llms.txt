@@ -20,7 +20,7 @@
 - Background downloads of albums and playlists as 256 kbps MP3 or the original file (e.g. FLAC), with a Live Activity
 - Podcasts (optional): directory search, follow by URL, OPML import, chapters, transcripts, episode downloads, subscriptions synced through Jellyfin
 - Now Playing and Recently Played widgets, Siri, Dark and Light themes
-- CarPlay: built, waiting on Apple's CarPlay audio entitlement
+- CarPlay
 
 ## Requirements
 - iPhone with iOS 26.1 or later
