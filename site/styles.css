@@ -71,31 +71,23 @@ h1, h2, p { margin: 0; }
 .link { transition: text-decoration-color var(--hover) var(--ease); }
 @media (hover: hover) and (pointer: fine) { .link:hover { text-decoration-color: var(--ink); } }
 
-/* The wave and the cube on the left; guide links on the right. */
+/* The wordmark and the wave on the left; guide links on the right. */
 .top {
   position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
   gap: 12px 24px; min-height: 64px; padding: 4px calc(var(--frame) + 18px);
 }
 /* The logo gets the nav's tinted pill on hover and press; the negative margin keeps the
-   wordmark lined up with the panel below. The pill is its own composited layer that only fades its
-   opacity, so it doesn't flicker while the wave redraws inside the link every frame. */
+   wordmark lined up with the panel below. */
 .brand {
-  position: relative; isolation: isolate;
   display: inline-flex; align-items: center; gap: 12px; min-height: 40px; padding: 0 12px; margin-left: -12px;
   border-radius: 8px; color: var(--ink); text-decoration: none;
-  transition: scale var(--press) var(--ease-out);
+  transition: background-color var(--hover) var(--ease), scale var(--press) var(--ease-out);
 }
-.brand::before {
-  content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit;
-  background: var(--tint); opacity: 0; will-change: opacity;
-  transition: opacity var(--hover) var(--ease);
-}
-@media (hover: hover) and (pointer: fine) { .brand:hover::before { opacity: 1; } }
-.brand:focus-visible::before { opacity: 1; }
-.brand:active { scale: 0.97; }
-.brand:active::before { opacity: 1; background: var(--tint-pressed); }
+@media (hover: hover) and (pointer: fine) { .brand:hover { background: var(--tint); } }
+.brand:focus-visible { background: var(--tint); }
+.brand:active { background: var(--tint-pressed); scale: 0.97; }
 @media (prefers-reduced-motion: reduce) { .brand:active { scale: none; } }
-/* The wordmark in Inter at the lead size, then the wave, which ripples on hover. */
+/* The wordmark in Inter at the lead size, then the wave (still). */
 .wordmark { font-size: 20px; line-height: 1; }
 .brand .wave { display: block; width: 72px; height: auto; overflow: visible; }
 /* Text links at caption size, in pills that only show on interaction, like the app's tinted
