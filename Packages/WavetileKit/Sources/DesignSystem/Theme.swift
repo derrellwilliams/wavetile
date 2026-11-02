@@ -41,20 +41,20 @@ public struct Theme: Sendable, Identifiable, Hashable {
         public var artworkPlaceholder: [Color]
     }
 
-    /// One weight (Inter Regular), six sizes: 12 · 14 · 17 · 18 · 22 · 36. Hierarchy comes from size,
+    /// One weight (Inter Regular), six sizes: 12 · 14 · 18 · 20 · 22 · 36. Hierarchy comes from size,
     /// color and the mono face, never weight. Every token scales with Dynamic Type (HIG).
     public struct Typography: Sendable, Equatable {
-        public static let scale = (caption: CGFloat(12), small: CGFloat(14), body: CGFloat(17), lead: CGFloat(18), title: CGFloat(22), display: CGFloat(36))
+        public static let scale = (caption: CGFloat(12), small: CGFloat(14), body: CGFloat(18), lead: CGFloat(20), title: CGFloat(22), display: CGFloat(36))
 
         /// 36: screen and detail-page titles.
         public var largeTitle: Font
         /// 22: titles inside a screen (Now Playing, sheets, empty states, episodes).
         public var title: Font
-        /// 18: shelf and section titles.
+        /// 20: shelf and section titles.
         public var sectionHeader: Font
-        /// 18: secondary names under a title (a detail page's artist or show, the Now Playing artist).
+        /// 20: secondary names under a title (a detail page's artist or show, the Now Playing artist).
         public var lead: Font
-        /// 17: reading text, rows and buttons.
+        /// 18: reading text, rows and buttons.
         public var body: Font
         /// 14: names under artwork and in rows.
         public var itemTitle: Font
@@ -73,7 +73,7 @@ public struct Theme: Sendable, Identifiable, Hashable {
         public var textLeading: CGFloat = 3
         public var titleLeading: CGFloat = 0
 
-        /// Metadata (years, counts, durations, times) in the mono face: `.caption` is 12, `.body` 17,
+        /// Metadata (years, counts, durations, times) in the mono face: `.caption` is 12, `.body` 18,
         /// anything else 14.
         public func mono(_ style: Font.TextStyle) -> Font {
             let size = switch style {
@@ -137,9 +137,9 @@ public extension Theme {
         typography: .init(
             largeTitle: BrandFont.font(.largeTitle, size: 36),
             title: BrandFont.font(.title2, size: 22),
-            sectionHeader: BrandFont.font(.title3, size: 18),
-            lead: BrandFont.font(.title3, size: 18),
-            body: BrandFont.font(.body, size: 17),
+            sectionHeader: BrandFont.font(.title3, size: 20),
+            lead: BrandFont.font(.title3, size: 20),
+            body: BrandFont.font(.body, size: 18),
             itemTitle: BrandFont.font(.subheadline, size: 14),
             itemSubtitle: BrandFont.font(.subheadline, size: 14),
             itemMetadata: BrandFont.font(.subheadline, size: 14, family: BrandFont.monoFamily),

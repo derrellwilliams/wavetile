@@ -13,7 +13,7 @@ struct LinkRow: View {
                 .foregroundStyle(theme.palette.accent)
                 .frame(width: 28)
             Text(title)
-                .font(theme.typography.sectionHeader)
+                .font(theme.typography.body)
                 .foregroundStyle(theme.palette.textPrimary)
             Spacer()
         }
