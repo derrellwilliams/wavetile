@@ -10,33 +10,20 @@ public struct Motion: Sendable, Equatable {
     public var snappy: Animation
     /// Layout changes, expanding content. Critically damped.
     public var smooth: Animation
-    /// Kept for deliberate flourishes only; prefer `snappy`/`smooth` unless motion follows a flick.
-    public var bouncy: Animation
     /// Spring for settling after a drag/flick (drawers, sheets). Apple ships damping 0.8, response 0.3.
     public var momentumSpring: Spring
-    /// Now Playing background color drift.
-    public var ambient: Animation
     /// Scale applied to pressed tiles and buttons.
     public var pressedScale: CGFloat
+    /// Continuous progress (downloads): linear, so steady updates read as steady motion.
+    public var progress: Animation = .linear(duration: 0.2)
     /// Press-in: lands almost instantly so the touch feels direct. Release uses `snappy`.
     public var pressIn: Animation = .spring(response: 0.12, dampingFraction: 1)
 
     public static let standard = Motion(
         snappy: .spring(response: 0.3, dampingFraction: 1),
         smooth: .spring(response: 0.4, dampingFraction: 1),
-        bouncy: .bouncy(duration: 0.5, extraBounce: 0.1),
         momentumSpring: Spring(response: 0.3, dampingRatio: 0.8),
-        ambient: .easeInOut(duration: 8).repeatForever(autoreverses: true),
         pressedScale: 0.96
-    )
-
-    public static let playful = Motion(
-        snappy: .spring(response: 0.3, dampingFraction: 0.65),
-        smooth: .spring(response: 0.5, dampingFraction: 0.8),
-        bouncy: .bouncy(duration: 0.6, extraBounce: 0.25),
-        momentumSpring: Spring(response: 0.35, dampingRatio: 0.7),
-        ambient: .easeInOut(duration: 6).repeatForever(autoreverses: true),
-        pressedScale: 0.92
     )
 }
 
@@ -96,6 +83,28 @@ private struct IconSwapModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .scaleEffect(isActive && !reduceMotion ? 0.6 : 1)
+            .blur(radius: isActive && !reduceMotion ? 2 : 0)
+            .opacity(isActive ? 0 : 1)
+    }
+}
+
+// MARK: - Image crossfade
+
+public extension AnyTransition {
+    /// Crossfading one image for another (Now Playing artwork on a track change): a slight blur
+    /// on both sides blends them into one change instead of a double exposure. Reduce Motion keeps
+    /// the plain fade.
+    static var blurFade: AnyTransition {
+        .modifier(active: BlurFadeModifier(isActive: true), identity: BlurFadeModifier(isActive: false))
+    }
+}
+
+private struct BlurFadeModifier: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let isActive: Bool
+
+    func body(content: Content) -> some View {
+        content
             .blur(radius: isActive && !reduceMotion ? 2 : 0)
             .opacity(isActive ? 0 : 1)
     }

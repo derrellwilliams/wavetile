@@ -110,7 +110,7 @@ struct ProgressRing: View {
                 .trim(from: 0, to: max(0.04, progress))
                 .stroke(theme.palette.accent, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-                .animation(theme.motion.smooth, value: progress)
+                .animation(theme.motion.progress, value: progress)
         }
         .accessibilityLabel("\(Int(progress * 100))%")
     }

@@ -151,9 +151,14 @@ struct NowPlayingView: View {
 
     /// Square and edge to edge. No shadow or paused "breathing": the art is the sheet's top, not a card on it.
     private var artwork: some View {
-        ArtworkView(store.artwork(for: player.current, maxPixelWidth: 1200), cornerRadius: 0)
-            .id(player.current?.podcast?.artworkURL?.absoluteString ?? player.current?.albumID)
-            .transition(.opacity)
+        let artworkID = player.current?.podcast?.artworkURL?.absoluteString ?? player.current?.albumID
+        // Stacked, so the outgoing and incoming art crossfade in place.
+        return ZStack {
+            ArtworkView(store.artwork(for: player.current, maxPixelWidth: 1200), cornerRadius: 0)
+                .id(artworkID)
+                .transition(.blurFade)
+        }
+        .animation(theme.motion.smooth, value: artworkID)
     }
 
     /// Back and forward on the column edges, lined up with the controls under the hairline.
