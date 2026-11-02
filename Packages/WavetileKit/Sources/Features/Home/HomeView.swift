@@ -14,6 +14,9 @@ struct HomeView: View {
     @State var model: HomeModel
     @Namespace private var zoom
     @Binding var path: NavigationPath
+    /// Bumped when Home's tab is tapped again; scrolls back to the top.
+    let reselects: Int
+    @State private var scrollPosition = ScrollPosition(edge: .top)
     @State private var didRefresh = false
     @State private var podcastUpNext: [EpisodeItem]
     /// Greets a new listener by name on the welcome card.
@@ -21,9 +24,10 @@ struct HomeView: View {
 
     /// `upNext` is read synchronously by the caller, so the podcast shelf is on the first frame
     /// with the music shelves instead of popping in and pushing them around.
-    init(model: HomeModel, path: Binding<NavigationPath>, userName: String, upNext: [EpisodeItem] = []) {
+    init(model: HomeModel, path: Binding<NavigationPath>, reselects: Int = 0, userName: String, upNext: [EpisodeItem] = []) {
         _model = State(initialValue: model)
         _path = path
+        self.reselects = reselects
         self.userName = userName
         _podcastUpNext = State(initialValue: upNext)
     }
@@ -75,12 +79,13 @@ struct HomeView: View {
                 }
                 .padding(.vertical, theme.spacing.lg)
             }
+            .scrollPosition($scrollPosition)
             .overlay { overlay }
             .themedBackground()
             // No title on screen: the wave in the bar is Home's header. The title is for VoiceOver.
             .navigationTitle("Home")
             .toolbarTitleDisplayMode(.inline)
-            .tabRootChrome(showsWave: true)
+            .tabRootChrome(showsWave: true, onWaveTap: scrollToTop)
             .libraryDestinations(zoom: zoom) { path.append($0) }
             .podcastDestinations(zoom: zoom) { path.append($0) }
             // On the always-present scroll view: a task on a shelf that isn't shown never runs.
@@ -97,6 +102,10 @@ struct HomeView: View {
                 await model.load()
             }
             // First launch: the library is still syncing when Home appears.
+            .onChange(of: reselects) {
+                // Tapping Home again from a pushed screen goes back to Home; at Home, to the top.
+                if path.isEmpty { scrollToTop() } else { path = NavigationPath() }
+            }
             .onChange(of: store.isSyncing) { _, syncing in
                 guard !syncing else { return }
                 Task { await model.librarySynced() }
@@ -114,6 +123,10 @@ struct HomeView: View {
             }
         }
         .enableInjection()
+    }
+
+    private func scrollToTop() {
+        withAnimation(theme.motion.smooth) { scrollPosition.scrollTo(edge: .top) }
     }
 
     private var hasRecentlyPlayed: Bool {

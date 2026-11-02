@@ -16,6 +16,8 @@ struct MainTabView: View {
     @State private var connectivity = Connectivity.shared
     @State private var actions = LibraryActions()
     @State private var homePath = NavigationPath()
+    /// Bumped when Home's tab is tapped while it's already selected; Home scrolls to the top.
+    @State private var homeReselects = 0
     @State private var widgets: WidgetBridge
     @Namespace private var playerZoom
     @State private var selection: AppTab = DebugFlags.initialTab
@@ -68,9 +70,9 @@ struct MainTabView: View {
     }
 
     private var tabs: some View {
-        TabView(selection: $selection) {
+        TabView(selection: tabSelection) {
             Tab(value: .home) {
-                HomeView(model: home, path: $homePath, userName: signedIn.session.userName, upNext: signedIn.podcasts.launchUpNext)
+                HomeView(model: home, path: $homePath, reselects: homeReselects, userName: signedIn.session.userName, upNext: signedIn.podcasts.launchUpNext)
                     .environment(\.tabRootReporter, reporter(for: .home))
             } label: {
                 tabLabel("Home", icon: Image(uiImage: WavetileMark.uiImage(color: theme.palette.accent)))
@@ -160,6 +162,18 @@ extension MainTabView {
         default:
             break
         }
+    }
+
+    /// The tab selection; TabView sets it again when the selected tab is tapped, which on Home
+    /// means back to the top.
+    private var tabSelection: Binding<AppTab> {
+        Binding(
+            get: { selection },
+            set: { tab in
+                if tab == selection, tab == .home { homeReselects += 1 }
+                selection = tab
+            }
+        )
     }
 
     /// The first time podcasts are turned on (once the drawer has closed), explain them.
@@ -670,14 +684,14 @@ extension View {
     /// Chrome for a tab's root screen, applied to the content *inside* its `NavigationStack`:
     /// the profile button at top left (opens the drawer), and root reporting so the drawer's
     /// edge swipe only works at the root, never fighting the system back gesture.
-    /// `showsWave` centers the wave in the bar (Home only). `trailing` adds screen buttons next
+    /// `showsWave` centers the wave in the bar (Home only); `onWaveTap` makes it a button. `trailing` adds screen buttons next
     /// to AirPlay; give them `TintedBarIcon` labels.
-    func tabRootChrome(showsWave: Bool = false) -> some View {
-        modifier(TabRootChrome(showsWave: showsWave, trailing: EmptyView()))
+    func tabRootChrome(showsWave: Bool = false, onWaveTap: (() -> Void)? = nil) -> some View {
+        modifier(TabRootChrome(showsWave: showsWave, onWaveTap: onWaveTap, trailing: EmptyView()))
     }
 
-    func tabRootChrome<Trailing: View>(showsWave: Bool = false, @ViewBuilder trailing: () -> Trailing) -> some View {
-        modifier(TabRootChrome(showsWave: showsWave, trailing: trailing()))
+    func tabRootChrome<Trailing: View>(showsWave: Bool = false, onWaveTap: (() -> Void)? = nil, @ViewBuilder trailing: () -> Trailing) -> some View {
+        modifier(TabRootChrome(showsWave: showsWave, onWaveTap: onWaveTap, trailing: trailing()))
     }
 }
 
@@ -685,6 +699,7 @@ private struct TabRootChrome<Trailing: View>: ViewModifier {
     @Environment(\.theme) private var theme
     @Environment(\.tabRootReporter) private var reporter
     let showsWave: Bool
+    let onWaveTap: (() -> Void)?
     let trailing: Trailing
 
     private static var itemSize: CGFloat { 44 }
@@ -700,9 +715,20 @@ private struct TabRootChrome<Trailing: View>: ViewModifier {
                 // The wave, centered in Home's bar.
                 if showsWave {
                     ToolbarItem(placement: .principal) {
-                        WaveMark(width: 104)
-                            .accessibilityElement()
+                        if let onWaveTap {
+                            Button(action: onWaveTap) {
+                                WaveMark(width: 104)
+                                    .frame(height: Self.itemSize)
+                                    .contentShape(.rect)
+                            }
+                            .buttonStyle(.plain)
                             .accessibilityLabel("Wavetile")
+                            .accessibilityHint("Scrolls to the top")
+                        } else {
+                            WaveMark(width: 104)
+                                .accessibilityElement()
+                                .accessibilityLabel("Wavetile")
+                        }
                     }
                 }
                 // AirPlay and the screen's buttons share one tinted capsule; alone, it's a circle.

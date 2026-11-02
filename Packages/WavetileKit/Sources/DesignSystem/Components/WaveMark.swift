@@ -37,10 +37,10 @@ public struct WaveMark: View {
             let level = active
                 ? Self.rampIn(date.timeIntervalSince(startedAt ?? date))
                 : stoppedAt.map { 1 - Self.rampIn(date.timeIntervalSince($0)) } ?? 0
-            Canvas { canvas, size in
-                let swell = Self.swell(at: date.timeIntervalSince(Self.epoch), strength: strength * level)
-                Self.draw(in: &canvas, width: size.width, center: CGPoint(x: size.width / 2, y: size.height / 2), swell: swell, color: color ?? theme.palette.accent, lineWidth: lineWidth)
-            }
+            // A shape, not a Canvas: in track rows a Canvas kept its first frame while the
+            // timeline ticked, so the playing marker sat still.
+            WaveShape(swell: Self.swell(at: date.timeIntervalSince(Self.epoch), strength: strength * level))
+                .stroke(color ?? theme.palette.accent, style: StrokeStyle(lineWidth: lineWidth ?? Self.lineWidth(forWidth: width), lineCap: .round))
         }
         // Room above and below for the ripple's tallest swell.
         .frame(width: width, height: Self.height(forWidth: width) * (1 + strength))

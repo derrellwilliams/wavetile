@@ -49,4 +49,29 @@ final class HomeTests: XCTestCase {
         goToArtist.tap()
         XCTAssertTrue(app.navigationBars.buttons.firstMatch.waitForExistence(timeout: 5), "Artist page didn't open")
     }
+
+    /// Tapping the wave in the bar, or the Home tab while on Home, scrolls back to the top.
+    @MainActor func testWaveAndHomeTabScrollToTop() throws {
+        let app = XCUIApplication()
+        app.launch()
+        _ = app.wait(for: .runningForeground, timeout: 10)
+
+        let first = app.buttons.matching(identifier: "albumTile").firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 8), "No album tiles on Home")
+        let top = first.frame.minY
+        let scrollAway = {
+            for _ in 0..<4 { app.swipeUp() }
+            XCTAssertNotEqual(first.exists ? first.frame.minY : -1, top, "Home didn't scroll")
+        }
+
+        scrollAway()
+        app.buttons["Wavetile"].tap()
+        XCTAssertTrue(first.waitForExistence(timeout: 3))
+        XCTAssertEqual(first.frame.minY, top, accuracy: 2, "Wave tap didn't scroll to the top")
+
+        scrollAway()
+        app.tabBars.buttons["Home"].tap()
+        XCTAssertTrue(first.waitForExistence(timeout: 3))
+        XCTAssertEqual(first.frame.minY, top, accuracy: 2, "Home tab tap didn't scroll to the top")
+    }
 }
