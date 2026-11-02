@@ -16,8 +16,8 @@ document.addEventListener("DOMContentLoaded", () => {
 // The turning cube from DesignSystem/Components (WavetileMark) and the screenshot marquee. Each
 // runs frames only while it's on screen and actually moving. Reduce Motion holds both still.
 const still = matchMedia("(prefers-reduced-motion: reduce)").matches || !("IntersectionObserver" in window);
-// With a mouse, the hero cube and the marquee move only while the pointer is over them. Without
-// hover (phones, tablets) they move whenever they're on screen.
+// With a mouse, the marquee moves only while the pointer is over it. Without hover (phones,
+// tablets) it moves whenever it's on screen.
 const fine = matchMedia("(hover: hover) and (pointer: fine)").matches;
 const smooth = (x) => x * x * (3 - 2 * x);
 
@@ -27,13 +27,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const rays = mountCube(host);
     animate(host, cubeStep(rays, () => true));
   });
-  document.querySelectorAll(".hero").forEach((hero) => {
-    const rays = hero.querySelector(".hero__cube [data-cube]");
-    if (!rays) return;
-    let wake = () => {};
-    const active = fine ? pointerOver(hero, () => wake()) : () => true;
-    wake = animate(rays.ownerSVGElement, cubeStep(rays, active));
-  });
+  // Hero cube: always turning while on screen, too.
+  document.querySelectorAll(".hero__cube [data-cube]").forEach((rays) => animate(rays.ownerSVGElement, cubeStep(rays, () => true)));
   document.querySelectorAll(".screens").forEach((screens) => {
     const track = screens.querySelector(".marquee");
     if (!track || still) return;
