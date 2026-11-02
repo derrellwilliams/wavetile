@@ -1,22 +1,17 @@
-/* Wavetile site. Tokens mirror the app's Theme.dark (DesignSystem/Theme.swift). */
+/* Wavetile site. Tokens mirror the app's Theme.dark (DesignSystem/Theme.swift).
+   Type: Inter Regular and Geist Mono Regular, one weight; hierarchy is size, color and mono,
+   on the app's scale 12 · 14 · 16 · 18 · 20 · 22 · 36 (Theme.Typography.scale). */
 
 @font-face {
-  font-family: "Familjen Grotesk";
-  src: url("/assets/fonts/FamiljenGrotesk.woff2") format("woff2");
-  font-weight: 400 700;
+  font-family: "Inter";
+  src: url("/assets/fonts/Inter-Regular.woff2") format("woff2");
+  font-weight: 400;
   font-display: swap;
 }
 @font-face {
-  font-family: "Stack Sans Notch";
-  src: url("/assets/fonts/StackSansNotch.woff2") format("woff2");
-  font-weight: 200 700;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Stack Sans Headline";
-  src: url("/assets/fonts/StackSansHeadline.woff2") format("woff2");
-  font-weight: 200 700;
+  font-family: "Geist Mono";
+  src: url("/assets/fonts/GeistMono-Regular.woff2") format("woff2");
+  font-weight: 400;
   font-display: swap;
 }
 
@@ -27,17 +22,32 @@
   --surface: #2E2E2E;
   --surface-2: #2E2E2E;
   --ink: #ECE4D2;
-  --ink-2: rgb(236 228 210 / 0.6);
+  --ink-2: #989388; /* textSecondary: solid, so it reads the same everywhere */
   --ink-3: rgb(236 228 210 / 0.35);
   --line: rgb(255 255 255 / 0.12);
 
-  --text: "Familjen Grotesk", ui-sans-serif, system-ui, sans-serif;
-  --display: "Stack Sans Notch", "Familjen Grotesk", ui-sans-serif, system-ui, sans-serif; /* wordmark only */
-  --headline: "Stack Sans Headline", "Familjen Grotesk", ui-sans-serif, system-ui, sans-serif;
-  --frame: clamp(12px, 2.2vw, 28px);
+  --text: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --mono: "Geist Mono", ui-monospace, monospace;
+  /* Phosphor Bold's weight at the app's 24pt icon size (WavetileMark.strokeWidth). */
+  --stroke: 2.25px;
+  --frame: clamp(12px, 2.5vw, 48px);
+  --radius: 16px; /* Theme.radius.card */
   --inset: clamp(20px, 4vw, 40px);
-  /* Critically damped, like Motion.smooth: no overshoot. */
-  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Motion (Emil Kowalski's standards): ease-out for anything entering or responding, ease for
+     hover and color, linear for constant motion. Never ease-in. UI stays under 300ms; only the
+     scroll reveals run longer. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease: ease;
+  --hover: 150ms; /* hover and color changes */
+  --press: 160ms; /* press feedback */
+  --reveal: 600ms; /* fade up on scroll */
+  /* The one display size: the home headline and every page title. */
+  --display-size: clamp(28px, 2.4vw, 46px);
+  /* The accent wash behind tinted controls, as in the app: resting (buttons only), hover/current,
+     pressed. All three are tan over the panel, so a change never passes through the panel color. */
+  --tint-rest: rgb(236 228 210 / 0.08);
+  --tint: rgb(236 228 210 / 0.12);
+  --tint-pressed: rgb(236 228 210 / 0.2);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -46,7 +56,8 @@ body {
   margin: 0;
   background: var(--page);
   color: var(--ink);
-  font: 400 17px/1.55 var(--text);
+  font: 400 16px/1.4 var(--text);
+  font-synthesis: none;
   -webkit-font-smoothing: antialiased;
 }
 img { display: block; max-width: 100%; height: auto; }
@@ -55,79 +66,96 @@ h1, h2, p { margin: 0; }
 ::selection { background: var(--ink); color: var(--bg); }
 :focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 6px; }
 
-/* Values from the Figma mockup. */
-.wordmark { font-family: var(--display); font-weight: 700; font-size: 32px; line-height: 1; color: #EFE4D0; }
-.link { text-underline-offset: 4px; text-decoration-color: var(--ink-3); font-weight: 600; }
-.link:hover { text-decoration-color: var(--ink); }
+.mono { font-family: var(--mono); }
+.link { text-underline-offset: 4px; text-decoration-color: var(--ink-3); }
+.link { transition: text-decoration-color var(--hover) var(--ease); }
+@media (hover: hover) and (pointer: fine) { .link:hover { text-decoration-color: var(--ink); } }
 
-/* Wordmark on the left, sitting on the top edge of the first panel; guide links on the right. */
+/* The wave and the cube on the left; guide links on the right. */
 .top {
   position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
-  gap: 12px 24px; padding: clamp(28px, 3.5vw, 40px) calc(var(--frame) + var(--inset)) 0; margin-bottom: -16px;
+  gap: 12px 24px; min-height: 64px; padding: 4px calc(var(--frame) + 18px);
 }
-.brand { display: inline-block; text-decoration: none; transition: opacity 240ms var(--ease), scale 240ms var(--ease); }
-@media (hover: hover) { .brand:hover { opacity: 0.75; } }
-.brand:active { opacity: 0.6; scale: 0.97; transition-duration: 80ms; }
+/* The logo gets the nav's tinted pill on hover and press; the negative margin keeps the
+   wordmark lined up with the panel below. The pill is its own composited layer that only fades its
+   opacity, so it doesn't flicker while the wave redraws inside the link every frame. */
+.brand {
+  position: relative; isolation: isolate;
+  display: inline-flex; align-items: center; gap: 12px; min-height: 40px; padding: 0 12px; margin-left: -12px;
+  border-radius: 8px; color: var(--ink); text-decoration: none;
+  transition: scale var(--press) var(--ease-out);
+}
+.brand::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit;
+  background: var(--tint); opacity: 0; will-change: opacity;
+  transition: opacity var(--hover) var(--ease);
+}
+@media (hover: hover) and (pointer: fine) { .brand:hover::before { opacity: 1; } }
+.brand:focus-visible::before { opacity: 1; }
+.brand:active { scale: 0.97; }
+.brand:active::before { opacity: 1; background: var(--tint-pressed); }
 @media (prefers-reduced-motion: reduce) { .brand:active { scale: none; } }
-/* Small pills in the beta button's style. */
-.top__nav { display: flex; flex-wrap: wrap; gap: 8px; font: 700 14px/1 var(--text); }
+/* The wordmark in Inter at the lead size, then the wave, which ripples on hover. */
+.wordmark { font-size: 20px; line-height: 1; }
+.brand .wave { display: block; width: 72px; height: auto; overflow: visible; }
+/* Text links at caption size, in pills that only show on interaction, like the app's tinted
+   buttons: the accent wash (palette.tint) on hover and for the current page, deeper while pressed.
+   The negative margin keeps the last label flush with the panel's edge. */
+.top__nav { display: flex; flex-wrap: wrap; gap: 4px; margin-right: -12px; font: 400 12px/1 var(--text); }
 .top__nav a {
-  display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 16px 0 13px; border-radius: 999px;
-  background: #222222; color: var(--ink-2); text-decoration: none;
-  transition: background-color 240ms var(--ease), color 240ms var(--ease), scale 240ms var(--ease);
+  display: inline-flex; align-items: center; min-height: 32px; padding: 0 12px; border-radius: 8px;
+  color: var(--ink-2); text-decoration: none;
+  transition: color var(--hover) var(--ease), background-color var(--hover) var(--ease), scale var(--press) var(--ease-out);
 }
-.top__nav a:focus-visible { background: #171717; color: var(--ink); }
-.top__nav a[aria-current="page"] { background: #171717; color: #FFFFFF; }
+.top__nav a[aria-current="page"] { color: var(--ink); background: var(--tint); }
 /* Phones: the links float in a bar at the bottom of the screen, clear of the home indicator. */
 @media (max-width: 640px) {
   .top { justify-content: center; }
+  .brand { margin-left: 0; }
   .top__nav {
     position: fixed; z-index: 10; left: 50%; translate: -50% 0; bottom: calc(12px + env(safe-area-inset-bottom));
-    flex-wrap: nowrap; padding: 6px; border-radius: 999px;
+    flex-wrap: nowrap; padding: 6px; border-radius: 14px;
     background: rgb(34 34 34 / 0.8); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
     box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08), 0 12px 32px -12px rgb(0 0 0 / 0.7);
   }
-  .top__nav a { background: transparent; padding: 0 12px 0 10px; }
+  .top__nav { margin-right: 0; }
+  .top__nav a { min-height: 40px; padding: 0 16px; } /* bigger tap targets on touch */
   body { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
 }
 
-.panel { margin: 0 var(--frame); background: var(--bg); }
+.panel { margin: 0 var(--frame); background: var(--bg); border-radius: var(--radius); }
 
-/* Hero */
+/* Hero: the turning cube over one line and the button, centered. */
 .hero {
-  display: grid; place-items: center; align-content: center; gap: 36px; text-align: center;
-  min-height: clamp(360px, 40vw, 500px); padding: 64px var(--inset);
+  display: grid; justify-items: center; align-content: center; gap: 28px; text-align: center;
+  min-height: clamp(320px, 22vw, 440px); padding: clamp(56px, 5vw, 80px) var(--inset);
 }
-/* Desktop: sit the headline a little above center, clear of the phones rising into the box. */
-@media (min-width: 900px) { .hero { padding-block: 40px 88px; } }
+.hero__cube { display: block; width: 24px; height: 24px; margin-bottom: 8px; color: var(--ink); }
 .headline {
-  font-family: var(--headline); font-weight: 700;
-  font-size: clamp(28px, 2.9vw, 37px); line-height: 1.2; color: var(--ink);
-  text-wrap: balance; max-width: 22ch;
+  font-size: var(--display-size); line-height: 1.2; letter-spacing: -0.01em; color: var(--ink);
+  max-width: 15em; text-wrap: balance;
 }
-@media (min-width: 900px) { .headline { max-width: none; } }
+/* The hero comes in as one group: cube, line, then button, 60ms apart. */
+.js .hero .headline.reveal { transition-delay: 60ms; }
+.js .hero .button.reveal { transition-delay: 120ms, 120ms, 0ms, 0ms; }
 .button {
-  display: inline-flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 30px; border-radius: 999px;
-  background: #222222; font: 400 18px/1 var(--text); color: var(--ink); text-decoration: none;
+  display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 18px; border-radius: 8px;
+  background: var(--tint-rest); font: 400 14px/1 var(--text); color: var(--ink); text-decoration: none;
 }
 
 /* Screens: a slow marquee that loops. Spacing is margin on each image (not gap), so one
    set is exactly half the track and translating -50% lands back on the start. */
-.screens { overflow: hidden; padding: clamp(40px, 4.4vw, 56px) 0; }
+.screens { overflow: hidden; padding: clamp(32px, 2.9vw, 56px) 0 clamp(40px, 4.4vw, 56px); padding-left: calc(var(--frame) + 16px); }
 .marquee { display: flex; width: max-content; animation: marquee 84s linear infinite; }
 .marquee__copy { display: contents; }
-.screens:hover .marquee { animation-play-state: paused; }
-/* Desktop: the phones rise 100px into the hero, below its centered content. */
-@media (min-width: 900px) {
-  .screens { position: relative; margin-top: -100px; padding-top: 0; }
-}
+/* With a mouse, main.js runs the marquee only while the pointer is over it. */
 /* A simple phone: dark bezel, rounded corners, a Dynamic Island over the status bar. */
 .device {
-  --h: clamp(420px, 42vw, 560px);
+  --h: clamp(420px, 36.6vw, 705px);
   position: relative; flex: none;
   height: var(--h); aspect-ratio: 924 / 2000;
   box-sizing: content-box; padding: calc(var(--h) * 0.014);
-  margin-right: clamp(24px, 4.2vw, 56px);
+  margin-right: clamp(24px, 3.7vw, 72px);
   border-radius: calc(var(--h) * 0.075);
   background: #0B0B0B;
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.10), 0 30px 60px -30px rgb(0 0 0 / 0.8);
@@ -151,35 +179,37 @@ h1, h2, p { margin: 0; }
   padding: clamp(64px, 7vw, 100px) clamp(28px, 3.2vw, 40px);
 }
 .feature { display: grid; align-content: start; gap: 18px; }
-.feature p { font-size: 16px; line-height: 1.4; color: #EDE8DC; max-width: 265px; text-wrap: pretty; }
+.feature p { font-size: 12px; line-height: 1.5; color: var(--ink); max-width: 265px; text-wrap: pretty; }
+/* Icons: Phosphor's stroke source (raw/regular), each drawn with a 1.5px line to match the wave and
+   cube. The stroke is baked into the SVG for the size it's shown at (256-unit grid): 16 at 24px
+   (feature icons), 24 at 16px (the button arrow). A new size needs its own stroke: 384 / px. */
 .icon {
-  width: 28px; height: 28px; background: currentColor;
+  width: 24px; height: 24px; background: currentColor;
   -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat;
 }
-.icon[data-icon="microphone"] { --icon: url("/assets/icons/microphone.svg"); }
-.icon[data-icon="gauge"] { --icon: url("/assets/icons/gauge.svg"); }
-.icon[data-icon="cloud-slash"] { --icon: url("/assets/icons/cloud-slash.svg"); }
-.icon[data-icon="lock"] { --icon: url("/assets/icons/lock.svg"); }
-.icon[data-icon="arrow-right"] { --icon: url("/assets/icons/arrow-right.svg"); }
-.icon[data-icon="info"] { --icon: url("/assets/icons/info.svg"); }
-.icon[data-icon="download-simple"] { --icon: url("/assets/icons/download-simple.svg"); }
-.top__nav .icon { width: 16px; height: 16px; }
-.button .icon { width: 20px; height: 20px; }
-/* Hover: the button lifts a shade and the arrow nudges toward where it leads. */
-.button { transition: background-color 240ms var(--ease), scale 240ms var(--ease); }
+.icon[data-icon="microphone"] { --icon: url("/assets/icons/microphone.svg?v=2"); }
+.icon[data-icon="gauge"] { --icon: url("/assets/icons/gauge.svg?v=2"); }
+.icon[data-icon="cloud-slash"] { --icon: url("/assets/icons/cloud-slash.svg?v=2"); }
+.icon[data-icon="lock"] { --icon: url("/assets/icons/lock.svg?v=2"); }
+.icon[data-icon="arrow-right"] { --icon: url("/assets/icons/arrow-right.svg?v=2"); }
+.button .icon { width: 16px; height: 16px; }
+/* Hover: the wash deepens like the nav's, and the arrow nudges toward where it leads. */
+.button { transition: background-color var(--hover) var(--ease), scale var(--press) var(--ease-out); }
 /* The hero button also fades in on scroll; keep both transitions. */
-.js .button.reveal { transition: opacity 800ms var(--ease), translate 800ms var(--ease), background-color 240ms var(--ease), scale 240ms var(--ease); }
-.button .icon { transition: translate 240ms var(--ease); }
-a.button:focus-visible { background: #171717; }
-a.button:focus-visible .icon { translate: 4px 0; }
-/* Hover only where there's a pointer, so a tap on a phone doesn't leave the hover look stuck. */
-@media (hover: hover) {
-  a.button:hover { background: #171717; }
-  a.button:hover .icon { translate: 4px 0; }
-  .top__nav a:hover { background: #171717; color: var(--ink); }
+.js .button.reveal { transition: opacity var(--reveal) var(--ease-out), translate var(--reveal) var(--ease-out), background-color var(--hover) var(--ease), scale var(--press) var(--ease-out); }
+.button .icon { transition: translate 200ms var(--ease-out); }
+a.button:focus-visible { background: var(--tint); }
+a.button:focus-visible .icon { translate: 3px 0; }
+/* Hover only with a real pointer, so a tap on a phone doesn't leave the hover look stuck. */
+@media (hover: hover) and (pointer: fine) {
+  a.button:hover { background: var(--tint); }
+  a.button:hover .icon { translate: 3px 0; }
+  .top__nav a:hover { color: var(--ink); background: var(--tint); }
 }
-/* Pressed: a quick press-in that springs back on release. */
-a.button:active, .top__nav a:active { scale: 0.96; background: #111111; transition-duration: 80ms; }
+/* Pressed: a subtle press-in (0.97) that eases back out on release. */
+a.button:active { scale: 0.97; background: var(--tint-pressed); }
+.top__nav a:focus-visible { color: var(--ink); background: var(--tint); }
+.top__nav a:active { scale: 0.97; color: var(--ink); background: var(--tint-pressed); }
 @media (prefers-reduced-motion: reduce) {
   .button .icon { transition: none; }
   a.button:active, .top__nav a:active { scale: none; }
@@ -191,27 +221,28 @@ a.button:active, .top__nav a:active { scale: 0.96; background: #111111; transiti
 .footer {
   display: grid; gap: 14px; justify-items: center; text-align: center;
   padding: clamp(48px, 6vw, 72px) var(--inset) 56px;
-  color: var(--ink-3); font-size: 13px;
+  color: var(--ink-3); font-size: 12px;
 }
-.footer__mark { width: 28px; height: 28px; color: #6B6862; /* ink-3 over the page, as a solid so overlapping strokes don't stack */ margin-bottom: 10px; }
+.footer__mark { width: 32px; height: 32px; color: #6B6862; /* ink-3 over the page, as a solid so overlapping strokes don't stack */ margin-bottom: 10px; }
 .footer__mark svg { display: block; width: 100%; height: 100%; }
-.footer nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 28px; font-size: 15px; }
-.footer nav a { color: var(--ink-2); text-decoration: none; transition: color 200ms; }
-.footer nav a:hover { color: var(--ink); }
+.footer nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 28px; font-size: 14px; }
+.footer nav a { color: var(--ink-2); text-decoration: none; transition: color var(--hover) var(--ease); }
+@media (hover: hover) and (pointer: fine) { .footer nav a:hover { color: var(--ink); } }
 .footer p { max-width: 46em; }
 
 /* Privacy and support pages */
-.page { margin: 0 var(--frame); background: var(--bg); padding: clamp(56px, 7vw, 88px) var(--inset); }
+.page { margin: 0 var(--frame); background: var(--bg); border-radius: var(--radius); padding: clamp(56px, 7vw, 88px) var(--inset); font-size: 14px; line-height: 1.5; }
 .page > * { max-width: 680px; margin-inline: auto; }
-.page h1 { font-family: var(--headline); font-weight: 600; font-size: clamp(34px, 4.4vw, 52px); letter-spacing: -0.03em; line-height: 1.05; margin-bottom: 12px; }
-.page .meta { color: var(--ink-3); font-size: 15px; margin-bottom: 32px; }
-.page h2 { font-family: var(--headline); font-weight: 600; font-size: 24px; letter-spacing: -0.02em; margin-top: 40px; margin-bottom: 10px; }
+/* Titles 8px over the home headline; then 18 for headings, 14 for text, 12 for metadata. */
+.page h1 { font-weight: 400; font-size: calc(var(--display-size) + 8px); letter-spacing: -0.01em; line-height: 1.2; margin-bottom: 12px; }
+.page .meta { color: var(--ink-2); font-size: 12px; margin-bottom: 32px; }
+.page h2 { font-weight: 400; font-size: 18px; line-height: 1.25; margin-top: 40px; margin-bottom: 10px; }
 .page p, .page li { color: var(--ink-2); }
 .page p + p { margin-top: 12px; }
 .page ul { padding-left: 20px; }
 .page ul { margin-top: 12px; margin-bottom: 0; }
 .page li + li { margin-top: 8px; }
-.page strong { color: var(--ink); font-weight: 600; }
+.page strong { color: var(--ink); font-weight: 400; }
 .page .cta-line { margin-top: 48px; }
 .page .button { text-decoration: none; }
 
@@ -220,21 +251,21 @@ a.button:active, .top__nav a:active { scale: 0.96; background: #111111; transiti
 .guide {
   --cols: 12; --gap: clamp(16px, 2vw, 28px);
   display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); column-gap: var(--gap);
-  padding-block: clamp(56px, 8vw, 120px) clamp(56px, 7vw, 96px);
+  padding-block: clamp(56px, 6vw, 96px) clamp(56px, 6vw, 88px);
 }
 .guide > * { max-width: none; margin-inline: 0; grid-column: 1 / -1; }
-.guide__head { display: grid; grid-template-columns: subgrid; row-gap: 20px; padding-bottom: clamp(48px, 7vw, 96px); }
+.guide__head { display: grid; grid-template-columns: subgrid; row-gap: 16px; padding-bottom: clamp(40px, 5vw, 72px); }
 .guide__head > * { grid-column: 1 / span 9; }
-.guide .title { font-size: clamp(44px, 7vw, 104px); line-height: 0.95; letter-spacing: -0.035em; margin: 0; text-wrap: balance; }
-.guide .meta { grid-column: 1 / span 6; margin: 8px 0 0; font-size: clamp(18px, 1.6vw, 22px); line-height: 1.45; color: var(--ink); max-width: 44ch; text-wrap: pretty; }
+.guide .title { margin: 0; text-wrap: balance; }
+.guide .meta { grid-column: 1 / span 6; margin: 0; font-size: 16px; line-height: 1.4; color: var(--ink-2); max-width: 44ch; text-wrap: pretty; }
 .guide__head .guide__action { grid-column: 1 / -1; margin: 12px 0 0; }
 .guide__head .guide__intro { grid-column: 7 / -1; align-self: end; max-width: 52ch; margin: 0; color: var(--ink-2); }
 .guide__row {
   display: grid; grid-template-columns: subgrid; align-items: baseline;
   padding-block: clamp(24px, 3vw, 40px); border-top: 1px solid rgb(236 228 210 / 0.12);
 }
-.guide__num { grid-column: 1; font: 700 14px/1 var(--text); color: var(--ink-3); font-variant-numeric: tabular-nums; }
-.guide h2 { grid-column: 2 / span 4; margin: 0; font-size: clamp(22px, 2vw, 28px); line-height: 1.15; text-wrap: balance; }
+.guide__num { grid-column: 1; font: 400 12px/1 var(--mono); color: var(--ink-2); }
+.guide h2 { grid-column: 2 / span 4; margin: 0; font-size: 18px; line-height: 1.25; text-wrap: balance; }
 .guide__body { grid-column: 7 / -1; max-width: 62ch; }
 .guide__body > :first-child { margin-top: 0; }
 .guide__cta { grid-column: 7 / -1; padding-top: clamp(32px, 4vw, 48px); border-top: 1px solid rgb(236 228 210 / 0.12); }
@@ -254,6 +285,11 @@ a.button:active, .top__nav a:active { scale: 0.96; background: #111111; transiti
 }
 
 /* Fade up on scroll; only hidden once JS is running, so nothing goes missing without it. */
-.js .reveal { opacity: 0; translate: 0 12px; transition: opacity 800ms var(--ease), translate 800ms var(--ease); }
+.js .reveal { opacity: 0; translate: 0 8px; transition: opacity var(--reveal) var(--ease-out), translate var(--reveal) var(--ease-out); }
 .js .reveal.is-in { opacity: 1; translate: none; }
-@media (prefers-reduced-motion: reduce) { .js .reveal { opacity: 1; translate: none; transition: none; } }
+/* Features come in one after another, 60ms apart. */
+.js .features .reveal:nth-child(2) { transition-delay: 60ms; }
+.js .features .reveal:nth-child(3) { transition-delay: 120ms; }
+.js .features .reveal:nth-child(4) { transition-delay: 180ms; }
+/* Reduced motion: keep the fade, drop the movement. */
+@media (prefers-reduced-motion: reduce) { .js .reveal { translate: none; transition: opacity 300ms var(--ease); } }
