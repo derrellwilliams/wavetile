@@ -5,7 +5,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// The Podcasts tab: Continue Listening, a row of the latest episodes, then the library
-/// shortcuts, and nothing below (user-specified order). Up Next in Podcasts stays on Home. The
+/// shortcuts, and nothing below (user-specified order). Latest Podcast Episodes stays on Home. The
 /// gear opens the podcast settings; the profile drawer only holds the on/off switch.
 struct PodcastsView: View {
     @ObserveInjection var inject

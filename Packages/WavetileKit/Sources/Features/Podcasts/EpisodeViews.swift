@@ -228,7 +228,7 @@ struct EpisodeMenu: View {
     }
 }
 
-/// An episode tile for Home's podcast shelves: art, show, title and time left.
+/// An episode tile for podcast shelves: art, title, show and time left.
 struct EpisodeCard: View {
     @Environment(\.theme) private var theme
     @Environment(\.pushPodcastRoute) private var push
@@ -236,6 +236,8 @@ struct EpisodeCard: View {
     let item: EpisodeItem
     /// Disambiguates the same episode on several shelves of one screen.
     var context = ""
+    /// Time left under the show; off on Home.
+    var showsStatus = true
 
     var body: some View {
         let sourceID = "\(context)-\(item.id)"
@@ -243,23 +245,24 @@ struct EpisodeCard: View {
         Button { push(.episode(id: item.id, sourceID: sourceID)) } label: {
             VStack(alignment: .leading, spacing: theme.spacing.sm) {
                 ArtworkView(.unsized(item.artworkURL, maxPixelWidth: 840), cornerRadius: theme.radius.small)
-                // Show and title read as one unit, so they sit closer than the rest of the card.
+                // Title and show read as one unit, so they sit closer than the rest of the card.
                 VStack(alignment: .leading, spacing: theme.spacing.xs) {
-                    Text(item.show.title)
-                        .font(theme.typography.caption)
-                        .foregroundStyle(theme.palette.textSecondary)
-                        .textCase(.uppercase)
-                        .lineLimit(1)
                     Text(item.episode.title)
                         .font(theme.typography.itemTitle)
                         .foregroundStyle(theme.palette.textPrimary)
                         .lineLimit(2, reservesSpace: true)
                         .multilineTextAlignment(.leading)
+                    Text(item.show.title)
+                        .font(theme.typography.itemSubtitle)
+                        .foregroundStyle(theme.palette.textSecondary)
+                        .lineLimit(1)
                 }
                 // Time left as plain text, matching album tiles; tapping the card opens the episode.
-                Text(EpisodeFormat.status(item.episode))
-                    .font(theme.typography.itemMetadata)
-                    .foregroundStyle(theme.palette.textSecondary)
+                if showsStatus {
+                    Text(EpisodeFormat.status(item.episode))
+                        .font(theme.typography.itemMetadata)
+                        .foregroundStyle(theme.palette.textSecondary)
+                }
             }
             .contentShape(.rect)
             .zoomSource(sourceID, in: zoom)

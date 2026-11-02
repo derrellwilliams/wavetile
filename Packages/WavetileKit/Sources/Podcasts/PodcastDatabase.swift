@@ -261,7 +261,7 @@ public extension PodcastDatabase {
         }
     }
 
-    /// Home's Up Next in Podcasts, like Apple Podcasts: the user's queue, then the newest
+    /// Home's Latest Podcast Episodes, like Apple Podcasts: the user's queue, then the newest
     /// unplayed episode of each followed show. Episodes in progress are left out (they're in
     /// Continue Listening).
     func upNextShelf(limit: Int = 20) -> ValueObservation<ValueReducers.Fetch<[EpisodeItem]>> {

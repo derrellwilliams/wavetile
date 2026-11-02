@@ -32,8 +32,8 @@ struct HomeView: View {
         NavigationStack(path: $path) {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: theme.spacing.xxl) {
-                    // Order: Recently Played, Up Next in Podcasts, Most Played, Recently Added,
-                    // then up to three Artist Spotlights. Up Next appears only when podcasts are
+                    // Order: Recently Played, Latest Podcast Episodes, Most Played, Recently Added,
+                    // then up to three Artist Spotlights. Latest Podcast Episodes appears only when podcasts are
                     // on and it has episodes. (Continue Listening lives at the top of the Podcasts
                     // tab.) With little play history, a welcome card leads and genre and playlist
                     // shelves follow Recently Added (the card only for the first visit).
@@ -120,10 +120,10 @@ struct HomeView: View {
         model.shelves.contains { $0.kind == .recentlyPlayed }
     }
 
-    /// Up Next in Podcasts: after Recently Played, or first among the music shelves without it.
+    /// Latest Podcast Episodes: after Recently Played, or first among the music shelves without it.
     @ViewBuilder private var podcastUpNextShelf: some View {
         if podcasts.isEnabled, !podcastUpNext.isEmpty, !DebugFlags.freshHome {
-            EpisodeShelf(title: "Up Next in Podcasts", items: podcastUpNext)
+            EpisodeShelf(title: "Latest Podcast Episodes", items: podcastUpNext, showsStatus: false)
         }
     }
 
