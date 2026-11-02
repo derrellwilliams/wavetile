@@ -30,10 +30,11 @@ final class HomeModel {
         var id: String { genre }
     }
 
-    struct Spotlight {
+    struct Spotlight: Identifiable {
         let artistID: String
         let name: String
         let albums: [AlbumSummary]
+        var id: String { artistID }
     }
 
     private(set) var shelves: [Shelf] = []
@@ -42,8 +43,8 @@ final class HomeModel {
     private(set) var stats: LibraryStats?
     private(set) var genreShelves: [GenreShelf] = []
     private(set) var playlists: [PlaylistRecord] = []
-    private(set) var rediscover: [AlbumSummary] = []
-    private(set) var spotlight: Spotlight?
+    /// Up to three artists with 3+ albums, at the bottom of Home.
+    private(set) var spotlights: [Spotlight] = []
     private(set) var isLoading = false
     private(set) var errorMessage: String?
     /// Called with the Recently Played albums after each load (feeds the widget).
@@ -148,9 +149,8 @@ final class HomeModel {
             return albums.count < 4 ? nil : GenreShelf(genre: genre.genre, albums: albums.map(\.summary))
         }
         playlists = (try? database.playlistsByName()) ?? []
-        rediscover = ((try? database.randomAlbums()) ?? []).map(\.summary)
-        spotlight = (try? database.spotlightArtist()).flatMap { found in
-            found.map { Spotlight(artistID: $0.artist.id, name: $0.artist.name, albums: $0.albums.map(\.summary)) }
+        spotlights = ((try? database.spotlightArtists(limit: 3)) ?? []).map {
+            Spotlight(artistID: $0.artist.id, name: $0.artist.name, albums: $0.albums.map(\.summary))
         }
     }
 

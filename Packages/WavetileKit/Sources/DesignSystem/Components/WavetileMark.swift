@@ -98,6 +98,19 @@ public struct WavetileMark: View {
     }
 }
 
+public extension WavetileMark {
+    /// The resting mark as an image at `size` points with its color baked in, for surfaces that
+    /// only take images and recolor templates on their own (the glass tab bar). At the icons'
+    /// 24pt it matches a Phosphor Bold glyph.
+    @MainActor static func uiImage(size: CGFloat = 24, color: Color) -> UIImage {
+        let renderer = ImageRenderer(content: Canvas { canvas, canvasSize in
+            draw(in: &canvas, size: canvasSize, turn: 0, color: color)
+        }.frame(width: size, height: size))
+        renderer.scale = 3
+        return (renderer.uiImage ?? UIImage()).withRenderingMode(.alwaysOriginal)
+    }
+}
+
 /// Branded loading indicator: the turning mark, sized for content areas.
 public struct LoadingMark: View {
     private let size: CGFloat

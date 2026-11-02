@@ -73,7 +73,7 @@ struct MainTabView: View {
                 HomeView(model: home, path: $homePath, userName: signedIn.session.userName, upNext: signedIn.podcasts.launchUpNext)
                     .environment(\.tabRootReporter, reporter(for: .home))
             } label: {
-                tabLabel("Home", glyph: .home)
+                tabLabel("Home", icon: Image(uiImage: WavetileMark.uiImage(color: theme.palette.accent)))
             }
             Tab(value: .music) {
                 LibraryView()
@@ -214,13 +214,14 @@ extension MainTabView {
         }
     }
 
+    /// Icon only; the title is VoiceOver's name for the tab.
     private func tabLabel(_ title: String, glyph: Glyph) -> some View {
-        // The glass tab bar keeps titles system-colored for legibility; only the icon can be tinted.
-        Label {
-            Text(title)
-        } icon: {
-            glyph.image(color: theme.palette.accent)
-        }
+        tabLabel(title, icon: glyph.image(color: theme.palette.accent))
+    }
+
+    private func tabLabel(_ title: String, icon: Image) -> some View {
+        // The glass tab bar forces template colors, so icons come with the accent baked in.
+        icon.accessibilityLabel(title)
     }
 
     private func reporter(for tab: AppTab) -> TabRootReporter {

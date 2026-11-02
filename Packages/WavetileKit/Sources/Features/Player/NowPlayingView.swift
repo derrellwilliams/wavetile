@@ -11,7 +11,6 @@ struct NowPlayingView: View {
     @ObserveInjection var inject
     @Environment(\.theme) private var theme
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(AudioPlayer.self) private var player
     @Environment(LibraryStore.self) private var store
@@ -41,6 +40,8 @@ struct NowPlayingView: View {
         }
         .scrollIndicators(.hidden)
         .scrollBounceBehavior(.basedOnSize)
+        // The artwork starts at the sheet's top edge.
+        .ignoresSafeArea(.container, edges: .top)
         .presentationDetents(contentHeight > 0 ? [.height(contentHeight)] : [.large])
         .background(theme.palette.background.ignoresSafeArea())
         .sheet(isPresented: $showQueue) {
@@ -67,25 +68,25 @@ struct NowPlayingView: View {
         chapters = loaded
     }
 
-    /// One column on the screen margins with fixed gaps: the top bar, the artwork at full column
-    /// width, the info and playback controls, then the secondary controls in a capsule.
+    /// The artwork edge to edge, flush with the sheet's top (the sheet's corners round it), with
+    /// Close over it; then one column on the screen margins with fixed gaps: the info and
+    /// playback controls, then the secondary controls in a capsule.
     private var content: some View {
         VStack(alignment: .leading, spacing: 0) {
-            header
             artwork
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, theme.spacing.xl)
+                .overlay(alignment: .topLeading) { closeButton }
             VStack(alignment: .leading, spacing: theme.spacing.xl) {
                 info
                 Scrubber(chapterStarts: chapters.map(\.start))
                 transport
             }
-            .padding(.bottom, theme.spacing.xl)
+            .padding(.vertical, theme.spacing.xl)
+            .padding(.horizontal, theme.spacing.screenInset)
             secondaryControls
                 .padding(.horizontal, theme.spacing.xl)
                 .background(theme.palette.tint, in: .capsule)
+                .padding(.horizontal, theme.spacing.screenInset)
         }
-        .padding(.horizontal, theme.spacing.screenInset)
         .padding(.bottom, theme.spacing.lg)
     }
 
@@ -133,26 +134,24 @@ struct NowPlayingView: View {
         .animation(theme.motion.smooth, value: player.current?.queueID)
     }
 
-    /// Close only; what's playing reads in the info block and the queue is in the capsule.
-    private var header: some View {
-        HStack {
-            Button("Close", glyph: .dismiss) { dismiss() }
-            Spacer()
+    /// Close only, a tinted circle like the bar buttons (opaque, so it reads over any artwork);
+    /// what's playing reads in the info block and the queue is in the capsule.
+    private var closeButton: some View {
+        Button { dismiss() } label: {
+            Glyph.dismiss.image
+                .foregroundStyle(theme.palette.accent)
+                .frame(width: 44, height: 44)
+                .background { TintedBarFill(shape: .circle) }
         }
-        .labelStyle(.iconOnly)
-        .buttonStyle(.plain)
-        .foregroundStyle(theme.palette.accent)
+        .buttonStyle(.pressable)
+        .accessibilityLabel("Close")
+        .padding(.leading, theme.spacing.screenInset)
         .padding(.top, theme.spacing.lg)
     }
 
+    /// Square and edge to edge. No shadow or paused "breathing": the art is the sheet's top, not a card on it.
     private var artwork: some View {
-        ArtworkView(store.artwork(for: player.current, maxPixelWidth: 1200))
-            // Fixed radius: only the shadow's opacity animates (radius changes re-render a big blur every frame).
-            .shadow(color: .black.opacity(player.isPlaying ? 0.5 : 0.2), radius: 24, y: 12)
-            // Apple Music–style "breathing": artwork recedes when paused.
-            .scaleEffect(player.isPlaying || reduceMotion ? 1 : 0.86)
-            // State change, not a flick: critically damped, no overshoot.
-            .animation(theme.motion.smooth, value: player.isPlaying)
+        ArtworkView(store.artwork(for: player.current, maxPixelWidth: 1200), cornerRadius: 0)
             .id(player.current?.podcast?.artworkURL?.absoluteString ?? player.current?.albumID)
             .transition(.opacity)
     }

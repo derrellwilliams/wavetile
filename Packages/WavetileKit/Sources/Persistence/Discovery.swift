@@ -21,10 +21,6 @@ public extension LibraryDatabase {
         }
     }
 
-    func randomAlbums(limit: Int = 16) throws -> [AlbumRecord] {
-        try pool.read { try AlbumRecord.order(sql: "random()").limit(limit).fetchAll($0) }
-    }
-
     /// Random albums tagged with any spelling of `genre`.
     func randomAlbums(genre: String, limit: Int = 16) throws -> [AlbumRecord] {
         let key = GenreTag.keySQL("albumGenre.genre")
@@ -59,20 +55,24 @@ public extension LibraryDatabase {
         }
     }
 
-    /// A random artist for the spotlight, preferring ones with artwork and at least three albums.
-    func spotlightArtist() throws -> (artist: ArtistRecord, albums: [AlbumRecord])? {
+    /// Random artists with three or more albums for the spotlights, ones with a photo first.
+    /// Fewer (or none) when the library doesn't have enough.
+    func spotlightArtists(limit: Int) throws -> [(artist: ArtistRecord, albums: [AlbumRecord])] {
         try pool.read { db in
-            guard let artist = try ArtistRecord.fetchOne(db, sql: """
+            let artists = try ArtistRecord.fetchAll(db, sql: """
                 SELECT artist.* FROM artist
                 JOIN (SELECT artistID, COUNT(*) AS n FROM album WHERE artistID IS NOT NULL GROUP BY artistID) a
                   ON a.artistID = artist.id
-                ORDER BY (a.n >= 3 AND artist.imageTag IS NOT NULL) DESC, a.n >= 2 DESC, random()
-                LIMIT 1
-                """) else { return nil }
-            let albums = try AlbumRecord.filter(Column("artistID") == artist.id)
-                .order(Column("year").desc, Column("sortTitle"))
-                .fetchAll(db)
-            return (artist, albums)
+                WHERE a.n >= 3
+                ORDER BY artist.imageTag IS NOT NULL DESC, random()
+                LIMIT ?
+                """, arguments: [limit])
+            return try artists.map { artist in
+                let albums = try AlbumRecord.filter(Column("artistID") == artist.id)
+                    .order(Column("year").desc, Column("sortTitle"))
+                    .fetchAll(db)
+                return (artist, albums)
+            }
         }
     }
 

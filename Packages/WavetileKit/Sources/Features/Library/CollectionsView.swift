@@ -99,12 +99,18 @@ struct CollectionDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(LibraryStore.self) private var store
     @Environment(LibraryActions.self) private var actions
+    @Environment(\.pushLibraryRoute) private var push
     let collection: CollectionRecord
     @State private var albums: [AlbumRecord] = []
+    /// Set after the first read, so the empty state doesn't flash before the albums arrive.
+    @State private var loaded = false
     @State private var confirmDelete = false
 
     var body: some View {
         ScrollView {
+            if loaded, albums.isEmpty {
+                emptyState
+            }
             LazyVGrid(
                 columns: [GridItem(.adaptive(minimum: theme.artwork.shelfTileWidth - 8), spacing: theme.spacing.lg)],
                 alignment: .leading,
@@ -125,11 +131,6 @@ struct CollectionDetailView: View {
             }
             .padding(.horizontal, theme.spacing.screenInset)
             .padding(.vertical, theme.spacing.lg)
-        }
-        .overlay {
-            if albums.isEmpty {
-                EmptyState("Empty Collection", message: "Use “Add to Collection” on an album to add it here.")
-            }
         }
         .themedBackground()
         .navigationTitle(collection.name)
@@ -157,10 +158,32 @@ struct CollectionDetailView: View {
         }
         .task {
             do {
-                for try await value in store.observe(store.database.albums(collectionID: collection.id)) { albums = value }
+                for try await value in store.observe(store.database.albums(collectionID: collection.id)) {
+                    albums = value
+                    loaded = true
+                }
             } catch { Log.observationFailed(error) }
         }
         .enableInjection()
+    }
+
+    /// Right under the title, like the Podcasts tab's: what goes here and a way to find it.
+    private var emptyState: some View {
+        VStack(alignment: .leading, spacing: theme.spacing.xs) {
+            Text("Nothing Here Yet")
+                .font(theme.typography.title)
+                .foregroundStyle(theme.palette.textPrimary)
+                .accessibilityAddTraits(.isHeader)
+            Text("Open an album’s menu and choose Add to Collection.")
+                .font(theme.typography.body)
+                .foregroundStyle(theme.palette.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            PrimaryButton("Browse Albums", glyph: .album) { push(.section(.albums)) }
+                .padding(.top, theme.spacing.lg)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, theme.spacing.screenInset)
+        .padding(.top, theme.spacing.lg)
     }
 }
 

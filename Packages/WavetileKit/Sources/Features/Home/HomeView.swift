@@ -33,7 +33,7 @@ struct HomeView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: theme.spacing.xxl) {
                     // Order: Recently Played, Up Next in Podcasts, Most Played, Recently Added,
-                    // From Your Library, Artist Spotlight. Up Next appears only when podcasts are
+                    // then up to three Artist Spotlights. Up Next appears only when podcasts are
                     // on and it has episodes. (Continue Listening lives at the top of the Podcasts
                     // tab.) With little play history, a welcome card leads and genre and playlist
                     // shelves follow Recently Added (the card only for the first visit).
@@ -69,12 +69,7 @@ struct HomeView: View {
                             }
                         }
                     }
-                    if !model.rediscover.isEmpty {
-                        ShelfSection("From Your Library", items: model.rediscover) { album in
-                            AlbumLink(album: album, context: "rediscover")
-                        }
-                    }
-                    if let spotlight = model.spotlight, !spotlight.albums.isEmpty {
+                    ForEach(model.spotlights) { spotlight in
                         ArtistSpotlightShelf(spotlight: spotlight)
                     }
                 }
@@ -82,7 +77,9 @@ struct HomeView: View {
             }
             .overlay { overlay }
             .themedBackground()
-            .navigationTitle("Wavetile")
+            // No title on screen: the wave in the bar is Home's header. The title is for VoiceOver.
+            .navigationTitle("Home")
+            .toolbarTitleDisplayMode(.inline)
             .tabRootChrome(showsWave: true)
             .libraryDestinations(zoom: zoom) { path.append($0) }
             .podcastDestinations(zoom: zoom) { path.append($0) }

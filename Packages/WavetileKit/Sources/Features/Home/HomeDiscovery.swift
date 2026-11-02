@@ -103,7 +103,7 @@ struct PlaylistLink: View {
     }
 }
 
-/// One artist and their albums, at the bottom of Home. A new artist is picked each launch
+/// One artist and their albums, at the bottom of Home. New artists are picked each launch
 /// and on pull to refresh.
 struct ArtistSpotlightShelf: View {
     @Environment(\.theme) private var theme
@@ -117,7 +117,7 @@ struct ArtistSpotlightShelf: View {
                 .lineLimit(1)
                 .accessibilityAddTraits(.isHeader)
         } tile: { album in
-            AlbumLink(album: album, context: "spotlight")
+            AlbumLink(album: album, context: "spotlight-\(spotlight.artistID)")
         }
     }
 }
