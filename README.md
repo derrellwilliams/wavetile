@@ -6,7 +6,7 @@
 
 You need an iPhone on iOS 26.1 or later and a Jellyfin server with a music library. Wavetile collects no data: no account, no analytics, no tracking ([privacy policy](https://wavetile.com/privacy)). Bug reports and feature ideas are welcome in [Issues](https://github.com/derrellwilliams/wavetile/issues).
 
-<img width="3241" height="1488" alt="wavetile" src="https://github.com/user-attachments/assets/4cfb75fe-5376-4a5d-8e44-516eff4793bf" />
+<img width="2000" height="918" alt="Wavetile screens: launch screen, Home, album, Now Playing and Podcasts" src="docs/wavetile.png" />
 
 ## Features
 | Area | What |
