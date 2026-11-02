@@ -43,16 +43,24 @@ struct SearchView: View {
                 case .music: musicResults
                 }
             }
-            // The filter under the title, pinned above the results (in place of the system scope bar).
+            // The title, then the filter (in place of the system scope bar), pinned above the results.
             .safeAreaInset(edge: .top, spacing: 0) {
-                if podcasts.isEnabled {
-                    // Opaque, so results don't scroll visibly through the translucent capsule.
-                    MediaFilter(selection: $scope, options: MediaKind.allCases)
-                        .background(theme.palette.background)
+                VStack(alignment: .leading, spacing: 0) {
+                    title
+                    if podcasts.isEnabled {
+                        MediaFilter(selection: $scope, options: MediaKind.allCases)
+                    }
                 }
+                // Opaque, so results don't scroll visibly through the translucent capsule.
+                .background(theme.palette.background)
             }
             .themedBackground()
+            // iOS hides the bar's large title while the field is active, and this tab activates it
+            // on selection, so the title is drawn above the filter instead. The bar's title stays
+            // for VoiceOver and Back, but isn't shown.
             .navigationTitle("Search")
+            .toolbarTitleDisplayMode(.inline)
+            .toolbar(removing: .title)
             .tabRootChrome()
             .libraryDestinations(zoom: zoom) { path.append($0) }
             .podcastDestinations(zoom: zoom) { path.append($0) }
@@ -98,6 +106,19 @@ struct SearchView: View {
         let relevant = shows.filter { show in show.matches(query) && !(show.feedURL.map(followed.contains) ?? false) }
         withAnimation(theme.motion.smooth) { appleShows = Array(relevant.prefix(5)) }
         appleSearchedText = query
+    }
+
+    /// Styled and placed like the other tabs' large titles: 36pt in the 75pt row under the bar,
+    /// sitting a little above its middle as theirs do.
+    private var title: some View {
+        Text("Search")
+            .font(theme.typography.largeTitle)
+            .tracking(theme.typography.displayTracking)
+            .foregroundStyle(theme.palette.textPrimary)
+            .accessibilityAddTraits(.isHeader)
+            .frame(maxWidth: .infinity, minHeight: 65, alignment: .leading)
+            .padding(.bottom, 10)
+            .padding(.horizontal, theme.spacing.screenInset)
     }
 
     private var prompt: String {
