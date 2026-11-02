@@ -23,7 +23,7 @@ struct LibraryView: View {
                             LinkRow(title: section.title, glyph: section.glyph)
                         }
                         .buttonStyle(.plain)
-                        Divider().overlay(theme.palette.separator).padding(.leading, 28 + theme.spacing.md)
+                        LinkRowDivider()
                     }
 
                     LibrarySyncStatus()

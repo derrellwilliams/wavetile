@@ -11,7 +11,6 @@ public enum Glyph: String, CaseIterable, Sendable {
     case library = "headphones"
     case downloads = "box-arrow-down"
     case search = "magnifying-glass"
-    case profile = "user-circle"
     case playlist
     case artist = "microphone-stage"
     case album = "vinyl-record"
@@ -40,7 +39,6 @@ public enum Glyph: String, CaseIterable, Sendable {
     case queue
     case dismiss = "caret-down"
     case back = "caret-left"
-    case airplay = "speaker-hifi"
     case more = "dots-three"
     case addToQueue = "list-plus"
     case playNext = "arrow-bend-down-right"
@@ -65,7 +63,6 @@ public enum Glyph: String, CaseIterable, Sendable {
     case export = "upload-simple"
     case speed = "gauge"
     case share = "export"
-    case trending = "trend-up"
     case history = "clock-counter-clockwise"
     case hidePlayed = "eye-slash"
     case wave = "hand-waving"
@@ -106,7 +103,7 @@ public extension Label where Title == Text, Icon == Image {
 }
 
 public extension Button where Label == SwiftUI.Label<Text, Image> {
-    /// `Button("Settings", glyph: .profile) { ... }`: the Phosphor equivalent of `Button(_:systemImage:action:)`.
+    /// `Button("Settings", glyph: .settings) { ... }`: the Phosphor equivalent of `Button(_:systemImage:action:)`.
     init(_ title: String, glyph: Glyph, role: ButtonRole? = nil, action: @escaping () -> Void) {
         self.init(role: role, action: action) { SwiftUI.Label(title, glyph: glyph) }
     }

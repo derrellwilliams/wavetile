@@ -116,7 +116,7 @@ public enum BrandFont {
     public private(set) static var titleAttributes: [NSAttributedString.Key: Any] = [:]
 
     /// Each text style's size on the type scale (`Theme.Typography.scale`) at the standard
-    /// ("Large") content size category, so even a bare style lands on one of the six sizes.
+    /// ("Large") content size category, so even a bare style lands on one of the seven sizes.
     private static func defaultSize(_ style: Font.TextStyle) -> CGFloat {
         let scale = Theme.Typography.scale
         switch style {

@@ -52,7 +52,7 @@ struct NowPlayingWidgetView: View {
             VStack(spacing: 6) {
                 Glyph.waveform.image.foregroundStyle(Theme.dark.palette.textPrimary)
                 Text("Nothing playing")
-                    .font(BrandFont.font(.caption))
+                    .font(Theme.dark.typography.caption)
                     .foregroundStyle(Theme.dark.palette.textSecondary)
             }
         }
@@ -93,8 +93,8 @@ struct NowPlayingWidgetView: View {
 
     private func rectangular(_ snapshot: NowPlayingSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text(snapshot.title).font(BrandFont.font(.headline)).widgetAccentable()
-            Text(snapshot.artist).font(BrandFont.font(.caption))
+            Text(snapshot.title).font(Theme.dark.typography.body).widgetAccentable()
+            Text(snapshot.artist).font(Theme.dark.typography.caption)
         }
         .lineLimit(1)
     }
@@ -102,10 +102,10 @@ struct NowPlayingWidgetView: View {
     private func titles(_ snapshot: NowPlayingSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(snapshot.title)
-                .font(BrandFont.font(.subheadline))
+                .font(Theme.dark.typography.itemTitle)
                 .foregroundStyle(Theme.dark.palette.textPrimary)
             Text(snapshot.artist)
-                .font(BrandFont.font(.caption))
+                .font(Theme.dark.typography.caption)
                 .foregroundStyle(Theme.dark.palette.textSecondary)
         }
         .lineLimit(1)

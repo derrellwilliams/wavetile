@@ -28,7 +28,7 @@ struct WidgetArtwork: View {
     let file: String?
 
     var body: some View {
-        Color(hex: 0x2E2E2E)
+        Theme.dark.palette.artworkPlaceholder
             .aspectRatio(1, contentMode: .fit)
             .overlay {
                 if let image = widgetArtwork(file) {

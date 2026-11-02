@@ -95,7 +95,7 @@ struct PodcastsView: View {
                     LinkRow(title: list.title, glyph: list.glyph)
                 }
                 .buttonStyle(.plain)
-                Divider().overlay(theme.palette.separator).padding(.leading, 28 + theme.spacing.md)
+                LinkRowDivider()
             }
             NavigationLink(value: PodcastRoute.shows) {
                 LinkRow(title: "Shows", glyph: .collection)

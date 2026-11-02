@@ -13,10 +13,10 @@ struct DownloadLiveActivity: Widget {
                     .foregroundStyle(Theme.dark.palette.textPrimary)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(context.attributes.name)
-                        .font(BrandFont.font(.subheadline))
+                        .font(Theme.dark.typography.itemTitle)
                         .lineLimit(1)
                     Text(status(context.state))
-                        .font(BrandFont.font(.caption))
+                        .font(Theme.dark.typography.caption)
                         .foregroundStyle(Theme.dark.palette.textSecondary)
                     ProgressView(value: context.state.progress)
                         .tint(Theme.dark.palette.textPrimary)
@@ -33,12 +33,12 @@ struct DownloadLiveActivity: Widget {
                 }
                 DynamicIslandExpandedRegion(.center) {
                     Text(context.attributes.name)
-                        .font(BrandFont.font(.subheadline))
+                        .font(Theme.dark.typography.itemTitle)
                         .lineLimit(1)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     Text("\(context.state.done)/\(context.state.total)")
-                        .font(BrandFont.font(.caption, family: BrandFont.monoFamily))
+                        .font(Theme.dark.typography.mono(.caption))
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     ProgressView(value: context.state.progress).tint(Theme.dark.palette.textPrimary)

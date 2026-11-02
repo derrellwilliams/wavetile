@@ -44,12 +44,12 @@ struct RecentsView: View {
         let albums = Array(entry.albums.prefix(count))
         VStack(alignment: .leading, spacing: 8) {
             Text("Recently Played")
-                .font(BrandFont.font(.subheadline))
+                .font(Theme.dark.typography.itemTitle)
                 .foregroundStyle(Theme.dark.palette.textPrimary)
             if albums.isEmpty {
                 Spacer()
                 Text("Play some music to see it here.")
-                    .font(BrandFont.font(.caption))
+                    .font(Theme.dark.typography.caption)
                     .foregroundStyle(Theme.dark.palette.textSecondary)
                 Spacer()
             } else {

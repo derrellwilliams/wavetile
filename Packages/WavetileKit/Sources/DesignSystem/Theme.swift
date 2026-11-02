@@ -37,8 +37,8 @@ public struct Theme: Sendable, Identifiable, Hashable {
         /// reads the same over artwork and glass.
         public var textSecondary: Color
         public var separator: Color
-        /// Placeholder tones for artwork that hasn't loaded yet.
-        public var artworkPlaceholder: [Color]
+        /// Behind artwork that hasn't loaded (widgets).
+        public var artworkPlaceholder: Color
     }
 
     /// One weight (Inter Regular), seven sizes: 12 · 14 · 16 · 18 · 20 · 22 · 36. Hierarchy comes from size,
@@ -50,7 +50,7 @@ public struct Theme: Sendable, Identifiable, Hashable {
         public var largeTitle: Font
         /// 22: titles inside a screen (Now Playing, sheets, empty states, episodes).
         public var title: Font
-        /// 20: shelf and section titles.
+        /// 18: shelf and section titles.
         public var sectionHeader: Font
         /// 20: secondary names under a title (a detail page's artist or show, the Now Playing artist).
         public var lead: Font
@@ -76,6 +76,10 @@ public struct Theme: Sendable, Identifiable, Hashable {
         /// Metadata (years, counts, durations, times) in the mono face: `.caption` is 12, `.body` 16,
         /// anything else 14.
         public func mono(_ style: Font.TextStyle) -> Font {
+            Self.mono(style)
+        }
+
+        static func mono(_ style: Font.TextStyle) -> Font {
             let size = switch style {
             case .caption, .caption2, .footnote: Self.scale.caption
             case .body, .callout, .headline: Self.scale.body
@@ -90,9 +94,9 @@ public struct Theme: Sendable, Identifiable, Hashable {
         public var xs: CGFloat = 4
         public var sm: CGFloat = 8
         public var md: CGFloat = 12
-        public var lg: CGFloat = 16
+        public var lg: CGFloat = 18
         public var xl: CGFloat = 24
-        public var xxl: CGFloat = 32
+        public var xxl: CGFloat = 34
         /// Leading/trailing inset for scrolling content (matches system list margins).
         public var screenInset: CGFloat = 20
     }
@@ -132,19 +136,19 @@ public extension Theme {
             textPrimary: Color(hex: 0xECE4D2),
             textSecondary: Color(hex: 0x989388),
             separator: Color(hex: 0xECE4D2).opacity(0.12),
-            artworkPlaceholder: [Color(hex: 0x2E2E2E), Color(hex: 0x222222)]
+            artworkPlaceholder: Color(hex: 0x2E2E2E)
         ),
         typography: .init(
-            largeTitle: BrandFont.font(.largeTitle, size: 36),
-            title: BrandFont.font(.title2, size: 22),
-            sectionHeader: BrandFont.font(.title3, size: 20),
-            lead: BrandFont.font(.title3, size: 20),
-            body: BrandFont.font(.body, size: 16),
-            itemTitle: BrandFont.font(.subheadline, size: 14),
-            itemSubtitle: BrandFont.font(.subheadline, size: 14),
-            itemMetadata: BrandFont.font(.subheadline, size: 14, family: BrandFont.monoFamily),
-            caption: BrandFont.font(.caption, size: 12),
-            code: BrandFont.font(.largeTitle, size: 36, family: BrandFont.monoFamily)
+            largeTitle: BrandFont.font(.largeTitle, size: Typography.scale.display),
+            title: BrandFont.font(.title2, size: Typography.scale.title),
+            sectionHeader: BrandFont.font(.title3, size: Typography.scale.large),
+            lead: BrandFont.font(.title3, size: Typography.scale.lead),
+            body: BrandFont.font(.body, size: Typography.scale.body),
+            itemTitle: BrandFont.font(.subheadline, size: Typography.scale.small),
+            itemSubtitle: BrandFont.font(.subheadline, size: Typography.scale.small),
+            itemMetadata: Typography.mono(.subheadline),
+            caption: BrandFont.font(.caption, size: Typography.scale.caption),
+            code: BrandFont.font(.largeTitle, size: Typography.scale.display, family: BrandFont.monoFamily)
         ),
         spacing: .init(),
         radius: .init(),
@@ -165,7 +169,7 @@ public extension Theme {
         theme.palette.textPrimary = Color(hex: 0x1A1A1A)
         theme.palette.textSecondary = Color(hex: 0x75726B)
         theme.palette.separator = .black.opacity(0.12)
-        theme.palette.artworkPlaceholder = [Color(hex: 0xD9CFB9), Color(hex: 0xE3DAC6)]
+        theme.palette.artworkPlaceholder = Color(hex: 0xD9CFB9)
         theme.colorScheme = .light
         return theme
     }()
