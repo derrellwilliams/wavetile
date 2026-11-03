@@ -14,7 +14,9 @@ public extension LibraryClient {
 
     /// Universal audio endpoint: the server picks direct play when the file is in
     /// `directPlayContainers` and under `maxBitrate`, otherwise transcodes to 320k MP3.
+    /// Nil while an HTTP server hasn't proved its identity on this network (see `ServerIdentity`).
     func streamRequest(trackID: String, maxBitrate: Int = 140_000_000) -> StreamRequest? {
+        guard ServerIdentity.shared.allowsToken(to: session.serverURL) else { return nil }
         let playSessionID = UUID().uuidString
         let params = Paths.GetUniversalAudioStreamParameters(
             container: Self.directPlayContainers,

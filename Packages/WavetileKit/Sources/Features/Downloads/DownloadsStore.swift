@@ -20,6 +20,8 @@ final class Connectivity {
     struct Server: Equatable {
         let url: URL
         let id: String
+
+        var isCleartext: Bool { url.scheme?.lowercased() == "http" }
     }
 
     private(set) var hasNetwork = true
@@ -33,10 +35,16 @@ final class Connectivity {
     var server: Server? {
         didSet {
             guard server != oldValue else { return }
-            serverReachable = true
+            if let server { ServerIdentity.shared.register(server.url, serverID: server.id) }
+            // An HTTP server gets no requests until it proves itself (`ServerIdentity`), so it starts
+            // offline rather than offering streams that can't start yet. On the LAN that's milliseconds.
+            serverReachable = server?.isCleartext != true
             check()
         }
     }
+
+    /// Called when the device changes networks, before the server is checked again.
+    @ObservationIgnored var onNetworkChange: (() async -> Void)?
 
     @ObservationIgnored private let monitor = NWPathMonitor()
     /// Which interfaces the last path used: Wi-Fi to cellular stays "connected" but can put a
@@ -45,14 +53,6 @@ final class Connectivity {
     @ObservationIgnored private var checkTask: Task<Void, Never>?
     @ObservationIgnored private var retryTask: Task<Void, Never>?
     @ObservationIgnored private var foregroundToken: NSObjectProtocol?
-    /// Short timeout and no waiting for a network: the answer is needed now, not eventually.
-    @ObservationIgnored private let session: URLSession = {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = 6
-        configuration.waitsForConnectivity = false
-        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        return URLSession(configuration: configuration)
-    }()
 
     init() {
         monitor.pathUpdateHandler = { [weak self] path in
@@ -79,7 +79,7 @@ final class Connectivity {
     /// failed to connect: one bad stream shouldn't dim the library on its own).
     func recheck() async {
         guard hasNetwork, let server else { return }
-        let reachable = await Self.ping(server, session: session)
+        let reachable = await ServerIdentity.shared.check(server.url)
         guard !Task.isCancelled, server == self.server, hasNetwork else { return }
         serverReachable = reachable
         retryTask?.cancel()
@@ -93,7 +93,15 @@ final class Connectivity {
     }
 
     private func pathChanged(online: Bool, interfaces: [String]) {
-        guard online != hasNetwork || interfaces != self.interfaces else { return }
+        // Security: an HTTP server's address can be another machine on the new network (café Wi-Fi
+        // on the same subnet), and Wi-Fi to Wi-Fi keeps the same interfaces, so any path update
+        // means it proves itself again before it gets the token.
+        let cleartext = server?.isCleartext == true
+        guard cleartext || online != hasNetwork || interfaces != self.interfaces else { return }
+        if cleartext {
+            ServerIdentity.shared.networkChanged()
+            if let onNetworkChange { Task { await onNetworkChange() } }
+        }
         hasNetwork = online
         self.interfaces = interfaces
         check()
@@ -103,24 +111,6 @@ final class Connectivity {
         checkTask?.cancel()
         retryTask?.cancel()
         checkTask = Task { await recheck() }
-    }
-
-    /// Security: Jellyfin's public info endpoint, sent without the token. Only this server
-    /// answering counts: a captive portal or another host at the same LAN address returns a
-    /// page, not this server's ID.
-    @concurrent private nonisolated static func ping(_ server: Server, session: URLSession) async -> Bool {
-        struct PublicInfo: Decodable {
-            let Id: String?
-        }
-        let url = server.url.appending(path: "System/Info/Public")
-        guard let (data, response) = try? await session.data(from: url),
-              let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
-              let id = (try? JSONDecoder().decode(PublicInfo.self, from: data))?.Id
-        else { return false }
-        // A session saved without an ID can't be matched; any Jellyfin answer has to do.
-        guard !server.id.isEmpty else { return true }
-        let normalized = { (id: String) in id.lowercased().replacingOccurrences(of: "-", with: "") }
-        return normalized(id) == normalized(server.id)
     }
 }
 
@@ -175,6 +165,12 @@ final class DownloadsStore {
 
     private func resumePending() async {
         await manager?.resumePending(quality: quality, allowCellular: allowCellular)
+    }
+
+    /// Transfers from an HTTP server stop on a network change and restart once it has proved itself.
+    func networkChanged() async {
+        await manager?.networkChanged()
+        await resumePending()
     }
 
     func isDownloaded(_ trackID: String) -> Bool { downloadedTrackIDs.contains(trackID) }

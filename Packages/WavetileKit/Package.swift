@@ -26,6 +26,8 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/jellyfin/jellyfin-sdk-swift.git", from: "3.3.0"),
+        // The SDK's HTTP layer; JellyfinKit adds a request hook (`ServerIdentityCheck`).
+        .package(url: "https://github.com/kean/Get", from: "2.1.6"),
         .package(url: "https://github.com/kean/Nuke.git", from: "13.2.0"),
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.11.1"),
         .package(url: "https://github.com/krzysztofzablocki/Inject.git", from: "1.6.0"),
@@ -33,7 +35,10 @@ let package = Package(
     targets: [
         .target(
             name: "JellyfinKit",
-            dependencies: [.product(name: "JellyfinAPI", package: "jellyfin-sdk-swift")],
+            dependencies: [
+                .product(name: "JellyfinAPI", package: "jellyfin-sdk-swift"),
+                .product(name: "Get", package: "Get"),
+            ],
             swiftSettings: serviceSettings
         ),
         .target(

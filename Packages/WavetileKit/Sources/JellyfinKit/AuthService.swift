@@ -43,6 +43,7 @@ public struct AuthService: Sendable {
                 deviceID: identity.deviceID,
                 version: identity.version
             ),
+            delegate: ServerIdentityCheck(),
             sessionConfiguration: sessionConfiguration,
             sessionDelegate: RedirectGuard.shared
         )

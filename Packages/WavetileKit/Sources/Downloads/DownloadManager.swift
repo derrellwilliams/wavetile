@@ -76,7 +76,7 @@ public final class DownloadManager: NSObject, Sendable {
 
     public func download(_ collection: DownloadCollectionRecord, trackIDs: [String], quality: Quality, allowCellular: Bool) async throws {
         let needed = try await database.requestDownload(collection, trackIDs: trackIDs)
-        enqueue(needed, quality: quality, allowCellular: allowCellular)
+        await enqueue(needed, quality: quality, allowCellular: allowCellular)
     }
 
     public func remove(collectionID: String) async throws {
@@ -97,7 +97,7 @@ public final class DownloadManager: NSObject, Sendable {
         for id in ids {
             guard let tracks = try? database.tracks(playlistID: id) else { continue }
             guard let (added, orphans) = try? await database.syncDownloadedPlaylist(id: id, trackIDs: tracks.map(\.id)) else { continue }
-            enqueue(added, quality: quality, allowCellular: allowCellular)
+            await enqueue(added, quality: quality, allowCellular: allowCellular)
             deleteFiles(orphans)
         }
     }
@@ -108,7 +108,15 @@ public final class DownloadManager: NSObject, Sendable {
         let running = Set(await session.allTasks.compactMap(\.taskDescription))
         _ = try? await database.requeueFailedDownloads()
         let pending = (try? database.pendingDownloads().map(\.trackID)) ?? []
-        enqueue(pending.filter { !running.contains($0) }, quality: quality, allowCellular: allowCellular)
+        await enqueue(pending.filter { !running.contains($0) }, quality: quality, allowCellular: allowCellular)
+    }
+
+    /// Security: the system carries a background transfer over to a new network on its own,
+    /// token and all, so transfers from a plain-HTTP server stop here and wait for
+    /// `resumePending` to restart them once the server has proved itself (see `ServerIdentity`).
+    public func networkChanged() async {
+        guard library.session.serverURL.scheme?.lowercased() == "http" else { return }
+        for task in await session.allTasks { task.cancel() }
     }
 
     /// Local file for a finished download, or nil. Cheap enough to call per player item.
@@ -126,7 +134,8 @@ public final class DownloadManager: NSObject, Sendable {
 
     // MARK: - Internals
 
-    private func enqueue(_ trackIDs: [String], quality: Quality, allowCellular: Bool) {
+    private func enqueue(_ trackIDs: [String], quality: Quality, allowCellular: Bool) async {
+        guard !trackIDs.isEmpty, await ServerIdentity.shared.confirmToken(to: library.session.serverURL) else { return }
         state.withLock {
             $0.quality = quality
             $0.allowCellular = allowCellular
@@ -273,13 +282,15 @@ extension DownloadManager: URLSessionDownloadDelegate {
         Task {
             try? await Task.sleep(for: .seconds(pow(2, Double(attempt))))
             guard (try? database.pendingDownloads().contains { $0.trackID == trackID }) == true else { return }
+            // Resume data carries the original request, Authorization header included.
+            guard await ServerIdentity.shared.confirmToken(to: library.session.serverURL) else { return }
             if let resumeData {
                 let retry = self.session.downloadTask(withResumeData: resumeData)
                 retry.taskDescription = trackID
                 retry.resume()
             } else {
                 let (quality, cellular) = state.withLock { ($0.quality, $0.allowCellular) }
-                enqueue([trackID], quality: quality, allowCellular: cellular)
+                await enqueue([trackID], quality: quality, allowCellular: cellular)
             }
         }
     }

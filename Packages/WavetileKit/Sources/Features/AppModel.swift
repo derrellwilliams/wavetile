@@ -105,6 +105,7 @@ public final class AppModel {
             if !track.isEpisode { await Connectivity.shared.recheck() }
         }
         Connectivity.shared.server = .init(url: session.serverURL, id: session.serverID)
+        Connectivity.shared.onNetworkChange = { [weak downloads] in await downloads?.networkChanged() }
         player.resumePosition = { [weak podcasts] track in podcasts?.resumePosition(for: track) }
         player.onEpisodeProgress = { [weak podcasts] track, position, duration in
             podcasts?.episodeProgress(track, position: position, duration: duration)
