@@ -8,7 +8,12 @@ Native Jellyfin music + podcast player for iPhone (iOS 26.1+, Swift 6, SwiftUI).
 - Run (two separate commands; an `&&` chain keeps them in the sandbox, where they fail): `xcrun simctl install booted build/Build/Products/Debug-iphonesimulator/Wavetile.app`, then `xcrun simctl launch booted com.derrellwilliams.wavetile [flags]`
 - Check the screen: `xcrun simctl io booted screenshot <path>.png`, then read the PNG.
 - Tests: package scheme `WavetileKit-Package` (incl. a 50k-track perf suite); UI tests (incl. an accessibility audit) in `UITests/`, run from the `Wavetile` scheme.
-- TestFlight: `scripts/testflight.sh` (no argument; build numbers are timestamps, so don't bump `CURRENT_PROJECT_VERSION`). Only when asked.
+- TestFlight (only when asked; uploads whatever is checked out, so confirm it's committed): `scripts/testflight.sh` for me in Terminal. Claude runs its steps directly, since the script would run Xcode inside the sandbox. Run these as four separate plain commands, without `$(...)`:
+  1. `date +%Y%m%d%H%M` → the build number (timestamps, so don't bump `CURRENT_PROJECT_VERSION`)
+  2. `xcodegen generate --spec <repo>/project.yml --project <repo>`
+  3. `xcodebuild archive -project <repo>/Wavetile.xcodeproj -scheme Wavetile -configuration Release -destination generic/platform=iOS -archivePath <repo>/build/Wavetile.xcarchive -allowProvisioningUpdates -quiet CURRENT_PROJECT_VERSION=<number> 2>&1`
+  4. `xcodebuild -exportArchive -archivePath <repo>/build/Wavetile.xcarchive -exportOptionsPlist <repo>/scripts/ExportOptions.plist -exportPath <repo>/build/export -allowProvisioningUpdates 2>&1` (uploads; done at `** EXPORT SUCCEEDED **`)
+  `<repo>` is the absolute repo path. With `-quiet`, "failed with exit code 0 but produced no further output" lines are noise; real failures show `error:` with a file path or `ARCHIVE FAILED`.
 - Debug builds link with `-interposable` for hot reload (Inject); Release doesn't.
 
 ## Layout
