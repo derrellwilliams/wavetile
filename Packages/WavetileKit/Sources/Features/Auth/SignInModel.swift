@@ -99,7 +99,7 @@ final class SignInModel {
         case AuthService.AuthError.setupIncomplete: "Finish setting up this server in a browser first."
         case AuthService.AuthError.quickConnectDisabled: "Quick Connect is turned off on this server."
         case AuthService.AuthError.insecureTransport:
-            "This server uses plain HTTP over the internet. Use an HTTPS address."
+            "This server uses plain HTTP over the internet. Use an HTTPS address, or its .ts.net name on Tailscale."
         case let error as URLError where error.code == .appTransportSecurityRequiresSecureConnection:
             "This server uses plain HTTP over the internet. Use an HTTPS address."
         case let error as URLError: error.localizedDescription

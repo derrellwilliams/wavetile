@@ -44,8 +44,9 @@ public struct ServerAddress: Hashable, Sendable {
     public var isSecure: Bool { url.scheme?.lowercased() == "https" }
 
     /// True for hosts that never leave the local network (RFC 1918, link-local, loopback, mDNS),
-    /// or that are reached over Tailscale, which encrypts the traffic itself (WireGuard): its
-    /// 100.64.0.0/10 addresses, MagicDNS `*.ts.net` names, and fd7a:115c:a1e0::/48 (covered by fd).
+    /// or that are reached over Tailscale, which encrypts the traffic itself (WireGuard): MagicDNS
+    /// `*.ts.net` names and fd7a:115c:a1e0::/48 (covered by fd). Tailscale's 100.64.0.0/10 IPv4
+    /// addresses aren't included: carriers use the same range (CGNAT), where HTTP isn't encrypted.
     public var isLocalNetwork: Bool {
         guard let host = url.host()?.lowercased() else { return false }
         if host == "localhost" || host.hasSuffix(".local") || host == "::1" { return true }
@@ -60,7 +61,6 @@ public struct ServerAddress: Hashable, Sendable {
         switch (octets[0], octets[1]) {
         case (10, _), (127, _), (169, 254), (192, 168): return true
         case (172, 16...31): return true
-        case (100, 64...127): return true  // Tailscale (CGNAT range)
         default: return false
         }
     }

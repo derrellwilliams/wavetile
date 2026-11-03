@@ -14,7 +14,18 @@ public enum ImageCaching {
             sizeLimit: 1024 * 1024 * 1024
         )
         configuration.isProgressiveDecodingEnabled = false
+        // Security: podcast art comes from any host a feed names, so no cookies go to or from them.
+        let session = URLSessionConfiguration.default
+        session.urlCache = nil
+        session.httpCookieAcceptPolicy = .never
+        session.httpShouldSetCookies = false
+        configuration.dataLoader = DataLoader(configuration: session)
         ImagePipeline.shared = ImagePipeline(configuration: configuration)
+    }
+
+    /// Removes all cached artwork, in memory and on disk (sign out: it belongs to that account).
+    @MainActor public static func removeAll() {
+        ImagePipeline.shared.cache.removeAll()
     }
 
     @MainActor private static var isConfigured = false

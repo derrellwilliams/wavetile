@@ -134,6 +134,7 @@ public final class AppModel {
             // The cached library is private to this account; don't leave it on disk.
             LibraryDatabase.delete(serverID: signedIn.session.serverID, userID: signedIn.session.userID)
             RecentSearches.clearStored()
+            ImageCaching.removeAll()
         }
         store.clear()
         phase = .signedOut

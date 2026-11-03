@@ -75,7 +75,7 @@ struct SignInFlow: View {
         } else {
             switch model.transportWarning {
             case .insecureRemote:
-                Label("HTTP over the internet would send your password and token unencrypted. Use HTTPS.", glyph: .lockOpen)
+                Label("HTTP over the internet would send your password and token unencrypted. Use HTTPS, or the .ts.net name on Tailscale.", glyph: .lockOpen)
                     .foregroundStyle(theme.palette.textPrimary)
             case .insecureLocal:
                 Label("Unencrypted connection. OK on your home network or over Tailscale only.", glyph: .lockOpen)

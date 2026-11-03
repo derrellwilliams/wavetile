@@ -171,6 +171,14 @@ public final class DownloadManager: NSObject, Sendable {
         return url
     }
 
+    /// The track's file in the download folder. Security: the ID and extension come from the server,
+    /// so only letters, digits and `-` are kept; a hostile ID like `../x` can't leave the folder.
+    static func fileName(trackID: String, response: URLResponse?) -> String {
+        let safe = { (text: String) in text.filter { ($0.isASCII && ($0.isLetter || $0.isNumber)) || $0 == "-" } }
+        let id = safe(trackID)
+        return "\(id.isEmpty ? "track" : id).\(safe(fileExtension(for: response)).prefix(8))"
+    }
+
     /// AVFoundation picks a decoder from the file extension, so map the served MIME type.
     static func fileExtension(for response: URLResponse?) -> String {
         switch response?.mimeType?.lowercased() {
@@ -214,7 +222,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
             return
         }
         // The temp file is deleted when this method returns, so move it synchronously.
-        let name = "\(trackID).\(Self.fileExtension(for: downloadTask.response))"
+        let name = Self.fileName(trackID: trackID, response: downloadTask.response)
         let destination = directory.appending(path: name)
         do {
             try? FileManager.default.removeItem(at: destination)
@@ -237,6 +245,14 @@ extension DownloadManager: URLSessionDownloadDelegate {
         } catch {
             markFailed(trackID, error.localizedDescription)
         }
+    }
+
+    /// Drops the token if the server redirects a download to another host (see `RedirectGuard`).
+    public func urlSession(
+        _ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest, completionHandler: @escaping @Sendable (URLRequest?) -> Void
+    ) {
+        completionHandler(RedirectGuard.request(request, redirectedFrom: task.originalRequest?.url))
     }
 
     public func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: (any Error)?) {

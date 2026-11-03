@@ -757,7 +757,7 @@ public final class AudioPlayer {
             ?? track.albumID.flatMap({ library.imageURL(itemID: $0, tag: track.albumImageTag, maxPixelWidth: 600) })
         else { return }
         artworkTask = Task { [weak self] in
-            guard let (data, _) = try? await URLSession.shared.data(from: url),
+            guard let data = await Self.fetchArtwork(url),
                   let image = await Self.decodeArtwork(data), !Task.isCancelled,
                   self?.queue.current?.queueID == track.queueID
             else { return }
@@ -766,6 +766,44 @@ public final class AudioPlayer {
             info[MPMediaItemPropertyArtwork] = artwork
             MPNowPlayingInfoCenter.default().nowPlayingInfo = info
         }
+    }
+
+    /// Security: podcast art comes from any host a feed names, so it's fetched with no cookies or
+    /// credentials, and capped in size so a hostile host can't fill memory.
+    private nonisolated static let artworkSession: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.httpCookieAcceptPolicy = .never
+        config.httpShouldSetCookies = false
+        config.urlCredentialStorage = nil
+        config.timeoutIntervalForRequest = 20
+        return URLSession(configuration: config)
+    }()
+
+    private nonisolated static let maxArtworkBytes = 10 * 1024 * 1024
+
+    @concurrent private nonisolated static func fetchArtwork(_ url: URL) async -> Data? {
+        guard let (bytes, response) = try? await artworkSession.bytes(from: url),
+              (response as? HTTPURLResponse).map({ (200 ..< 300).contains($0.statusCode) }) ?? true,
+              response.expectedContentLength <= maxArtworkBytes
+        else { return nil }
+        // Appends in 64 KB chunks: per-byte `Data.append` is slow on a big image.
+        var data = Data()
+        var chunk: [UInt8] = []
+        chunk.reserveCapacity(65_536)
+        do {
+            for try await byte in bytes {
+                chunk.append(byte)
+                if chunk.count == 65_536 {
+                    data.append(contentsOf: chunk)
+                    chunk.removeAll(keepingCapacity: true)
+                    if data.count > maxArtworkBytes { return nil }
+                }
+            }
+        } catch {
+            return nil
+        }
+        data.append(contentsOf: chunk)
+        return data.count <= maxArtworkBytes ? data : nil
     }
 
     /// Decoded off the main actor and scaled down: third-party podcast art can be 3000 px.
