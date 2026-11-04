@@ -12,6 +12,7 @@ struct FavoritesView: View {
     @Environment(LibraryStore.self) private var store
     @Environment(AudioPlayer.self) private var player
     @Environment(DownloadsStore.self) private var downloads
+    @Environment(\.pushLibraryRoute) private var push
     @State private var kind: Kind = .songs
     @State private var tracks: [TrackRecord] = []
     @State private var albums: [AlbumRecord] = []
@@ -23,24 +24,39 @@ struct FavoritesView: View {
                 SegmentedFilter(selection: $kind, options: Kind.allCases.map { ($0, $0.rawValue) })
                     .padding(.horizontal, theme.spacing.screenInset)
 
-                switch kind {
-                case .songs: songs
-                case .albums: albumGrid
-                case .artists: artistList
+                if isEmpty {
+                    emptyState
+                } else {
+                    switch kind {
+                    case .songs: songs
+                    case .albums: albumGrid
+                    case .artists: artistList
+                    }
                 }
             }
             .padding(.vertical, theme.spacing.lg)
-        }
-        .overlay {
-            if isEmpty {
-                EmptyState("No Favorites", message: "Tap the heart on songs, albums, and artists to find them here.")
-            }
         }
         .themedBackground()
         .navigationTitle("Favorites")
         .listBar()
         .task { await observe() }
         .enableInjection()
+    }
+
+    /// Under the filter, like the other empty screens: what goes here and where to find it.
+    private var emptyState: some View {
+        let noun = kind.rawValue.lowercased()
+        let section: LibrarySection = switch kind {
+        case .songs: .songs
+        case .albums: .albums
+        case .artists: .artists
+        }
+        return EmptyPrompt(
+            "No Favorite \(kind.rawValue) Yet",
+            message: "Tap the heart on any of your \(noun) to keep them here.",
+            button: "Browse \(kind.rawValue)"
+        ) { push(.section(section)) }
+        .padding(.top, theme.spacing.md)
     }
 
     private var isEmpty: Bool {
