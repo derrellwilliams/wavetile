@@ -40,10 +40,10 @@ struct HomeView: View {
         NavigationStack(path: $path) {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: theme.spacing.xxl) {
-                    // Order: Recently Played, Latest Podcast Episodes, Most Played, Playlists,
+                    // Order: Recently Played, Latest Podcast Episodes, Most Played, Your Playlists &
                     // Collections, Recently Added, then up to three Artist Spotlights. Latest Podcast
-                    // Episodes appears only when podcasts are on and it has episodes; Playlists and
-                    // Collections only when there are some. (Continue Listening lives at the top of
+                    // Episodes appears only when podcasts are on and it has episodes; the playlists
+                    // and collections row only when there are some. (Continue Listening lives at the top of
                     // the Podcasts tab.) With little play history, a welcome card leads and genre
                     // shelves follow Recently Added (the card only for the first visit).
                     if model.showsWelcome, let stats = model.stats, stats.albums > 0 {
@@ -133,13 +133,18 @@ struct HomeView: View {
         .enableInjection()
     }
 
-    /// The user's own playlists and collections, just above Recently Added (or where it would be).
+    /// The user's own playlists and collections in one row, by name, just above Recently Added
+    /// (or where it would be).
     @ViewBuilder private var libraryShelves: some View {
-        if !playlists.isEmpty {
-            ShelfSection("Playlists", items: playlists) { PlaylistLink(playlist: $0) }
-        }
-        if !collections.isEmpty {
-            ShelfSection("Collections", items: collections) { CollectionLink(collection: $0) }
+        let items = (playlists.map(LibraryShelfItem.playlist) + collections.map(LibraryShelfItem.collection))
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        if !items.isEmpty {
+            ShelfSection("Your Playlists & Collections", items: items) { item in
+                switch item {
+                case let .playlist(playlist): PlaylistLink(playlist: playlist)
+                case let .collection(collection): CollectionLink(collection: collection)
+                }
+            }
         }
     }
 
@@ -201,5 +206,25 @@ struct HomeView: View {
         ]), path: .constant(NavigationPath()), userName: Fixtures.session.userName)
         .environment(signedIn.library)
         .environment(signedIn.podcasts)
+    }
+}
+
+/// A tile in Home's playlists and collections row.
+private enum LibraryShelfItem: Identifiable {
+    case playlist(PlaylistRecord)
+    case collection(CollectionRecord)
+
+    var id: String {
+        switch self {
+        case let .playlist(playlist): "playlist-\(playlist.id)"
+        case let .collection(collection): "collection-\(collection.id)"
+        }
+    }
+
+    var name: String {
+        switch self {
+        case let .playlist(playlist): playlist.name
+        case let .collection(collection): collection.name
+        }
     }
 }
