@@ -23,6 +23,8 @@ struct HomeView: View {
     /// Live, so a playlist or collection made elsewhere in the app shows up right away.
     @State private var playlists: [PlaylistRecord] = []
     @State private var collections: [CollectionRecord] = []
+    /// Both, by name, capped: rebuilt when either list changes rather than on every render.
+    @State private var libraryItems: [LibraryShelfItem] = []
     /// Greets a new listener by name on the welcome card.
     let userName: String
 
@@ -102,8 +104,8 @@ struct HomeView: View {
                       (try? await Task.sleep(for: .seconds(60))) != nil else { return }
                 model.countWelcomeVisit()
             }
-            .task { await observe(store.database.playlists()) { playlists = $0 } }
-            .task { await observe(store.database.collections()) { collections = $0 } }
+            .task { await store.observe(store.database.playlists()) { playlists = $0; rebuildLibraryItems() } }
+            .task { await store.observe(store.database.collections()) { collections = $0; rebuildLibraryItems() } }
             .task(id: podcasts.isEnabled) { await observePodcasts(podcasts.database.upNextShelf()) { podcastUpNext = $0 } }
             .markRefreshable {
                 await model.loadDiscovery()
@@ -136,10 +138,8 @@ struct HomeView: View {
     /// The user's own playlists and collections in one row, by name, just above Recently Added
     /// (or where it would be).
     @ViewBuilder private var libraryShelves: some View {
-        let items = (playlists.map(LibraryShelfItem.playlist) + collections.map(LibraryShelfItem.collection))
-            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-        if !items.isEmpty {
-            ShelfSection("Your Playlists & Collections", items: items) { item in
+        if !libraryItems.isEmpty {
+            ShelfSection("Your Playlists & Collections", items: libraryItems) { item in
                 switch item {
                 case let .playlist(playlist): PlaylistLink(playlist: playlist)
                 case let .collection(collection): CollectionLink(collection: collection)
@@ -148,10 +148,13 @@ struct HomeView: View {
         }
     }
 
-    private func observe<T: Sendable & Equatable>(_ observation: GRDBObservation<T>, update: (T) -> Void) async {
-        do {
-            for try await value in store.observe(observation) { update(value) }
-        } catch { Log.observationFailed(error) }
+    /// The first 16 by name; the Music tab has them all.
+    private func rebuildLibraryItems() {
+        libraryItems = Array(
+            (playlists.map(LibraryShelfItem.playlist) + collections.map(LibraryShelfItem.collection))
+                .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+                .prefix(16)
+        )
     }
 
     private func scrollToTop() {
@@ -174,14 +177,7 @@ struct HomeView: View {
             update([])
             return
         }
-        do {
-            // The first load appears as-is; later changes animate.
-            var loaded = false
-            for try await items in podcasts.observe(observation) {
-                withAnimation(loaded ? theme.motion.smooth : nil) { update(items) }
-                loaded = true
-            }
-        } catch { Log.observationFailed(error) }
+        await podcasts.observe(observation, animation: theme.motion.smooth, update: update)
     }
 
     @ViewBuilder private var overlay: some View {

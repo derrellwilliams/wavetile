@@ -77,15 +77,9 @@ struct PodcastsView: View {
         .opmlImporter(isPresented: $showImporter, message: $importMessage)
     }
 
-    private func observe<T: Sendable>(_ observation: GRDBObservation<T>, update: (T) -> Void) async {
-        do {
-            // The first load appears as-is; later changes animate.
-            var loaded = false
-            for try await value in podcasts.observe(observation) {
-                withAnimation(loaded ? theme.motion.smooth : nil) { update(value) }
-                loaded = true
-            }
-        } catch { Log.observationFailed(error) }
+    /// The first load appears as-is; later changes animate.
+    private func observe<T: Sendable & Equatable>(_ observation: GRDBObservation<T>, update: (T) -> Void) async {
+        await podcasts.observe(observation, animation: theme.motion.smooth, update: update)
     }
 
     private var libraryLinks: some View {

@@ -579,7 +579,13 @@ struct GeneratedCover: View {
                 }
             }
             .task(id: key) {
-                guard pixels > 0, CoverArt.cached(seed: seed, pixels: pixels) == nil else { return }
+                guard pixels > 0 else { return }
+                // Keep a cache hit in state too: the cache can evict it later, and the task won't
+                // run again while the key stays the same.
+                if let hit = CoverArt.cached(seed: seed, pixels: pixels) {
+                    rendered = (key, hit)
+                    return
+                }
                 guard let image = await CoverArt.image(seed: seed, pixels: pixels, scale: displayScale) else { return }
                 withAnimation(theme.motion.snappy) { rendered = (key, image) }
             }

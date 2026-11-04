@@ -6,6 +6,7 @@ import Library
 import Observation
 import Persistence
 import Playback
+import SwiftUI
 
 /// The signed-in user's library: local database, background sync, and API access.
 /// Screens read from the database (instant, offline) and observe it for live updates.
@@ -86,6 +87,18 @@ final class LibraryStore {
     /// (another table's rows, a no-op sync page) don't re-render it.
     func observe<T: Sendable & Equatable>(_ observation: ValueObservation<ValueReducers.Fetch<T>>) -> AsyncValueObservation<T> {
         observation.removeDuplicates().values(in: database.pool)
+    }
+
+    /// Feeds a query's results to `update` until the task is cancelled: the first value as-is,
+    /// later ones with `animation`. A failure is logged and the screen keeps its last values.
+    func observe<T: Sendable & Equatable>(_ observation: GRDBObservation<T>, animation: Animation? = nil, update: (T) -> Void) async {
+        do {
+            var loaded = false
+            for try await value in observe(observation) {
+                withAnimation(loaded ? animation : nil) { update(value) }
+                loaded = true
+            }
+        } catch { Log.observationFailed(error) }
     }
 
     // MARK: Artwork

@@ -16,6 +16,8 @@ struct FavoritesView: View {
     @State private var tracks: [TrackRecord] = []
     @State private var albums: [AlbumRecord] = []
     @State private var artists: [ArtistRecord] = []
+    /// Kinds whose first read is in, so an empty prompt never flashes before a list loads.
+    @State private var loaded: Set<Kind> = []
 
     var body: some View {
         ScrollView {
@@ -23,7 +25,7 @@ struct FavoritesView: View {
                 SegmentedFilter(selection: $kind, options: Kind.allCases.map { ($0, $0.rawValue) })
                     .padding(.horizontal, theme.spacing.screenInset)
 
-                if isEmpty {
+                if loaded.contains(kind), isEmpty {
                     emptyState
                 } else {
                     switch kind {
@@ -121,14 +123,14 @@ struct FavoritesView: View {
     }
 
     private func observeTracks() async {
-        do { for try await value in store.observe(store.database.favoriteTracks()) { tracks = value } } catch { Log.observationFailed(error) }
+        await store.observe(store.database.favoriteTracks()) { tracks = $0; loaded.insert(.songs) }
     }
 
     private func observeAlbums() async {
-        do { for try await value in store.observe(store.database.favoriteAlbums()) { albums = value } } catch { Log.observationFailed(error) }
+        await store.observe(store.database.favoriteAlbums()) { albums = $0; loaded.insert(.albums) }
     }
 
     private func observeArtists() async {
-        do { for try await value in store.observe(store.database.favoriteArtists()) { artists = value } } catch { Log.observationFailed(error) }
+        await store.observe(store.database.favoriteArtists()) { artists = $0; loaded.insert(.artists) }
     }
 }

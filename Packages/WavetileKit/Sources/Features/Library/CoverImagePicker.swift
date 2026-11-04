@@ -1,4 +1,5 @@
 import DesignSystem
+import ImageIO
 import Library
 import PhotosUI
 import SwiftUI
@@ -86,17 +87,26 @@ private struct CoverImagePicker: ViewModifier {
     }
 
     /// Center-cropped square JPEG, at most 1200px: plenty for the detail page, small to upload.
+    /// ImageIO decodes straight to a thumbnail whose short side is 1200px (orientation applied),
+    /// so a 48MP photo never becomes a full-size bitmap in memory.
     @concurrent private static func squareJPEG(_ data: Data) async -> Data? {
-        guard let image = UIImage(data: data) else { return nil }
-        let side = min(1200, min(image.size.width, image.size.height) * image.scale)
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = 1
-        format.opaque = true
-        let rendered = UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { _ in
-            let fill = side / min(image.size.width, image.size.height)
-            let size = CGSize(width: image.size.width * fill, height: image.size.height * fill)
-            image.draw(in: CGRect(x: (side - size.width) / 2, y: (side - size.height) / 2, width: size.width, height: size.height))
-        }
-        return rendered.jpegData(compressionQuality: 0.85)
+        let side = 1200.0
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = properties[kCGImagePropertyPixelWidth] as? Double,
+              let height = properties[kCGImagePropertyPixelHeight] as? Double,
+              width > 0, height > 0 else { return nil }
+        let longest = max(width, height), shortest = min(width, height)
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: min(longest, (side * longest / shortest).rounded(.up)),
+        ]
+        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        let crop = min(image.width, image.height)
+        let rect = CGRect(x: (image.width - crop) / 2, y: (image.height - crop) / 2, width: crop, height: crop)
+        guard let square = image.cropping(to: rect) else { return nil }
+        return UIImage(cgImage: square).jpegData(compressionQuality: 0.85)
     }
 }

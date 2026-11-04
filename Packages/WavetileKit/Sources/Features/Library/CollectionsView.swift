@@ -14,6 +14,8 @@ struct CollectionsView: View {
     @State private var newName = ""
     @State private var pendingDelete: CollectionRecord?
     @State private var pickingCover: String?
+    /// Set after the first read, so the empty prompt doesn't flash before the list loads.
+    @State private var loaded = false
 
     var body: some View {
         ScrollView {
@@ -46,7 +48,10 @@ struct CollectionsView: View {
             .padding(.vertical, theme.spacing.lg)
         }
         .overlay(alignment: .top) {
-            if collections.isEmpty {
+            if !store.hasSyncedOnce, collections.isEmpty {
+                LibraryEmptyState()
+                    .frame(maxHeight: .infinity)
+            } else if loaded, collections.isEmpty {
                 EmptyPrompt("Start a Collection", message: "Group albums you love, then find them here and on Home.", button: "New Collection") {
                     showNew = true
                 }
@@ -90,11 +95,7 @@ struct CollectionsView: View {
         } message: {
             Text("The albums stay in your library.")
         }
-        .task {
-            do {
-                for try await value in store.observe(store.database.collections()) { collections = value }
-            } catch { Log.observationFailed(error) }
-        }
+        .task { await store.observe(store.database.collections()) { collections = $0; loaded = true } }
         .enableInjection()
     }
 }
@@ -157,7 +158,8 @@ struct CollectionDetailView: View {
         .detailPageChrome()
         .detailBarButtons {
             Menu {
-                if store.canRenameCollections {
+                // Non-admins rename by recreating, which would drop an uploaded cover.
+                if store.canRenameCollections, store.isAdmin || collection.imageTag == nil {
                     Button("Rename", glyph: .edit) {
                         newName = collection.name
                         showRename = true
@@ -185,6 +187,8 @@ struct CollectionDetailView: View {
                             store.moveCoverShuffle(from: collection.id, to: newID)
                             if let record = try? store.database.collection(id: newID) { collection = record }
                         }
+                    } catch is LibraryEditor.RenameWouldLoseCoverError {
+                        actions.errorMessage = "Renaming would remove this collection's cover image. Ask your server admin to rename it."
                     } catch is LibraryEditor.DuplicateCollectionError {
                         actions.errorMessage = "Renamed, but the old copy couldn't be removed, so both are on your server. Delete the old one from Jellyfin."
                     } catch {

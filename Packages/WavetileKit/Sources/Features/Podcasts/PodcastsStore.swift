@@ -6,6 +6,7 @@ import Observation
 import os
 import Playback
 import Podcasts
+import SwiftUI
 
 /// The signed-in user's podcasts: settings, subscriptions, listening progress, Up Next,
 /// downloads and sync. Present for every user; the Podcasts tab, search scope and downloads
@@ -127,6 +128,18 @@ final class PodcastsStore {
     /// Skips results equal to the last one (a progress save that doesn't change this list).
     func observe<T: Sendable & Equatable>(_ observation: ValueObservation<ValueReducers.Fetch<T>>) -> AsyncValueObservation<T> {
         observation.removeDuplicates().values(in: database.pool)
+    }
+
+    /// Feeds a query's results to `update` until the task is cancelled: the first value as-is,
+    /// later ones with `animation`. A failure is logged and the screen keeps its last values.
+    func observe<T: Sendable & Equatable>(_ observation: GRDBObservation<T>, animation: Animation? = nil, update: (T) -> Void) async {
+        do {
+            var loaded = false
+            for try await value in observe(observation) {
+                withAnimation(loaded ? animation : nil) { update(value) }
+                loaded = true
+            }
+        } catch { Log.observationFailed(error) }
     }
 
     /// Long-running: download badges, storage, resumed downloads, sync and a refresh when stale.

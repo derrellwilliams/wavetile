@@ -15,6 +15,8 @@ struct PlaylistsView: View {
     @State private var newName = ""
     @State private var pendingDelete: PlaylistRecord?
     @State private var pickingCover: String?
+    /// Set after the first read, so the empty prompt doesn't flash before the list loads.
+    @State private var loaded = false
 
     var body: some View {
         ScrollView {
@@ -48,13 +50,14 @@ struct PlaylistsView: View {
         }
         .overlay(alignment: .top) {
             if playlists.isEmpty {
-                if store.hasSyncedOnce {
+                if !store.hasSyncedOnce {
+                    LibraryEmptyState()
+                        .frame(maxHeight: .infinity)
+                } else if loaded {
                     EmptyPrompt("Make a Playlist", message: "Gather songs for any mood, then find them here and on Home.", button: "New Playlist") {
                         showNew = true
                     }
                     .padding(.top, theme.spacing.lg)
-                } else {
-                    LibraryEmptyState()
                 }
             }
         }
@@ -95,11 +98,7 @@ struct PlaylistsView: View {
         } message: {
             Text("This deletes it from your Jellyfin server for all your devices.")
         }
-        .task {
-            do {
-                for try await value in store.observe(store.database.playlists()) { playlists = value }
-            } catch { Log.observationFailed(error) }
-        }
+        .task { await store.observe(store.database.playlists()) { playlists = $0; loaded = true } }
         .enableInjection()
     }
 }

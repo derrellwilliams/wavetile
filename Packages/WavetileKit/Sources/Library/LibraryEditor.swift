@@ -85,36 +85,42 @@ public struct LibraryEditor: Sendable {
 
     /// Renames a collection and returns its ID afterwards. Collections have no rename call, so an
     /// admin's rename reads the full item, changes the name and saves it back (as Jellyfin's
-    /// metadata editor does). Other accounts can't edit items, so for them the collection is
-    /// recreated under the new name, which gives it a new ID.
+    /// metadata editor does). Other accounts can't edit items: only a refused save (403) falls back
+    /// to recreating the collection under the new name, which gives it a new ID.
     @discardableResult
     public func renameCollection(id: String, to name: String) async throws -> String {
+        var item = try await client.send(Paths.getItem(itemID: id, userID: session.userID)).value
+        item.name = name
         do {
-            var item = try await client.send(Paths.getItem(itemID: id, userID: session.userID)).value
-            item.name = name
             try await client.send(Paths.updateItem(itemID: id, item))
-            try await sync.refreshCollection(id: id)
-            return id
         } catch let error where isForbidden(error) {
-            return try await recreateCollection(id: id, name: name)
+            return try await recreateCollection(id: id, name: name, image: item.imageTags?["Primary"])
         }
+        try await sync.refreshCollection(id: id)
+        return id
     }
 
     /// Neither copy could be deleted after a collection was recreated under its new name, so both
     /// are now on the server.
     public struct DuplicateCollectionError: Error {}
 
-    /// A new collection with the same albums in the same order, then the old one deleted. The
-    /// album list comes from the server, not the local mirror, so nothing added elsewhere since the
-    /// last sync is lost. If the old one can't be deleted, the new one is removed again; only if
-    /// that fails too are there two copies (`DuplicateCollectionError`).
-    private func recreateCollection(id: String, name: String) async throws -> String {
+    /// Recreating would drop the collection's cover image, which only an admin can upload again,
+    /// so the rename isn't attempted.
+    public struct RenameWouldLoseCoverError: Error {}
+
+    /// A new collection with the same items in the same order, then the old one deleted. Every
+    /// item is copied, not only albums, and the list comes from the server rather than the local
+    /// mirror, so nothing added elsewhere is lost. A collection with a cover image isn't recreated
+    /// (`RenameWouldLoseCoverError`). If the old one can't be deleted, the new one is removed again;
+    /// only if that fails too are there two copies (`DuplicateCollectionError`).
+    private func recreateCollection(id: String, name: String, image: String?) async throws -> String {
+        guard image == nil else { throw RenameWouldLoseCoverError() }
         var params = Paths.GetItemsParameters()
         params.userID = session.userID
         params.parentID = id
         let children = try await client.send(Paths.getItems(parameters: params)).value.items ?? []
-        let albumIDs = children.filter { $0.type == .musicAlbum }.compactMap(\.id)
-        let create = Paths.CreateCollectionParameters(name: name, ids: albumIDs.isEmpty ? nil : albumIDs, isLocked: false)
+        let itemIDs = children.compactMap(\.id)
+        let create = Paths.CreateCollectionParameters(name: name, ids: itemIDs.isEmpty ? nil : itemIDs, isLocked: false)
         guard let newID = try await client.send(Paths.createCollection(parameters: create)).value.id else {
             throw URLError(.badServerResponse)
         }
@@ -124,8 +130,20 @@ public struct LibraryEditor: Sendable {
             do { try await client.send(Paths.deleteItem(itemID: newID)) } catch { throw DuplicateCollectionError() }
             throw error
         }
-        _ = try await database.pool.write { try CollectionRecord.deleteOne($0, key: id) }
-        // The rename is done on the server; if this read fails, the next sync brings it in.
+        let old = try await database.pool.read { try CollectionRecord.fetchOne($0, key: id) }
+        let albumIDs = children.filter { $0.type == .musicAlbum }.compactMap(\.id)
+        // Swap the local copy over now, so the open page can follow even if the read below fails;
+        // the read (or the next sync) then fills in the server's details.
+        try await database.pool.write { db in
+            try CollectionRecord.deleteOne(db, key: id)
+            try CollectionRecord(
+                id: newID, name: name, sortName: SortKey.make(name), imageTag: nil,
+                albumCount: albumIDs.count, generation: old?.generation ?? 0
+            ).insert(db)
+            for (position, albumID) in albumIDs.enumerated() {
+                try CollectionAlbumRecord(collectionID: newID, albumID: albumID, position: position).insert(db)
+            }
+        }
         try? await sync.refreshCollection(id: newID)
         return newID
     }
