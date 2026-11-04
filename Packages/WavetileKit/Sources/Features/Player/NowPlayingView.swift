@@ -226,26 +226,30 @@ struct NowPlayingView: View {
                 }
             } label: {
                 Text("\(Double(player.podcastRate).formatted())×")
-                    .font(theme.typography.itemMetadata)
-                    .foregroundStyle(player.podcastRate == 1 ? theme.palette.textSecondary : theme.palette.accent)
+                    .font(theme.typography.mono(.body))
+                    .foregroundStyle(theme.palette.accent)
+                    .padding(.horizontal, theme.spacing.sm)
                     .frame(minWidth: 44, minHeight: 44)
+                    .controlOn(player.podcastRate != 1)
             }
             .accessibilityLabel("Playback Speed")
             .accessibilityValue("\(Double(player.podcastRate).formatted()) times")
             Spacer()
             SleepTimerMenu()
             Spacer()
-            AirPlayButton()
-            Spacer()
-            Button("Chapters", glyph: .chapters) { showChapters = true }
-                .foregroundStyle(chapters.isEmpty ? theme.palette.textSecondary.opacity(0.4) : theme.palette.accent)
-                .disabled(chapters.isEmpty)
-                .frame(minWidth: 44, minHeight: 44)
+            AirPlayButton(iconSize: 24)
+            // Only for episodes that have chapters; the Spacers spread the rest evenly without it.
+            if !chapters.isEmpty {
+                Spacer()
+                Button("Chapters", glyph: .chapters) { showChapters = true }
+                    .frame(minWidth: 44, minHeight: 44)
+            }
             Spacer()
             queueButton
         }
         .labelStyle(.iconOnly)
         .buttonStyle(.plain)
+        .foregroundStyle(theme.palette.accent)
         .frame(height: 44)
         .sensoryFeedback(.selection, trigger: player.podcastRate)
     }
@@ -253,21 +257,24 @@ struct NowPlayingView: View {
     private var musicControls: some View {
         HStack {
             Button("Shuffle", glyph: .shuffle) { player.toggleShuffle() }
-                .foregroundStyle(player.queue.isShuffled ? theme.palette.accent : theme.palette.textSecondary)
+                .frame(minWidth: 44, minHeight: 44)
+                .controlOn(player.queue.isShuffled)
                 .accessibilityValue(player.queue.isShuffled ? "On" : "Off")
             Spacer()
             SleepTimerMenu()
             Spacer()
-            AirPlayButton()
+            AirPlayButton(iconSize: 24)
             Spacer()
             Button("Repeat", glyph: player.queue.repeatMode == .one ? .repeatOne : .repeat) { player.cycleRepeat() }
-                .foregroundStyle(player.queue.repeatMode == .off ? theme.palette.textSecondary : theme.palette.accent)
+                .frame(minWidth: 44, minHeight: 44)
+                .controlOn(player.queue.repeatMode != .off)
                 .accessibilityValue(player.queue.repeatMode.rawValue)
             Spacer()
             queueButton
         }
         .labelStyle(.iconOnly)
         .buttonStyle(.plain)
+        .foregroundStyle(theme.palette.accent)
         .frame(height: 44)
         .sensoryFeedback(.selection, trigger: player.queue.repeatMode)
         .sensoryFeedback(.selection, trigger: player.queue.isShuffled)
@@ -434,12 +441,44 @@ struct SleepTimerMenu: View {
                         .frame(maxWidth: 48)
                 }
             }
-            .foregroundStyle(player.sleepTimer == nil ? theme.palette.textSecondary : theme.palette.accent)
+            .padding(.horizontal, isCountingDown ? theme.spacing.sm : 0)
+            .foregroundStyle(theme.palette.accent)
             .frame(minWidth: 44, minHeight: 44)
+            .controlOn(player.sleepTimer != nil)
         }
         .accessibilityLabel("Sleep Timer")
         .accessibilityValue(player.sleepTimer == nil ? "Off" : "On")
         .sensoryFeedback(.selection, trigger: player.sleepTimer)
+    }
+
+    private var isCountingDown: Bool {
+        if case .at = player.sleepTimer { true } else { false }
+    }
+}
+
+private extension View {
+    /// A switched-on control in the secondary capsule: every icon stays in the accent, and "on"
+    /// reads from a backing inset 4pt inside the 44pt tap area (a circle for an icon, a pill for text).
+    func controlOn(_ isOn: Bool) -> some View {
+        modifier(ControlOnBacking(isOn: isOn))
+    }
+}
+
+private struct ControlOnBacking: ViewModifier {
+    @Environment(\.theme) private var theme
+    let isOn: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .background {
+                if isOn {
+                    Capsule()
+                        .fill(theme.palette.controlOn)
+                        .padding(theme.spacing.xs)
+                        .transition(.opacity)
+                }
+            }
+            .animation(theme.motion.snappy, value: isOn)
     }
 }
 

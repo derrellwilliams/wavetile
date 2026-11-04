@@ -28,6 +28,9 @@ public struct Theme: Sendable, Identifiable, Hashable {
         /// the knob or read as off.
         public var toggle = Color(hex: 0x6E6E73)
         public var tintPressed: Color { accent.opacity(0.2) }
+        /// Behind a control that's switched on inside a tinted capsule (shuffle, repeat, sleep timer,
+        /// a speed other than 1×), so every icon keeps the accent and state reads from the backing.
+        public var controlOn: Color { accent.opacity(0.24) }
         public var background: Color
         public var surface: Color
         /// The main tan (in Dark): titles and primary text. Text is only ever this or `textSecondary`,
