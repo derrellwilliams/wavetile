@@ -46,10 +46,13 @@ struct PlaylistsView: View {
             .padding(.horizontal, theme.spacing.screenInset)
             .padding(.vertical, theme.spacing.lg)
         }
-        .overlay {
+        .overlay(alignment: .top) {
             if playlists.isEmpty {
                 if store.hasSyncedOnce {
-                    EmptyState("No Playlists", message: "Tap + to create one, or long-press any song and choose “Add to Playlist”.")
+                    EmptyPrompt("Make a Playlist", message: "Gather songs for any mood, then find them here and on Home.", button: "New Playlist") {
+                        showNew = true
+                    }
+                    .padding(.top, theme.spacing.lg)
                 } else {
                     LibraryEmptyState()
                 }
@@ -224,22 +227,11 @@ struct PlaylistDetailView: View {
         }
     }
 
-    /// Under the header, like an empty collection's: what goes here and a way to add it.
+    /// Under the header, like the Podcasts tab's: what goes here and a way to add it.
     private var emptyState: some View {
-        VStack(alignment: .leading, spacing: theme.spacing.xs) {
-            Text("Nothing Here Yet")
-                .font(theme.typography.title)
-                .foregroundStyle(theme.palette.textPrimary)
-                .accessibilityAddTraits(.isHeader)
-            Text("Pick songs from your library, or long-press any song and choose Add to Playlist.")
-                .font(theme.typography.body)
-                .foregroundStyle(theme.palette.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-            PrimaryButton("Add Songs", glyph: .add) { showPicker = true }
-                .padding(.top, theme.spacing.lg)
+        EmptyPrompt("Fill This Playlist", message: "Pick songs from your library, or long-press any song and choose Add to Playlist.", button: "Add Songs") {
+            showPicker = true
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, theme.spacing.screenInset)
     }
 
     private func observe() async {

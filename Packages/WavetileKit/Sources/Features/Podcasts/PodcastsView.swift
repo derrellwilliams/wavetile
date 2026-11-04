@@ -105,22 +105,11 @@ struct PodcastsView: View {
         .padding(.horizontal, theme.spacing.screenInset)
     }
 
+    /// Feed links and OPML import live in the + menu and Podcast Settings.
     private var emptyState: some View {
-        // Feed links and OPML import live in the + menu and Podcast Settings.
-        // Flush left on the screen margin, like the shelves below; no glyph.
-        VStack(alignment: .leading, spacing: theme.spacing.xs) {
-            Text("Find Your Shows")
-                .font(theme.typography.title)
-                .foregroundStyle(theme.palette.textPrimary)
-                .accessibilityAddTraits(.isHeader)
-            Text("Follow a show to see its episodes here.")
-                .font(theme.typography.body)
-                .foregroundStyle(theme.palette.textSecondary)
-            PrimaryButton("Find Shows") { openPodcastSearch() }
-                .padding(.top, theme.spacing.lg)
+        EmptyPrompt("Find Your Shows", message: "Follow a show to see its episodes here.", button: "Find Shows") {
+            openPodcastSearch()
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, theme.spacing.screenInset)
     }
 }
 

@@ -45,9 +45,12 @@ struct CollectionsView: View {
             .padding(.horizontal, theme.spacing.screenInset)
             .padding(.vertical, theme.spacing.lg)
         }
-        .overlay {
+        .overlay(alignment: .top) {
             if collections.isEmpty {
-                EmptyState("No Collections", message: "Group albums into collections. Tap + or use “Add to Collection” on any album.")
+                EmptyPrompt("Start a Collection", message: "Group albums you love, then find them here and on Home.", button: "New Collection") {
+                    showNew = true
+                }
+                .padding(.top, theme.spacing.lg)
             }
         }
         .themedBackground()
@@ -237,22 +240,11 @@ struct CollectionDetailView: View {
         } catch { Log.observationFailed(error) }
     }
 
-    /// Right under the title, like the Podcasts tab's: what goes here and a way to find it.
+    /// Right under the title, like the Podcasts tab's: what goes here and a way to add it.
     private var emptyState: some View {
-        VStack(alignment: .leading, spacing: theme.spacing.xs) {
-            Text("Nothing Here Yet")
-                .font(theme.typography.title)
-                .foregroundStyle(theme.palette.textPrimary)
-                .accessibilityAddTraits(.isHeader)
-            Text("Pick albums from your library, or use Add to Collection on any album.")
-                .font(theme.typography.body)
-                .foregroundStyle(theme.palette.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-            PrimaryButton("Add Albums", glyph: .add) { showPicker = true }
-                .padding(.top, theme.spacing.lg)
+        EmptyPrompt("Fill This Collection", message: "Pick albums from your library, or use Add to Collection on any album.", button: "Add Albums") {
+            showPicker = true
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, theme.spacing.screenInset)
         .padding(.top, theme.spacing.lg)
     }
 }
