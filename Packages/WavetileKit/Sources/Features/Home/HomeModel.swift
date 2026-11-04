@@ -42,7 +42,6 @@ final class HomeModel {
     // before there's any play history. Random picks are reshuffled on pull to refresh.
     private(set) var stats: LibraryStats?
     private(set) var genreShelves: [GenreShelf] = []
-    private(set) var playlists: [PlaylistRecord] = []
     /// Up to three artists with 3+ albums, at the bottom of Home.
     private(set) var spotlights: [Spotlight] = []
     private(set) var isLoading = false
@@ -76,7 +75,7 @@ final class HomeModel {
         loadLocal()
     }
 
-    /// Little play history yet: Home leads with the welcome card, genres and playlists.
+    /// Little play history yet: Home leads with the welcome card and genres.
     var isNewListener: Bool {
         (shelves.first { $0.kind == .recentlyPlayed }?.albums.count ?? 0) < 6
     }
@@ -148,7 +147,6 @@ final class HomeModel {
             let albums = (try? database.randomAlbums(genre: genre.genre)) ?? []
             return albums.count < 4 ? nil : GenreShelf(genre: genre.genre, albums: albums.map(\.summary))
         }
-        playlists = (try? database.playlistsByName()) ?? []
         spotlights = ((try? database.spotlightArtists(limit: 3)) ?? []).map {
             Spotlight(artistID: $0.artist.id, name: $0.artist.name, albums: $0.albums.map(\.summary))
         }

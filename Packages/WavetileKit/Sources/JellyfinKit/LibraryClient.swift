@@ -1,4 +1,5 @@
 import Foundation
+import Get
 
 /// Lightweight, UI-ready album model decoupled from the generated `BaseItemDto`.
 public struct AlbumSummary: Identifiable, Hashable, Sendable {
@@ -185,6 +186,12 @@ public struct LibraryClient: Sendable {
 
     /// Jellyfin image endpoints are unauthenticated, so no token goes in the URL.
     /// `tag` makes the URL change when artwork changes, which keeps image caches correct.
+    /// Whether the signed-in account is a server admin. Only admins can change item images and
+    /// edit items such as collection names.
+    public func isAdministrator() async throws -> Bool {
+        try await client.send(Paths.getCurrentUser).value.policy?.isAdministrator ?? false
+    }
+
     public func imageURL(itemID: String, tag: String?, maxPixelWidth: Int) -> URL? {
         let params = Paths.GetItemImageParameters(maxWidth: maxPixelWidth, quality: 90, tag: tag)
         return client.url(with: Paths.getItemImage(itemID: itemID, imageType: "Primary", parameters: params))
@@ -229,4 +236,10 @@ extension TrackSummary {
             normalizationGain: item.normalizationGain.map(Double.init)
         )
     }
+}
+
+/// True when the server refused a request for lack of permission (HTTP 403).
+public func isForbidden(_ error: any Error) -> Bool {
+    if case let APIError.unacceptableStatusCode(code) = error { return code == 403 }
+    return false
 }

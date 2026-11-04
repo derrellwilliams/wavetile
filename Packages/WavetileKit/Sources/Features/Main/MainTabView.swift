@@ -66,6 +66,7 @@ struct MainTabView: View {
         .task { await applyPodcastDebugFlags() }
         // Background library sync: on launch if stale (>1h); pull to refresh in Library forces one.
         .task { await signedIn.library.syncIfNeeded() }
+        .task { await signedIn.library.loadPermissions() }
         .enableInjection()
     }
 

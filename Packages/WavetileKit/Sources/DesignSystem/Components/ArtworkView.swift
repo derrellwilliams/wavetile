@@ -9,6 +9,8 @@ public enum ArtworkSource: Hashable, Sendable {
     /// It's downsampled to `maxPixelWidth` on decode so lists don't hold full-size bitmaps.
     case unsized(URL?, maxPixelWidth: Int)
     case placeholder(seed: Int)
+    /// Generated playlist and collection covers (`CoverArt`), drawn on device from a seed.
+    case generated(seed: String)
 
     /// Builds a sized request URL for the rendered point size × screen scale.
     public typealias URLProvider = @Sendable (_ pixelWidth: Int) -> URL?
@@ -52,6 +54,8 @@ public struct ArtworkView: View {
                     }
                 case let .placeholder(seed):
                     placeholder(seed: seed)
+                case let .generated(seed):
+                    GeneratedCover(seed: seed)
                 }
             }
             .clipShape(shape)

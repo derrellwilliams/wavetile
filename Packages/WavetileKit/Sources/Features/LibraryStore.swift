@@ -20,6 +20,9 @@ final class LibraryStore {
     private(set) var isSyncing = false
     private(set) var syncError: String?
     private(set) var hasSyncedOnce = false
+    /// How many times each playlist or collection's generated cover has been shuffled, by item
+    /// ID. Kept on this device; an item that's never been shuffled has the same cover everywhere.
+    private(set) var coverShuffles: [String: Int] = UserDefaults.standard.dictionary(forKey: LibraryStore.coverShufflesKey) as? [String: Int] ?? [:]
     /// Runs after each successful sync (downloaded-playlist refresh).
     @ObservationIgnored var afterSync: (() async -> Void)?
 
@@ -92,6 +95,41 @@ final class LibraryStore {
     func artwork(itemID: String?, tag: String? = nil, maxPixelWidth: Int) -> ArtworkSource {
         guard let itemID else { return .placeholder(seed: 0) }
         return .url(api.imageURL(itemID: itemID, tag: tag, maxPixelWidth: maxPixelWidth))
+    }
+
+    /// A playlist or collection's cover: its server image when it has one (uploaded, or made by
+    /// Jellyfin), otherwise a generated one (`CoverArt`) as a unique placeholder.
+    func cover(for itemID: String, tag: String?, maxPixelWidth: Int) -> ArtworkSource {
+        guard tag == nil else { return artwork(itemID: itemID, tag: tag, maxPixelWidth: maxPixelWidth) }
+        return .generated(seed: coverSeed(for: itemID))
+    }
+
+    func coverSeed(for itemID: String) -> String {
+        CoverArt.seed(id: itemID, shuffle: coverShuffles[itemID] ?? 0)
+    }
+
+    /// Swaps an item's cover for the next one its seed gives.
+    func shuffleCover(for itemID: String) {
+        coverShuffles[itemID, default: 0] += 1
+        UserDefaults.standard.set(coverShuffles, forKey: Self.coverShufflesKey)
+    }
+
+    /// Keeps a shuffled cover's count when an item gets a new ID (a collection renamed by
+    /// recreating it). Its cover still changes, since the ID is part of the seed.
+    func moveCoverShuffle(from oldID: String, to newID: String) {
+        guard let count = coverShuffles.removeValue(forKey: oldID) else { return }
+        coverShuffles[newID] = count
+        UserDefaults.standard.set(coverShuffles, forKey: Self.coverShufflesKey)
+    }
+
+    private static let coverShufflesKey = "coverShuffles"
+
+    /// Whether the account is a server admin. Only admins can change item images, so Upload and
+    /// Remove Cover Image show only for them. Checked once per session.
+    private(set) var isAdmin = false
+
+    func loadPermissions() async {
+        isAdmin = (try? await api.isAdministrator()) ?? false
     }
 
     var statusText: String? {

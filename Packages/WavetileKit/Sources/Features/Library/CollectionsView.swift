@@ -13,6 +13,7 @@ struct CollectionsView: View {
     @State private var showNew = false
     @State private var newName = ""
     @State private var pendingDelete: CollectionRecord?
+    @State private var pickingCover: String?
 
     var body: some View {
         ScrollView {
@@ -24,7 +25,7 @@ struct CollectionsView: View {
                 ForEach(collections) { collection in
                     NavigationLink(value: LibraryRoute.collection(collection)) {
                         VStack(alignment: .leading, spacing: theme.spacing.xs) {
-                            CollectionMosaic(collectionID: collection.id)
+                            ArtworkView(store.cover(for: collection.id, tag: collection.imageTag, maxPixelWidth: 480))
                             Text(collection.name)
                                 .font(theme.typography.itemTitle)
                                 .foregroundStyle(theme.palette.textPrimary)
@@ -36,6 +37,22 @@ struct CollectionsView: View {
                     }
                     .buttonStyle(.pressable)
                     .contextMenu {
+                        if store.isAdmin {
+                            Button("Upload Cover Image", glyph: .photo) { pickingCover = collection.id }
+                        }
+                        if collection.imageTag == nil {
+                            Button("Shuffle Cover", glyph: .shuffle) {
+                                withAnimation(theme.motion.snappy) { store.shuffleCover(for: collection.id) }
+                            }
+                        } else if store.isAdmin {
+                            Button("Remove Cover Image", glyph: .close) {
+                                Task {
+                                    do { try await store.editor.removeCoverImage(itemID: collection.id, owner: .collection) } catch {
+                                        actions.errorMessage = "Couldn't remove the cover."
+                                    }
+                                }
+                            }
+                        }
                         Button("Delete Collection", glyph: .trash, role: .destructive) { pendingDelete = collection }
                     }
                 }
@@ -50,6 +67,7 @@ struct CollectionsView: View {
         }
         .themedBackground()
         .navigationTitle("Collections")
+        .coverImagePicker(itemID: $pickingCover, owner: .collection)
         .listBar {
             Button { showNew = true } label: { TintedBarIcon(glyph: .add) }
                 .accessibilityLabel("New Collection")
@@ -93,54 +111,111 @@ struct CollectionsView: View {
     }
 }
 
+/// Collection page: full-bleed cover, name and album count, then the albums. Like a playlist page.
 struct CollectionDetailView: View {
     @ObserveInjection var inject
     @Environment(\.theme) private var theme
     @Environment(\.dismiss) private var dismiss
     @Environment(LibraryStore.self) private var store
     @Environment(LibraryActions.self) private var actions
-    @Environment(\.pushLibraryRoute) private var push
-    let collection: CollectionRecord
+    @State private var collection: CollectionRecord
     @State private var albums: [AlbumRecord] = []
     /// Set after the first read, so the empty state doesn't flash before the albums arrive.
     @State private var loaded = false
     @State private var confirmDelete = false
+    @State private var pickingCover: String?
+    @State private var showRename = false
+    @State private var newName = ""
+    @State private var showPicker = false
+
+    init(collection: CollectionRecord) {
+        _collection = State(initialValue: collection)
+    }
 
     var body: some View {
         ScrollView {
-            if loaded, albums.isEmpty {
-                emptyState
-            }
-            LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: theme.artwork.shelfTileWidth - 8), spacing: theme.spacing.lg)],
-                alignment: .leading,
-                spacing: theme.spacing.xl
-            ) {
-                ForEach(albums) { album in
-                    AlbumLink(album: album.summary, context: "collection")
-                        .contextMenu {
-                            Button("Remove from Collection", glyph: .trash, role: .destructive) {
-                                Task {
-                                    do { try await store.editor.removeFromCollection(id: collection.id, albumIDs: [album.id]) } catch {
-                                        actions.errorMessage = "Couldn't update the collection."
+            VStack(spacing: 0) {
+                VStack(spacing: theme.spacing.md) {
+                    ArtworkHero(artwork: store.cover(for: collection.id, tag: collection.imageTag, maxPixelWidth: 1320))
+                    DetailHeader(collection.name, metadata: "\(collection.albumCount) album\(collection.albumCount == 1 ? "" : "s")")
+                }
+                if loaded, albums.isEmpty {
+                    emptyState
+                }
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: theme.artwork.shelfTileWidth - 8), spacing: theme.spacing.lg)],
+                    alignment: .leading,
+                    spacing: theme.spacing.xl
+                ) {
+                    ForEach(albums) { album in
+                        AlbumLink(album: album.summary, context: "collection")
+                            .contextMenu {
+                                Button("Remove from Collection", glyph: .trash, role: .destructive) {
+                                    Task {
+                                        do { try await store.editor.removeFromCollection(id: collection.id, albumIDs: [album.id]) } catch {
+                                            actions.errorMessage = "Couldn't update the collection."
+                                        }
                                     }
                                 }
                             }
-                        }
+                    }
                 }
+                .padding(.horizontal, theme.spacing.screenInset)
+                .padding(.vertical, theme.spacing.lg)
             }
-            .padding(.horizontal, theme.spacing.screenInset)
-            .padding(.vertical, theme.spacing.lg)
+            .padding(.bottom, theme.spacing.xxl)
         }
-        .themedBackground()
-        .navigationTitle(collection.name)
-        .listBar {
+        // Full-bleed art: no bar background or blur band under the navigation bar.
+        .detailPageChrome()
+        .detailBarButtons {
             Menu {
+                Button("Rename", glyph: .edit) {
+                    newName = collection.name
+                    showRename = true
+                }
+                if store.isAdmin {
+                    Button("Upload Cover Image", glyph: .photo) { pickingCover = collection.id }
+                }
+                if collection.imageTag == nil {
+                    Button("Shuffle Cover", glyph: .shuffle) {
+                        withAnimation(theme.motion.snappy) { store.shuffleCover(for: collection.id) }
+                    }
+                } else if store.isAdmin {
+                    Button("Remove Cover Image", glyph: .close) {
+                        Task {
+                            do { try await store.editor.removeCoverImage(itemID: collection.id, owner: .collection) } catch {
+                                actions.errorMessage = "Couldn't remove the cover."
+                            }
+                        }
+                    }
+                }
+                Divider()
                 Button("Delete Collection", glyph: .trash, role: .destructive) { confirmDelete = true }
             } label: {
                 TintedBarIcon(glyph: .more)
             }
             .accessibilityLabel("More")
+        }
+        .alert("Rename Collection", isPresented: $showRename) {
+            TextField("Name", text: $newName)
+            Button("Cancel", role: .cancel) {}
+            Button("Save") {
+                let name = newName.trimmingCharacters(in: .whitespaces)
+                guard !name.isEmpty, name != collection.name else { return }
+                Task {
+                    do {
+                        let newID = try await store.editor.renameCollection(id: collection.id, to: name)
+                        // Renamed by recreating: follow the new collection.
+                        if newID != collection.id {
+                            store.moveCoverShuffle(from: collection.id, to: newID)
+                            if let record = try? store.database.collection(id: newID) { collection = record }
+                        }
+                    } catch {
+                        Log.editFailed("Rename collection", error)
+                        actions.errorMessage = "Couldn't rename the collection. Check your connection."
+                    }
+                }
+            }
         }
         .confirmationDialog("Delete “\(collection.name)”?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete Collection", role: .destructive) {
@@ -156,15 +231,37 @@ struct CollectionDetailView: View {
         } message: {
             Text("The albums stay in your library.")
         }
-        .task {
-            do {
-                for try await value in store.observe(store.database.albums(collectionID: collection.id)) {
-                    albums = value
-                    loaded = true
-                }
-            } catch { Log.observationFailed(error) }
+        .coverImagePicker(itemID: $pickingCover, owner: .collection)
+        .sheet(isPresented: $showPicker) {
+            LibraryPicker(target: .collection(id: collection.id))
+                .presentationBackground(theme.palette.background)
         }
+        .task(id: collection.id) { await observe() }
         .enableInjection()
+    }
+
+    private func observe() async {
+        async let albums: Void = observeAlbums()
+        async let record: Void = observeRecord()
+        _ = await (albums, record)
+    }
+
+    private func observeAlbums() async {
+        do {
+            for try await value in store.observe(store.database.albums(collectionID: collection.id)) {
+                albums = value
+                loaded = true
+            }
+        } catch { Log.observationFailed(error) }
+    }
+
+    /// Keeps the cover, name and count current after uploads, shuffles and edits.
+    private func observeRecord() async {
+        do {
+            for try await value in store.observe(store.database.collectionObservation(id: collection.id)) {
+                if let value { collection = value }
+            }
+        } catch { Log.observationFailed(error) }
     }
 
     /// Right under the title, like the Podcasts tab's: what goes here and a way to find it.
@@ -174,47 +271,15 @@ struct CollectionDetailView: View {
                 .font(theme.typography.title)
                 .foregroundStyle(theme.palette.textPrimary)
                 .accessibilityAddTraits(.isHeader)
-            Text("Open an album’s menu and choose Add to Collection.")
+            Text("Pick albums from your library, or use Add to Collection on any album.")
                 .font(theme.typography.body)
                 .foregroundStyle(theme.palette.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
-            PrimaryButton("Browse Albums", glyph: .album) { push(.section(.albums)) }
+            PrimaryButton("Add Albums", glyph: .add) { showPicker = true }
                 .padding(.top, theme.spacing.lg)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, theme.spacing.screenInset)
         .padding(.top, theme.spacing.lg)
-    }
-}
-
-/// 2×2 grid of the collection's first album covers (Jellyfin rarely has collection art).
-struct CollectionMosaic: View {
-    @Environment(LibraryStore.self) private var store
-    let collectionID: String
-    @State private var covers: [AlbumRecord] = []
-
-    var body: some View {
-        Color.clear
-            .aspectRatio(1, contentMode: .fit)
-            .overlay {
-                if covers.count >= 4 {
-                    Grid(horizontalSpacing: 0, verticalSpacing: 0) {
-                        GridRow { cover(0); cover(1) }
-                        GridRow { cover(2); cover(3) }
-                    }
-                } else if let first = covers.first {
-                    ArtworkView(store.artwork(itemID: first.id, tag: first.imageTag, maxPixelWidth: 480), cornerRadius: 0)
-                } else {
-                    ArtworkView(.placeholder(seed: collectionID.count), cornerRadius: 0)
-                }
-            }
-            .clipped()
-            .task(id: collectionID) {
-                covers = (try? store.database.collectionCovers(collectionID: collectionID)) ?? []
-            }
-    }
-
-    private func cover(_ index: Int) -> some View {
-        ArtworkView(store.artwork(itemID: covers[index].id, tag: covers[index].imageTag, maxPixelWidth: 240), cornerRadius: 0)
     }
 }

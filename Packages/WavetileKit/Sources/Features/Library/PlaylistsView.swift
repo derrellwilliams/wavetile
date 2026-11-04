@@ -4,7 +4,7 @@ import Persistence
 import Playback
 import SwiftUI
 
-/// Song-based playlists: create, delete, open.
+/// Song-based playlists as a grid of covers, like Collections: create, delete, open.
 struct PlaylistsView: View {
     @ObserveInjection var inject
     @Environment(\.theme) private var theme
@@ -14,32 +14,53 @@ struct PlaylistsView: View {
     @State private var showNew = false
     @State private var newName = ""
     @State private var pendingDelete: PlaylistRecord?
+    @State private var pickingCover: String?
 
     var body: some View {
-        List {
-            ForEach(playlists) { playlist in
-                NavigationLink(value: LibraryRoute.playlist(playlist)) {
-                    HStack(spacing: theme.spacing.md) {
-                        ArtworkView(store.artwork(itemID: playlist.id, tag: playlist.imageTag, maxPixelWidth: 192))
-                            .frame(width: 56)
-                        VStack(alignment: .leading, spacing: theme.spacing.xxs) {
+        ScrollView {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: theme.artwork.shelfTileWidth - 8), spacing: theme.spacing.lg)],
+                alignment: .leading,
+                spacing: theme.spacing.xl
+            ) {
+                ForEach(playlists) { playlist in
+                    NavigationLink(value: LibraryRoute.playlist(playlist)) {
+                        VStack(alignment: .leading, spacing: theme.spacing.xs) {
+                            ArtworkView(store.cover(for: playlist.id, tag: playlist.imageTag, maxPixelWidth: 480))
                             Text(playlist.name)
-                                .font(theme.typography.body)
+                                .font(theme.typography.itemTitle)
                                 .foregroundStyle(theme.palette.textPrimary)
-                            Text("\(playlist.trackCount) songs")
+                            Text("\(playlist.trackCount) song\(playlist.trackCount == 1 ? "" : "s")")
                                 .font(theme.typography.itemMetadata)
                                 .foregroundStyle(theme.palette.textSecondary)
                         }
                         .lineLimit(1)
                     }
-                }
-                .listRowBackground(Color.clear)
-                .swipeActions {
-                    Button("Delete", role: .destructive) { pendingDelete = playlist }
+                    .buttonStyle(.pressable)
+                    .contextMenu {
+                        if store.isAdmin {
+                            Button("Upload Cover Image", glyph: .photo) { pickingCover = playlist.id }
+                        }
+                        if playlist.imageTag == nil {
+                            Button("Shuffle Cover", glyph: .shuffle) {
+                                withAnimation(theme.motion.snappy) { store.shuffleCover(for: playlist.id) }
+                            }
+                        } else if store.isAdmin {
+                            Button("Remove Cover Image", glyph: .close) {
+                                Task {
+                                    do { try await store.editor.removeCoverImage(itemID: playlist.id, owner: .playlist) } catch {
+                                        actions.errorMessage = "Couldn't remove the cover."
+                                    }
+                                }
+                            }
+                        }
+                        Button("Delete Playlist", glyph: .trash, role: .destructive) { pendingDelete = playlist }
+                    }
                 }
             }
+            .padding(.horizontal, theme.spacing.screenInset)
+            .padding(.vertical, theme.spacing.lg)
         }
-        .listStyle(.plain)
         .overlay {
             if playlists.isEmpty {
                 if store.hasSyncedOnce {
@@ -51,6 +72,7 @@ struct PlaylistsView: View {
         }
         .themedBackground()
         .navigationTitle("Playlists")
+        .coverImagePicker(itemID: $pickingCover, owner: .playlist)
         .listBar {
             Button { showNew = true } label: { TintedBarIcon(glyph: .add) }
                 .accessibilityLabel("New Playlist")
@@ -105,17 +127,17 @@ struct PlaylistDetailView: View {
     @Environment(DownloadsStore.self) private var downloads
     @State private var playlist: PlaylistRecord
     @State private var items: [PlaylistItem] = []
+    /// Set after the first read, so the empty state doesn't flash before the songs arrive.
+    @State private var loaded = false
+    @State private var showPicker = false
     @State private var showRename = false
     @State private var newName = ""
     @State private var showEditor = false
     @State private var confirmDelete = false
+    @State private var pickingCover: String?
 
     init(playlist: PlaylistRecord) {
         _playlist = State(initialValue: playlist)
-    }
-
-    private var artwork: ArtworkSource {
-        store.artwork(itemID: playlist.id, tag: playlist.imageTag, maxPixelWidth: 1320)
     }
 
     private var tracks: [TrackRecord] { items.map(\.track) }
@@ -124,8 +146,12 @@ struct PlaylistDetailView: View {
         ScrollView {
             VStack(spacing: theme.spacing.xl) {
                 VStack(spacing: theme.spacing.md) {
-                    ArtworkHero(artwork: artwork)
+                    ArtworkHero(artwork: store.cover(for: playlist.id, tag: playlist.imageTag, maxPixelWidth: 1320))
                     DetailHeader(playlist.name, metadata: "\(playlist.trackCount) songs · \(Duration.milliseconds(playlist.durationMs).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated)))")
+                }
+
+                if loaded, items.isEmpty {
+                    emptyState
                 }
 
                 LazyVStack(spacing: 0) {
@@ -160,6 +186,18 @@ struct PlaylistDetailView: View {
                     newName = playlist.name
                     showRename = true
                 }
+                if store.isAdmin {
+                    Button("Upload Cover Image", glyph: .photo) { pickingCover = playlist.id }
+                }
+                if playlist.imageTag == nil {
+                    Button("Shuffle Cover", glyph: .shuffle) {
+                        withAnimation(theme.motion.snappy) { store.shuffleCover(for: playlist.id) }
+                    }
+                } else if store.isAdmin {
+                    Button("Remove Cover Image", glyph: .close) {
+                        run("Couldn't remove the cover.") { try await store.editor.removeCoverImage(itemID: playlist.id, owner: .playlist) }
+                    }
+                }
                 Button("Edit Songs", glyph: .playlist) { showEditor = true }
                     .disabled(items.isEmpty)
                 Divider()
@@ -192,6 +230,11 @@ struct PlaylistDetailView: View {
         } message: {
             Text("This deletes it from your Jellyfin server for all your devices.")
         }
+        .coverImagePicker(itemID: $pickingCover, owner: .playlist)
+        .sheet(isPresented: $showPicker) {
+            LibraryPicker(target: .playlist(id: playlist.id))
+                .presentationBackground(theme.palette.background)
+        }
         .sheet(isPresented: $showEditor) {
             PlaylistEditor(playlistID: playlist.id, items: items)
                 .presentationBackground(theme.palette.background)
@@ -206,6 +249,24 @@ struct PlaylistDetailView: View {
         }
     }
 
+    /// Under the header, like an empty collection's: what goes here and a way to add it.
+    private var emptyState: some View {
+        VStack(alignment: .leading, spacing: theme.spacing.xs) {
+            Text("Nothing Here Yet")
+                .font(theme.typography.title)
+                .foregroundStyle(theme.palette.textPrimary)
+                .accessibilityAddTraits(.isHeader)
+            Text("Pick songs from your library, or long-press any song and choose Add to Playlist.")
+                .font(theme.typography.body)
+                .foregroundStyle(theme.palette.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            PrimaryButton("Add Songs", glyph: .add) { showPicker = true }
+                .padding(.top, theme.spacing.lg)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, theme.spacing.screenInset)
+    }
+
     private func observe() async {
         async let items: Void = observeItems()
         async let record: Void = observeRecord()
@@ -214,7 +275,10 @@ struct PlaylistDetailView: View {
 
     private func observeItems() async {
         do {
-            for try await value in store.observe(store.database.playlistItems(playlistID: playlist.id)) { items = value }
+            for try await value in store.observe(store.database.playlistItems(playlistID: playlist.id)) {
+                items = value
+                loaded = true
+            }
         } catch { Log.observationFailed(error) }
     }
 

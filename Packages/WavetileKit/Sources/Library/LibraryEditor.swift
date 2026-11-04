@@ -83,6 +83,39 @@ public struct LibraryEditor: Sendable {
         return result.id
     }
 
+    /// Renames a collection and returns its ID afterwards. Collections have no rename call, so an
+    /// admin's rename reads the full item, changes the name and saves it back (as Jellyfin's
+    /// metadata editor does). Other accounts can't edit items, so for them the collection is
+    /// recreated under the new name, which gives it a new ID.
+    @discardableResult
+    public func renameCollection(id: String, to name: String) async throws -> String {
+        do {
+            var item = try await client.send(Paths.getItem(itemID: id, userID: session.userID)).value
+            item.name = name
+            try await client.send(Paths.updateItem(itemID: id, item))
+            try await sync.refreshCollection(id: id)
+            return id
+        } catch let error where isForbidden(error) {
+            return try await recreateCollection(id: id, name: name)
+        }
+    }
+
+    /// A new collection with the same albums in the same order, then the old one deleted. If the
+    /// delete fails, the new one is removed again so there's no duplicate.
+    private func recreateCollection(id: String, name: String) async throws -> String {
+        let albumIDs = try await database.pool.read { db in
+            try CollectionAlbumRecord.filter(Column("collectionID") == id).order(Column("position")).fetchAll(db).map(\.albumID)
+        }
+        guard let newID = try await createCollection(name: name, albumIDs: albumIDs) else { throw URLError(.badServerResponse) }
+        do {
+            try await deleteCollection(id: id)
+        } catch {
+            try? await deleteCollection(id: newID)
+            throw error
+        }
+        return newID
+    }
+
     public func deleteCollection(id: String) async throws {
         try await client.send(Paths.deleteItem(itemID: id))
         _ = try await database.pool.write { try CollectionRecord.deleteOne($0, key: id) }
@@ -98,5 +131,31 @@ public struct LibraryEditor: Sendable {
         guard !albumIDs.isEmpty else { return }
         try await client.send(Paths.removeFromCollection(collectionID: id, ids: albumIDs))
         try await sync.refreshCollection(id: id)
+    }
+
+    // MARK: Cover images (playlists and collections)
+
+    public enum CoverOwner: Sendable { case playlist, collection }
+
+    /// Uploads a JPEG as the item's primary image on the server, replacing any it had. Jellyfin
+    /// takes the image base64-encoded in the body. Some servers only let admins change images.
+    public func setCoverImage(itemID: String, jpeg: Data, owner: CoverOwner) async throws {
+        var request = Paths.setItemImage(itemID: itemID, imageType: ImageType.primary.rawValue, jpeg.base64EncodedData())
+        request.headers = ["Content-Type": "image/jpeg"]
+        try await client.send(request)
+        try await refresh(itemID, owner)
+    }
+
+    /// Deletes the item's primary image, so Wavetile falls back to its generated cover.
+    public func removeCoverImage(itemID: String, owner: CoverOwner) async throws {
+        try await client.send(Paths.deleteItemImage(itemID: itemID, imageType: ImageType.primary.rawValue))
+        try await refresh(itemID, owner)
+    }
+
+    private func refresh(_ itemID: String, _ owner: CoverOwner) async throws {
+        switch owner {
+        case .playlist: try await sync.refreshPlaylist(id: itemID)
+        case .collection: try await sync.refreshCollection(id: itemID)
+        }
     }
 }

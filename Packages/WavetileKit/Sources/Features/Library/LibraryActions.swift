@@ -224,7 +224,7 @@ struct AddToPlaylistSheet: View {
                         perform("Added to \(playlist.name)") { try await store.editor.addToPlaylist(id: playlist.id, trackIDs: trackIDs) }
                     } label: {
                         HStack(spacing: theme.spacing.md) {
-                            ArtworkView(store.artwork(itemID: playlist.id, tag: playlist.imageTag, maxPixelWidth: 144))
+                            ArtworkView(store.cover(for: playlist.id, tag: playlist.imageTag, maxPixelWidth: 144))
                                 .frame(width: theme.artwork.rowThumbnail)
                             VStack(alignment: .leading) {
                                 Text(playlist.name).font(theme.typography.body)
@@ -300,7 +300,7 @@ struct AddToCollectionSheet: View {
                         perform("Added to \(collection.name)") { try await store.editor.addToCollection(id: collection.id, albumIDs: albumIDs) }
                     } label: {
                         HStack(spacing: theme.spacing.md) {
-                            CollectionMosaic(collectionID: collection.id)
+                            ArtworkView(store.cover(for: collection.id, tag: collection.imageTag, maxPixelWidth: 144))
                                 .frame(width: theme.artwork.rowThumbnail)
                             VStack(alignment: .leading) {
                                 Text(collection.name).font(theme.typography.body)

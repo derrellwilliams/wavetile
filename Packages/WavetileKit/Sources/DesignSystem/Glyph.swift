@@ -67,6 +67,7 @@ public enum Glyph: String, CaseIterable, Sendable {
     case hidePlayed = "eye-slash"
     case wave = "hand-waving"
     case radio
+    case photo = "image"
 
     /// 24pt template image; tints with `foregroundStyle`. Add `.resizable()` for other sizes.
     /// Decorative: VoiceOver skips it (otherwise it reads asset names like "magnifying-glass").

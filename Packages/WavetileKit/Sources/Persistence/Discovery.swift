@@ -75,8 +75,4 @@ public extension LibraryDatabase {
             }
         }
     }
-
-    func playlistsByName(limit: Int = 16) throws -> [PlaylistRecord] {
-        try pool.read { try PlaylistRecord.order(Column("name").collating(.nocase)).limit(limit).fetchAll($0) }
-    }
 }

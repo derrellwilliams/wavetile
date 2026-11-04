@@ -73,7 +73,7 @@ public struct ArtworkSpotlight: View {
             LazyImage(request: request, transaction: Transaction(animation: theme.motion.snappy)) { state in
                 if let image = state.image { image.resizable().scaledToFill() }
             }
-        case .placeholder:
+        case .placeholder, .generated:
             ArtworkView(artwork, cornerRadius: 0).blur(radius: 80)
         }
     }

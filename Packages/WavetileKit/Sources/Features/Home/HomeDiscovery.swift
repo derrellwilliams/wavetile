@@ -95,7 +95,25 @@ struct PlaylistLink: View {
             AlbumTile(
                 title: playlist.name,
                 subtitle: "\(playlist.trackCount) song\(playlist.trackCount == 1 ? "" : "s")",
-                artwork: store.artwork(itemID: playlist.id, tag: playlist.imageTag, maxPixelWidth: 480),
+                artwork: store.cover(for: playlist.id, tag: playlist.imageTag, maxPixelWidth: 480),
+                subtitleIsMetadata: true
+            )
+        }
+        .buttonStyle(.pressable)
+    }
+}
+
+/// Collection tile for Home shelves.
+struct CollectionLink: View {
+    @Environment(LibraryStore.self) private var store
+    let collection: CollectionRecord
+
+    var body: some View {
+        NavigationLink(value: LibraryRoute.collection(collection)) {
+            AlbumTile(
+                title: collection.name,
+                subtitle: "\(collection.albumCount) album\(collection.albumCount == 1 ? "" : "s")",
+                artwork: store.cover(for: collection.id, tag: collection.imageTag, maxPixelWidth: 480),
                 subtitleIsMetadata: true
             )
         }

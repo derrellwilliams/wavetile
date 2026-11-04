@@ -121,7 +121,9 @@ struct DownloadedView: View {
         let collection = item.collection
         NavigationLink(value: route(for: collection)) {
             VStack(alignment: .leading, spacing: theme.spacing.xs) {
-                ArtworkView(library.artwork(itemID: collection.id, tag: collection.imageTag, maxPixelWidth: 480))
+                ArtworkView(collection.kind == .playlist
+                            ? library.cover(for: collection.id, tag: collection.imageTag, maxPixelWidth: 480)
+                            : library.artwork(itemID: collection.id, tag: collection.imageTag, maxPixelWidth: 480))
                     .overlay(alignment: .bottomTrailing) {
                         if item.status.isInProgress {
                             ProgressRing(progress: item.status.progress)

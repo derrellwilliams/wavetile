@@ -167,7 +167,11 @@ public final class CarPlayController {
     private func playlistSections(_ signedIn: AppModel.SignedIn) -> [CPListSection] {
         let items = playlistContent(signedIn).map { playlist in
             let item = CPListItem(text: playlist.name, detailText: "\(playlist.trackCount) songs")
-            loadImage(item, itemID: playlist.id, tag: playlist.imageTag, signedIn)
+            if playlist.imageTag != nil {
+                loadImage(item, itemID: playlist.id, tag: playlist.imageTag, signedIn)
+            } else {
+                loadCover(item, seed: signedIn.library.coverSeed(for: playlist.id))
+            }
             item.handler = { [weak self] _, completion in
                 self?.play((try? signedIn.library.database.tracks(playlistID: playlist.id)) ?? [], signedIn)
                 completion()
@@ -301,6 +305,13 @@ public final class CarPlayController {
     private func loadImage(_ item: CPListItem, itemID: String, tag: String?, _ signedIn: AppModel.SignedIn) {
         guard let url = signedIn.library.api.imageURL(itemID: itemID, tag: tag, maxPixelWidth: 180) else { return }
         loadImage(item, url: url)
+    }
+
+    /// A generated cover for a playlist without server art, at CarPlay's list-image size.
+    private func loadCover(_ item: CPListItem, seed: String) {
+        Task {
+            if let image = await CoverArt.image(seed: seed, pixels: 180, scale: 2) { item.setImage(UIImage(cgImage: image)) }
+        }
     }
 
     private func loadImage(_ item: CPListItem, url: URL) {

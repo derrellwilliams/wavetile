@@ -12,7 +12,7 @@ public enum BrandFont {
     public static let monoFamily = "Geist Mono"
     /// PostScript names, for fixed faces (the wordmark, screen titles, Home's feed).
     public static let regularName = "Inter-Regular"
-    public static let monoName = "GeistMono-Regular"
+    nonisolated public static let monoName = "GeistMono-Regular"
 
     /// Registers bundled fonts with the process. Packages can't use `UIAppFonts`, so this
     /// runs once at launch (`RootView` calls it); repeated calls are no-ops.

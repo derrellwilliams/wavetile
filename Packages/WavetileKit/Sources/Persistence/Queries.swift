@@ -266,16 +266,6 @@ public extension LibraryDatabase {
         }
     }
 
-    /// First few album covers, for collection mosaics.
-    func collectionCovers(collectionID: String, limit: Int = 4) throws -> [AlbumRecord] {
-        try pool.read { db in
-            try AlbumRecord.fetchAll(db, sql: """
-                SELECT album.* FROM collectionAlbum JOIN album ON album.id = collectionAlbum.albumID
-                WHERE collectionAlbum.collectionID = ? ORDER BY collectionAlbum.position LIMIT ?
-                """, arguments: [collectionID, limit])
-        }
-    }
-
     func playlistEntries(playlistID: String) throws -> [PlaylistEntryRecord] {
         try pool.read { try PlaylistEntryRecord.filter(Column("playlistID") == playlistID).order(Column("position")).fetchAll($0) }
     }
@@ -304,6 +294,14 @@ public extension LibraryDatabase {
 
     func playlistObservation(id: String) -> ValueObservation<ValueReducers.Fetch<PlaylistRecord?>> {
         ValueObservation.tracking { try PlaylistRecord.fetchOne($0, key: id) }
+    }
+
+    func collection(id: String) throws -> CollectionRecord? {
+        try pool.read { try CollectionRecord.fetchOne($0, key: id) }
+    }
+
+    func collectionObservation(id: String) -> ValueObservation<ValueReducers.Fetch<CollectionRecord?>> {
+        ValueObservation.tracking { try CollectionRecord.fetchOne($0, key: id) }
     }
 }
 

@@ -1,5 +1,6 @@
 import DesignSystem
 import JellyfinKit
+import Persistence
 import Playback
 import Podcasts
 import PreviewSupport
@@ -19,6 +20,9 @@ struct HomeView: View {
     @State private var scrollPosition = ScrollPosition(edge: .top)
     @State private var didRefresh = false
     @State private var podcastUpNext: [EpisodeItem]
+    /// Live, so a playlist or collection made elsewhere in the app shows up right away.
+    @State private var playlists: [PlaylistRecord] = []
+    @State private var collections: [CollectionRecord] = []
     /// Greets a new listener by name on the welcome card.
     let userName: String
 
@@ -36,10 +40,11 @@ struct HomeView: View {
         NavigationStack(path: $path) {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: theme.spacing.xxl) {
-                    // Order: Recently Played, Latest Podcast Episodes, Most Played, Recently Added,
-                    // then up to three Artist Spotlights. Latest Podcast Episodes appears only when podcasts are
-                    // on and it has episodes. (Continue Listening lives at the top of the Podcasts
-                    // tab.) With little play history, a welcome card leads and genre and playlist
+                    // Order: Recently Played, Latest Podcast Episodes, Most Played, Playlists,
+                    // Collections, Recently Added, then up to three Artist Spotlights. Latest Podcast
+                    // Episodes appears only when podcasts are on and it has episodes; Playlists and
+                    // Collections only when there are some. (Continue Listening lives at the top of
+                    // the Podcasts tab.) With little play history, a welcome card leads and genre
                     // shelves follow Recently Added (the card only for the first visit).
                     if model.showsWelcome, let stats = model.stats, stats.albums > 0 {
                         WelcomeCard(userName: userName, stats: stats)
@@ -48,6 +53,9 @@ struct HomeView: View {
                         podcastUpNextShelf
                     }
                     ForEach(model.shelves) { shelf in
+                        if shelf.kind == .recentlyAdded {
+                            libraryShelves
+                        }
                         ShelfSection(shelf.title, items: shelf.albums) { album in
                             AlbumLink(
                                 album: album,
@@ -61,15 +69,13 @@ struct HomeView: View {
                             podcastUpNextShelf
                         }
                     }
+                    if !model.shelves.contains(where: { $0.kind == .recentlyAdded }) {
+                        libraryShelves
+                    }
                     if model.isNewListener {
                         ForEach(model.genreShelves) { shelf in
                             ShelfSection(shelf.genre, items: shelf.albums) { album in
                                 AlbumLink(album: album, context: "genre-\(shelf.genre)")
-                            }
-                        }
-                        if !model.playlists.isEmpty {
-                            ShelfSection("Playlists", items: model.playlists) { playlist in
-                                PlaylistLink(playlist: playlist)
                             }
                         }
                     }
@@ -96,6 +102,8 @@ struct HomeView: View {
                       (try? await Task.sleep(for: .seconds(60))) != nil else { return }
                 model.countWelcomeVisit()
             }
+            .task { await observe(store.database.playlists()) { playlists = $0 } }
+            .task { await observe(store.database.collections()) { collections = $0 } }
             .task(id: podcasts.isEnabled) { await observePodcasts(podcasts.database.upNextShelf()) { podcastUpNext = $0 } }
             .markRefreshable {
                 await model.loadDiscovery()
@@ -123,6 +131,22 @@ struct HomeView: View {
             }
         }
         .enableInjection()
+    }
+
+    /// The user's own playlists and collections, just above Recently Added (or where it would be).
+    @ViewBuilder private var libraryShelves: some View {
+        if !playlists.isEmpty {
+            ShelfSection("Playlists", items: playlists) { PlaylistLink(playlist: $0) }
+        }
+        if !collections.isEmpty {
+            ShelfSection("Collections", items: collections) { CollectionLink(collection: $0) }
+        }
+    }
+
+    private func observe<T: Sendable & Equatable>(_ observation: GRDBObservation<T>, update: (T) -> Void) async {
+        do {
+            for try await value in store.observe(observation) { update(value) }
+        } catch { Log.observationFailed(error) }
     }
 
     private func scrollToTop() {
