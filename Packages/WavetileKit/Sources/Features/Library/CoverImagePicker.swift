@@ -37,8 +37,7 @@ struct CoverMenuItems: View {
             Button("Remove Cover Image", glyph: .close) {
                 Task {
                     do { try await store.editor.removeCoverImage(itemID: itemID, owner: owner) } catch {
-                        Log.editFailed("Remove cover", error)
-                        actions.errorMessage = "Couldn't remove the cover. Check your connection."
+                        actions.editFailed("remove this cover", error)
                     }
                 }
             }
@@ -81,8 +80,7 @@ private struct CoverImagePicker: ViewModifier {
                 try await store.editor.setCoverImage(itemID: id, jpeg: jpeg, owner: owner)
                 actions.confirm("Cover updated")
             } catch {
-                Log.editFailed("Upload cover", error)
-                actions.errorMessage = "Couldn't change the cover. Your Jellyfin account may not be allowed to edit images."
+                actions.editFailed("change this cover", error)
             }
         }
     }

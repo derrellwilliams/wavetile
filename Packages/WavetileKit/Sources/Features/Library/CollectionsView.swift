@@ -66,7 +66,7 @@ struct CollectionsView: View {
                 guard !name.isEmpty else { return }
                 Task {
                     do { try await store.editor.createCollection(name: name) } catch {
-                        actions.errorMessage = "Couldn't create the collection. Check your connection."
+                        actions.editFailed("create collections", error)
                     }
                 }
             }
@@ -80,7 +80,7 @@ struct CollectionsView: View {
                 guard let collection = pendingDelete else { return }
                 Task {
                     do { try await store.editor.deleteCollection(id: collection.id) } catch {
-                        actions.errorMessage = "Couldn't delete the collection."
+                        actions.editFailed("delete this collection", error)
                     }
                 }
             }
@@ -138,7 +138,7 @@ struct CollectionDetailView: View {
                                 Button("Remove from Collection", glyph: .trash, role: .destructive) {
                                     Task {
                                         do { try await store.editor.removeFromCollection(id: collection.id, albumIDs: [album.id]) } catch {
-                                            actions.errorMessage = "Couldn't update the collection."
+                                            actions.editFailed("remove albums from this collection", error)
                                         }
                                     }
                                 }
@@ -185,8 +185,7 @@ struct CollectionDetailView: View {
                     } catch is LibraryEditor.DuplicateCollectionError {
                         actions.errorMessage = "Renamed, but the old copy couldn't be removed, so both are on your server. Delete the old one from Jellyfin."
                     } catch {
-                        Log.editFailed("Rename collection", error)
-                        actions.errorMessage = "Couldn't rename the collection. Check your connection."
+                        actions.editFailed("rename this collection", error)
                     }
                 }
             }
@@ -198,7 +197,7 @@ struct CollectionDetailView: View {
                         try await store.editor.deleteCollection(id: collection.id)
                         dismiss()
                     } catch {
-                        actions.errorMessage = "Couldn't delete the collection."
+                        actions.editFailed("delete this collection", error)
                     }
                 }
             }

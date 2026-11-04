@@ -137,8 +137,7 @@ struct LibraryPicker: View {
                 actions.confirm(label)
                 dismiss()
             } catch {
-                Log.editFailed(isSongs ? "Add songs" : "Add albums", error)
-                actions.errorMessage = "Couldn't add them. Check your connection."
+                actions.editFailed(isSongs ? "add songs to this playlist" : "add albums to this collection", error)
                 isAdding = false
             }
         }

@@ -1,4 +1,5 @@
 import DesignSystem
+import JellyfinKit
 import Library
 import Persistence
 import Playback
@@ -30,6 +31,16 @@ final class LibraryActions {
     var addToCollection: AlbumSelection?
     var errorMessage: String?
     private(set) var confirmation: Confirmation?
+
+    /// Shows why a server edit failed. A permission refusal (403) gets its own message pointing to
+    /// the server admin, since trying again won't help; anything else is most likely the
+    /// connection. `action` completes "isn't allowed to …" and "Couldn't …".
+    func editFailed(_ action: String, _ error: any Error) {
+        Log.editFailed(action, error)
+        errorMessage = isForbidden(error)
+            ? "Your Jellyfin account isn't allowed to \(action). Ask your server admin to turn this on for you."
+            : "Couldn't \(action). Check your connection."
+    }
 
     func confirm(_ message: String) {
         show(Confirmation(message: message), for: .seconds(2))
@@ -270,7 +281,7 @@ struct AddToPlaylistSheet: View {
             do {
                 try await work()
                 actions.confirm(success)
-            } catch { actions.errorMessage = "Couldn't update the playlist. Check your connection." }
+            } catch { actions.editFailed("add to this playlist", error) }
         }
     }
 }
@@ -346,7 +357,7 @@ struct AddToCollectionSheet: View {
             do {
                 try await work()
                 actions.confirm(success)
-            } catch { actions.errorMessage = "Couldn't update the collection. Check your connection." }
+            } catch { actions.editFailed("add to this collection", error) }
         }
     }
 }

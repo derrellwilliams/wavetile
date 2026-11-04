@@ -71,7 +71,7 @@ struct PlaylistsView: View {
                 guard !name.isEmpty else { return }
                 Task {
                     do { try await store.editor.createPlaylist(name: name) } catch {
-                        actions.errorMessage = "Couldn't create the playlist. Check your connection."
+                        actions.editFailed("create playlists", error)
                     }
                 }
             }
@@ -85,7 +85,7 @@ struct PlaylistsView: View {
                 guard let playlist = pendingDelete else { return }
                 Task {
                     do { try await store.editor.deletePlaylist(id: playlist.id) } catch {
-                        actions.errorMessage = "Couldn't delete the playlist."
+                        actions.editFailed("delete this playlist", error)
                     }
                 }
             }
@@ -187,7 +187,7 @@ struct PlaylistDetailView: View {
             Button("Save") {
                 let name = newName.trimmingCharacters(in: .whitespaces)
                 guard !name.isEmpty, name != playlist.name else { return }
-                run("Couldn't rename the playlist.") { try await store.editor.renamePlaylist(id: playlist.id, to: name) }
+                run("rename this playlist") { try await store.editor.renamePlaylist(id: playlist.id, to: name) }
             }
         }
         .confirmationDialog("Delete “\(playlist.name)”?", isPresented: $confirmDelete, titleVisibility: .visible) {
@@ -197,7 +197,7 @@ struct PlaylistDetailView: View {
                         try await store.editor.deletePlaylist(id: playlist.id)
                         dismiss()
                     } catch {
-                        actions.errorMessage = "Couldn't delete the playlist."
+                        actions.editFailed("delete this playlist", error)
                     }
                 }
             }
@@ -217,9 +217,10 @@ struct PlaylistDetailView: View {
         .enableInjection()
     }
 
-    private func run(_ failure: String, _ work: @escaping () async throws -> Void) {
+    /// `action` completes the failure message ("Couldn't rename this playlist", or the ask-your-admin one).
+    private func run(_ action: String, _ work: @escaping () async throws -> Void) {
         Task {
-            do { try await work() } catch { actions.errorMessage = failure }
+            do { try await work() } catch { actions.editFailed(action, error) }
         }
     }
 
@@ -309,7 +310,7 @@ private struct PlaylistEditor: View {
         guard let entryID = item.entry.entryID else { return }
         Task {
             do { try await store.editor.movePlaylistEntry(id: playlistID, entryID: entryID, to: newIndex) } catch {
-                actions.errorMessage = "Couldn't reorder the playlist."
+                actions.editFailed("reorder this playlist", error)
             }
         }
     }
@@ -319,7 +320,7 @@ private struct PlaylistEditor: View {
         items.remove(atOffsets: offsets)
         Task {
             do { try await store.editor.removeFromPlaylist(id: playlistID, entryIDs: entryIDs) } catch {
-                actions.errorMessage = "Couldn't remove songs from the playlist."
+                actions.editFailed("remove songs from this playlist", error)
             }
         }
     }
