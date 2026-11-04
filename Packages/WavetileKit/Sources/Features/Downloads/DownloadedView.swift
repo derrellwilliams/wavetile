@@ -20,13 +20,21 @@ struct DownloadedView: View {
     @State private var confirmRemoveAll = false
     @State private var filter: MediaKind = .music
     @State private var episodes: [EpisodeItem] = []
+    /// Set after each list's first read, so its empty state doesn't flash in before it loads.
+    @State private var collectionsLoaded = false
+    @State private var episodesLoaded = false
 
     private var showsPodcasts: Bool { podcasts.isEnabled && filter == .podcasts }
 
     var body: some View {
         NavigationStack(path: $path) {
-            Group {
-                if showsPodcasts { podcastContent } else { musicContent }
+            // One scroll view for both filters: swapping whole scroll views made the large title
+            // flash on every switch, since it follows whichever one is on screen.
+            ScrollView {
+                VStack(spacing: 0) {
+                    filterHeader
+                    if showsPodcasts { podcastContent } else { musicContent }
+                }
             }
             .themedBackground()
             .navigationTitle("Downloads")
@@ -55,6 +63,7 @@ struct DownloadedView: View {
                         if collections.isEmpty { collections = value } else {
                             withAnimation(theme.motion.smooth) { collections = value }
                         }
+                        collectionsLoaded = true
                     }
                 } catch { Log.observationFailed(error) }
             }
@@ -64,6 +73,7 @@ struct DownloadedView: View {
                         if episodes.isEmpty { episodes = value } else {
                             withAnimation(theme.motion.smooth) { episodes = value }
                         }
+                        episodesLoaded = true
                     }
                 } catch { Log.observationFailed(error) }
             }
@@ -71,12 +81,12 @@ struct DownloadedView: View {
         .enableInjection()
     }
 
-    private var podcastContent: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                filterHeader
-                PodcastDownloadsList(items: episodes)
-            }
+    @ViewBuilder private var podcastContent: some View {
+        if episodesLoaded, episodes.isEmpty {
+            EmptyPrompt("No Downloaded Episodes Yet", message: "Download any episode to listen without a connection.")
+                .padding(.top, theme.spacing.lg)
+        } else {
+            PodcastDownloadsList(items: episodes)
         }
     }
 
@@ -87,34 +97,34 @@ struct DownloadedView: View {
     }
 
     private var musicContent: some View {
-            ScrollView {
-              VStack(spacing: 0) {
-                filterHeader
-                VStack(alignment: .leading, spacing: theme.spacing.lg) {
-                    if !connectivity.isOnline {
-                        Label(connectivity.hasNetwork ? "Can't reach your server. Downloaded music still plays." : "You're offline. Downloaded music still plays.", glyph: .offline)
-                            .font(theme.typography.itemSubtitle)
-                            .foregroundStyle(theme.palette.textSecondary)
-                            // Drops in from the top and leaves the same way.
-                            .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
-                    }
-                    LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: theme.artwork.shelfTileWidth - 8), spacing: theme.spacing.lg)],
-                        alignment: .leading,
-                        spacing: theme.spacing.xl
-                    ) {
-                        ForEach(collections) { item in
-                            tile(item)
-                                // Removing a download fades the tile out; the rest slide into place.
-                                .transition(reduceMotion ? .opacity : .scale(scale: 0.96).combined(with: .opacity))
-                        }
+        VStack(alignment: .leading, spacing: theme.spacing.lg) {
+            if !connectivity.isOnline {
+                Label(connectivity.hasNetwork ? "Can't reach your server. Downloaded music still plays." : "You're offline. Downloaded music still plays.", glyph: .offline)
+                    .font(theme.typography.itemSubtitle)
+                    .foregroundStyle(theme.palette.textSecondary)
+                    // Drops in from the top and leaves the same way.
+                    .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
+                    .padding(.horizontal, theme.spacing.screenInset)
+            }
+            if collectionsLoaded, collections.isEmpty {
+                EmptyPrompt("No Downloaded Music Yet", message: "Download any album or playlist to play it without a connection.")
+            } else {
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: theme.artwork.shelfTileWidth - 8), spacing: theme.spacing.lg)],
+                    alignment: .leading,
+                    spacing: theme.spacing.xl
+                ) {
+                    ForEach(collections) { item in
+                        tile(item)
+                            // Removing a download fades the tile out; the rest slide into place.
+                            .transition(reduceMotion ? .opacity : .scale(scale: 0.96).combined(with: .opacity))
                     }
                 }
                 .padding(.horizontal, theme.spacing.screenInset)
-                .padding(.vertical, theme.spacing.lg)
-                .animation(theme.motion.smooth, value: connectivity.isOnline)
-              }
             }
+        }
+        .padding(.vertical, theme.spacing.lg)
+        .animation(theme.motion.smooth, value: connectivity.isOnline)
     }
 
     @ViewBuilder private func tile(_ item: DownloadedCollection) -> some View {

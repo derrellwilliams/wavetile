@@ -12,7 +12,6 @@ struct FavoritesView: View {
     @Environment(LibraryStore.self) private var store
     @Environment(AudioPlayer.self) private var player
     @Environment(DownloadsStore.self) private var downloads
-    @Environment(\.pushLibraryRoute) private var push
     @State private var kind: Kind = .songs
     @State private var tracks: [TrackRecord] = []
     @State private var albums: [AlbumRecord] = []
@@ -43,19 +42,12 @@ struct FavoritesView: View {
         .enableInjection()
     }
 
-    /// Under the filter, like the other empty screens: what goes here and where to find it.
+    /// Under the filter, like the other empty screens: what goes here and how it gets here.
     private var emptyState: some View {
-        let noun = kind.rawValue.lowercased()
-        let section: LibrarySection = switch kind {
-        case .songs: .songs
-        case .albums: .albums
-        case .artists: .artists
-        }
-        return EmptyPrompt(
+        EmptyPrompt(
             "No Favorite \(kind.rawValue) Yet",
-            message: "Tap the heart on any of your \(noun) to keep them here.",
-            button: "Browse \(kind.rawValue)"
-        ) { push(.section(section)) }
+            message: "Tap the heart on any of your \(kind.rawValue.lowercased()) to keep them here."
+        )
         .padding(.top, theme.spacing.md)
     }
 

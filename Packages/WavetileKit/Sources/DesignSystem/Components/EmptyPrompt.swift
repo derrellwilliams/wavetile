@@ -1,16 +1,17 @@
 import SwiftUI
 
 /// An empty screen's invitation: a title that names what to do, one line on why, and the button
-/// that does it. Flush left on the screen margin right under the page title, like the shelves that
-/// replace it; no glyph. Podcasts, Playlists, Collections and their empty pages all use it.
+/// that does it (or no button, when the line says it all, as on Favorites). Flush left on the
+/// screen margin right under the page title, like the shelves that replace it; no glyph.
+/// Podcasts, Playlists, Collections, Favorites and the empty playlist and collection pages use it.
 public struct EmptyPrompt: View {
     @Environment(\.theme) private var theme
     private let title: String
     private let message: String
-    private let button: String
+    private let button: String?
     private let action: () -> Void
 
-    public init(_ title: String, message: String, button: String, action: @escaping () -> Void) {
+    public init(_ title: String, message: String, button: String? = nil, action: @escaping () -> Void = {}) {
         self.title = title
         self.message = message
         self.button = button
@@ -27,8 +28,10 @@ public struct EmptyPrompt: View {
                 .font(theme.typography.body)
                 .foregroundStyle(theme.palette.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
-            PrimaryButton(LocalizedStringKey(button), action: action)
-                .padding(.top, theme.spacing.lg)
+            if let button {
+                PrimaryButton(LocalizedStringKey(button), action: action)
+                    .padding(.top, theme.spacing.lg)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, theme.spacing.screenInset)
