@@ -62,13 +62,13 @@ nonisolated extension CoverArt {
     /// The brand's two: Wavetile (tan marks on the dark canvas) and Tan (dark marks on tan), each
     /// with a quieter second fill.
     static let palettes: [Palette] = [
-        palette("Wavetile", 0x1A1A1A, 0xECE4D2, 0x3A3835),
-        palette("Tan", 0xECE4D2, 0x1A1A1A, 0xB9AE96),
+        palette("Wavetile", Theme.CoverPalette.ink, Theme.CoverPalette.tan, Theme.CoverPalette.inkSecondFill),
+        palette("Tan", Theme.CoverPalette.tan, Theme.CoverPalette.ink, Theme.CoverPalette.tanSecondFill),
     ]
 
     /// Dot inks: the brand tan for light dots, near-black for dark ones.
-    static let lightInk = rgb(0xECE4D2)
-    static let darkInk = rgb(0x141414)
+    static let lightInk = rgb(Theme.CoverPalette.tan)
+    static let darkInk = rgb(Theme.CoverPalette.darkDot)
 
     private static func palette(_ name: String, _ background: UInt32, _ a: UInt32, _ b: UInt32) -> Palette {
         Palette(name: name, background: rgb(background), fills: [rgb(a), rgb(b)])

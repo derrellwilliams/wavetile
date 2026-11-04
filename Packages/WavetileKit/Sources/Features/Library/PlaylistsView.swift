@@ -38,22 +38,7 @@ struct PlaylistsView: View {
                     }
                     .buttonStyle(.pressable)
                     .contextMenu {
-                        if store.isAdmin {
-                            Button("Upload Cover Image", glyph: .photo) { pickingCover = playlist.id }
-                        }
-                        if playlist.imageTag == nil {
-                            Button("Shuffle Cover", glyph: .shuffle) {
-                                withAnimation(theme.motion.snappy) { store.shuffleCover(for: playlist.id) }
-                            }
-                        } else if store.isAdmin {
-                            Button("Remove Cover Image", glyph: .close) {
-                                Task {
-                                    do { try await store.editor.removeCoverImage(itemID: playlist.id, owner: .playlist) } catch {
-                                        actions.errorMessage = "Couldn't remove the cover."
-                                    }
-                                }
-                            }
-                        }
+                        CoverMenuItems(itemID: playlist.id, imageTag: playlist.imageTag, owner: .playlist, pickingCover: $pickingCover)
                         Button("Delete Playlist", glyph: .trash, role: .destructive) { pendingDelete = playlist }
                     }
                 }
@@ -186,18 +171,7 @@ struct PlaylistDetailView: View {
                     newName = playlist.name
                     showRename = true
                 }
-                if store.isAdmin {
-                    Button("Upload Cover Image", glyph: .photo) { pickingCover = playlist.id }
-                }
-                if playlist.imageTag == nil {
-                    Button("Shuffle Cover", glyph: .shuffle) {
-                        withAnimation(theme.motion.snappy) { store.shuffleCover(for: playlist.id) }
-                    }
-                } else if store.isAdmin {
-                    Button("Remove Cover Image", glyph: .close) {
-                        run("Couldn't remove the cover.") { try await store.editor.removeCoverImage(itemID: playlist.id, owner: .playlist) }
-                    }
-                }
+                CoverMenuItems(itemID: playlist.id, imageTag: playlist.imageTag, owner: .playlist, pickingCover: $pickingCover)
                 Button("Edit Songs", glyph: .playlist) { showEditor = true }
                     .disabled(items.isEmpty)
                 Divider()

@@ -36,23 +36,25 @@ struct LibraryPicker: View {
 
     var body: some View {
         NavigationStack {
-            List(results ?? all) { item in
-                Button { toggle(item.id) } label: {
-                    HStack(spacing: theme.spacing.md) {
-                        TrackRow(title: item.title, subtitle: item.subtitle, leading: .artwork(item.artwork))
-                        if picked.contains(item.id) {
-                            Glyph.check.image.foregroundStyle(theme.palette.accent)
-                        }
+            List {
+                Section {
+                    rows(results ?? all)
+                } header: {
+                    if results == nil, !all.isEmpty {
+                        Text("Recently Added")
+                            .font(theme.typography.caption)
+                            .foregroundStyle(theme.palette.textSecondary)
                     }
-                    .contentShape(.rect)
                 }
-                .buttonStyle(.plain)
-                .listRowBackground(picked.contains(item.id) ? theme.palette.tint : Color.clear)
-                .accessibilityAddTraits(picked.contains(item.id) ? .isSelected : [])
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
-            .searchable(text: $text, placement: .navigationBarDrawer(displayMode: .always), prompt: isSongs ? "Songs or artists" : "Albums or artists")
+            .searchable(text: $text, placement: .navigationBarDrawer(displayMode: .always), prompt: isSongs ? "Search all songs" : "Search all albums")
+            .overlay {
+                if let results, results.isEmpty, !text.isEmpty {
+                    EmptyState("No Results", message: "Try another name or artist.")
+                }
+            }
             .safeAreaInset(edge: .bottom) {
                 if !picked.isEmpty {
                     PrimaryButton("Add \(picked.count) \(noun)", glyph: .add) { add() }
@@ -73,17 +75,34 @@ struct LibraryPicker: View {
         .task(id: text) { await search() }
     }
 
+    private func rows(_ items: [Item]) -> some View {
+        ForEach(items) { item in
+            Button { toggle(item.id) } label: {
+                HStack(spacing: theme.spacing.md) {
+                    TrackRow(title: item.title, subtitle: item.subtitle, leading: .artwork(item.artwork))
+                    if picked.contains(item.id) {
+                        Glyph.check.image.foregroundStyle(theme.palette.accent)
+                    }
+                }
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .listRowBackground(picked.contains(item.id) ? theme.palette.tint : Color.clear)
+            .accessibilityAddTraits(picked.contains(item.id) ? .isSelected : [])
+        }
+    }
+
     private func toggle(_ id: String) {
         if let index = picked.firstIndex(of: id) { picked.remove(at: index) } else { picked.append(id) }
     }
 
+    /// Before a search: the newest additions, a short list read off the main thread, so the
+    /// sheet opens instantly however big the library is. Search reaches everything else.
     private func load() async {
         do {
-            if isSongs {
-                for try await list in store.observe(store.database.allTracks()) { all = list.tracks.map(item) }
-            } else {
-                for try await albums in store.observe(store.database.albums()) { all = albums.map(item) }
-            }
+            all = isSongs
+                ? try await store.database.recentlyAddedTracks().map(item)
+                : try await store.database.recentlyAddedAlbumList().map(item)
         } catch { Log.observationFailed(error) }
     }
 

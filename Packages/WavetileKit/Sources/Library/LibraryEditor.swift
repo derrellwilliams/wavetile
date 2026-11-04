@@ -100,19 +100,33 @@ public struct LibraryEditor: Sendable {
         }
     }
 
-    /// A new collection with the same albums in the same order, then the old one deleted. If the
-    /// delete fails, the new one is removed again so there's no duplicate.
+    /// Neither copy could be deleted after a collection was recreated under its new name, so both
+    /// are now on the server.
+    public struct DuplicateCollectionError: Error {}
+
+    /// A new collection with the same albums in the same order, then the old one deleted. The
+    /// album list comes from the server, not the local mirror, so nothing added elsewhere since the
+    /// last sync is lost. If the old one can't be deleted, the new one is removed again; only if
+    /// that fails too are there two copies (`DuplicateCollectionError`).
     private func recreateCollection(id: String, name: String) async throws -> String {
-        let albumIDs = try await database.pool.read { db in
-            try CollectionAlbumRecord.filter(Column("collectionID") == id).order(Column("position")).fetchAll(db).map(\.albumID)
+        var params = Paths.GetItemsParameters()
+        params.userID = session.userID
+        params.parentID = id
+        let children = try await client.send(Paths.getItems(parameters: params)).value.items ?? []
+        let albumIDs = children.filter { $0.type == .musicAlbum }.compactMap(\.id)
+        let create = Paths.CreateCollectionParameters(name: name, ids: albumIDs.isEmpty ? nil : albumIDs, isLocked: false)
+        guard let newID = try await client.send(Paths.createCollection(parameters: create)).value.id else {
+            throw URLError(.badServerResponse)
         }
-        guard let newID = try await createCollection(name: name, albumIDs: albumIDs) else { throw URLError(.badServerResponse) }
         do {
-            try await deleteCollection(id: id)
+            try await client.send(Paths.deleteItem(itemID: id))
         } catch {
-            try? await deleteCollection(id: newID)
+            do { try await client.send(Paths.deleteItem(itemID: newID)) } catch { throw DuplicateCollectionError() }
             throw error
         }
+        _ = try await database.pool.write { try CollectionRecord.deleteOne($0, key: id) }
+        // The rename is done on the server; if this read fails, the next sync brings it in.
+        try? await sync.refreshCollection(id: newID)
         return newID
     }
 

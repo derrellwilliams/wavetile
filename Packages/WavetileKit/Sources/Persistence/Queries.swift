@@ -296,6 +296,13 @@ public extension LibraryDatabase {
         ValueObservation.tracking { try PlaylistRecord.fetchOne($0, key: id) }
     }
 
+    /// Every playlist and collection ID, to tidy per-item settings after a sync.
+    func playlistAndCollectionIDs() throws -> Set<String> {
+        try pool.read { db in
+            Set(try String.fetchAll(db, sql: "SELECT id FROM playlist UNION SELECT id FROM collection"))
+        }
+    }
+
     func collection(id: String) throws -> CollectionRecord? {
         try pool.read { try CollectionRecord.fetchOne($0, key: id) }
     }
@@ -334,6 +341,15 @@ public extension LibraryDatabase {
 
     func recentlyAddedAlbums(limit: Int = 24) throws -> [AlbumRecord] {
         try pool.read { try AlbumRecord.order(Column("dateAdded").desc).limit(limit).fetchAll($0) }
+    }
+
+    /// Newest songs first, for the song picker before anything is searched.
+    func recentlyAddedTracks(limit: Int = 100) async throws -> [TrackRecord] {
+        try await pool.read { try TrackRecord.order(Column("dateAdded").desc).limit(limit).fetchAll($0) }
+    }
+
+    func recentlyAddedAlbumList(limit: Int = 100) async throws -> [AlbumRecord] {
+        try await pool.read { try AlbumRecord.order(Column("dateAdded").desc).limit(limit).fetchAll($0) }
     }
 }
 

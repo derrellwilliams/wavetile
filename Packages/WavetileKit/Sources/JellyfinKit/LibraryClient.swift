@@ -184,14 +184,18 @@ public struct LibraryClient: Sendable {
         return try await client.send(Paths.getItems(parameters: params)).value.items ?? []
     }
 
-    /// Jellyfin image endpoints are unauthenticated, so no token goes in the URL.
-    /// `tag` makes the URL change when artwork changes, which keeps image caches correct.
-    /// Whether the signed-in account is a server admin. Only admins can change item images and
-    /// edit items such as collection names.
-    public func isAdministrator() async throws -> Bool {
-        try await client.send(Paths.getCurrentUser).value.policy?.isAdministrator ?? false
+    /// What the signed-in account may change on the server, from its Jellyfin policy.
+    public func accountPolicy() async throws -> AccountPolicy {
+        let policy = try await client.send(Paths.getCurrentUser).value.policy
+        return AccountPolicy(
+            isAdministrator: policy?.isAdministrator ?? false,
+            canManageCollections: policy?.enableCollectionManagement ?? false,
+            canDeleteContent: policy?.enableContentDeletion ?? false
+        )
     }
 
+    /// Jellyfin image endpoints are unauthenticated, so no token goes in the URL.
+    /// `tag` makes the URL change when artwork changes, which keeps image caches correct.
     public func imageURL(itemID: String, tag: String?, maxPixelWidth: Int) -> URL? {
         let params = Paths.GetItemImageParameters(maxWidth: maxPixelWidth, quality: 90, tag: tag)
         return client.url(with: Paths.getItemImage(itemID: itemID, imageType: "Primary", parameters: params))
@@ -235,6 +239,22 @@ extension TrackSummary {
             duration: item.runTimeTicks.map { .milliseconds($0 / 10_000) },
             normalizationGain: item.normalizationGain.map(Double.init)
         )
+    }
+}
+
+/// The account permissions Wavetile's edit menus depend on.
+public struct AccountPolicy: Sendable, Equatable {
+    /// Admins can change item images and edit items (a collection's name) directly.
+    public var isAdministrator: Bool
+    /// Create collections and add or remove their albums.
+    public var canManageCollections: Bool
+    /// Delete items, which renaming a collection by recreating it needs.
+    public var canDeleteContent: Bool
+
+    public init(isAdministrator: Bool, canManageCollections: Bool, canDeleteContent: Bool) {
+        self.isAdministrator = isAdministrator
+        self.canManageCollections = canManageCollections
+        self.canDeleteContent = canDeleteContent
     }
 }
 

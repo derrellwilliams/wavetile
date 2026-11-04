@@ -1,3 +1,4 @@
+import DesignSystem
 import Library
 import PhotosUI
 import SwiftUI
@@ -9,6 +10,39 @@ extension View {
     /// the place of its generated cover.
     func coverImagePicker(itemID: Binding<String?>, owner: LibraryEditor.CoverOwner) -> some View {
         modifier(CoverImagePicker(itemID: itemID, owner: owner))
+    }
+}
+
+/// A playlist or collection's cover items, shared by its page menu and its long-press menu:
+/// Upload and Remove Cover Image for admins (Jellyfin's image endpoints need admin), and Shuffle
+/// Cover while the cover is generated.
+struct CoverMenuItems: View {
+    @Environment(\.theme) private var theme
+    @Environment(LibraryStore.self) private var store
+    @Environment(LibraryActions.self) private var actions
+    let itemID: String
+    let imageTag: String?
+    let owner: LibraryEditor.CoverOwner
+    @Binding var pickingCover: String?
+
+    var body: some View {
+        if store.isAdmin {
+            Button("Upload Cover Image", glyph: .photo) { pickingCover = itemID }
+        }
+        if imageTag == nil {
+            Button("Shuffle Cover", glyph: .shuffle) {
+                withAnimation(theme.motion.snappy) { store.shuffleCover(for: itemID) }
+            }
+        } else if store.isAdmin {
+            Button("Remove Cover Image", glyph: .close) {
+                Task {
+                    do { try await store.editor.removeCoverImage(itemID: itemID, owner: owner) } catch {
+                        Log.editFailed("Remove cover", error)
+                        actions.errorMessage = "Couldn't remove the cover. Check your connection."
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -8,6 +8,7 @@ import UIKit
 struct MainTabView: View {
     @ObserveInjection var inject
     @Environment(\.theme) private var theme
+    @Environment(\.scenePhase) private var scenePhase
     let app: AppModel
     let signedIn: AppModel.SignedIn
     @State private var home: HomeModel
@@ -66,7 +67,11 @@ struct MainTabView: View {
         .task { await applyPodcastDebugFlags() }
         // Background library sync: on launch if stale (>1h); pull to refresh in Library forces one.
         .task { await signedIn.library.syncIfNeeded() }
-        .task { await signedIn.library.loadPermissions() }
+        // Permissions decide the edit menus; rechecked on return, so an offline launch recovers.
+        .task(id: scenePhase == .active) {
+            guard scenePhase == .active else { return }
+            await signedIn.library.loadPermissions()
+        }
         .enableInjection()
     }
 

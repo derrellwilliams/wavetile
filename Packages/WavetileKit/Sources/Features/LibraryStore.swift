@@ -21,8 +21,10 @@ final class LibraryStore {
     private(set) var syncError: String?
     private(set) var hasSyncedOnce = false
     /// How many times each playlist or collection's generated cover has been shuffled, by item
-    /// ID. Kept on this device; an item that's never been shuffled has the same cover everywhere.
-    private(set) var coverShuffles: [String: Int] = UserDefaults.standard.dictionary(forKey: LibraryStore.coverShufflesKey) as? [String: Int] ?? [:]
+    /// ID. Kept on this device per server and account; an item that's never been shuffled has the
+    /// same cover everywhere. Items gone from the library are dropped after each sync.
+    private(set) var coverShuffles: [String: Int]
+    @ObservationIgnored private let coverShufflesKey: String
     /// Runs after each successful sync (downloaded-playlist refresh).
     @ObservationIgnored var afterSync: (() async -> Void)?
 
@@ -33,6 +35,8 @@ final class LibraryStore {
         self.sync = sync
         self.editor = LibraryEditor(session: session, token: token, auth: auth, database: database, sync: sync)
         self.hasSyncedOnce = (try? database.syncState()?.lastCompleted) != nil
+        self.coverShufflesKey = "coverShuffles.\(session.serverID).\(session.userID)"
+        self.coverShuffles = UserDefaults.standard.dictionary(forKey: coverShufflesKey) as? [String: Int] ?? [:]
     }
 
     func syncIfNeeded() async {
@@ -55,6 +59,7 @@ final class LibraryStore {
                 Task { @MainActor in self?.progress = progress }
             }
             hasSyncedOnce = true
+            pruneCoverShuffles()
             await afterSync?()
         } catch is CancellationError {
         } catch {
@@ -111,7 +116,7 @@ final class LibraryStore {
     /// Swaps an item's cover for the next one its seed gives.
     func shuffleCover(for itemID: String) {
         coverShuffles[itemID, default: 0] += 1
-        UserDefaults.standard.set(coverShuffles, forKey: Self.coverShufflesKey)
+        saveCoverShuffles()
     }
 
     /// Keeps a shuffled cover's count when an item gets a new ID (a collection renamed by
@@ -119,17 +124,35 @@ final class LibraryStore {
     func moveCoverShuffle(from oldID: String, to newID: String) {
         guard let count = coverShuffles.removeValue(forKey: oldID) else { return }
         coverShuffles[newID] = count
-        UserDefaults.standard.set(coverShuffles, forKey: Self.coverShufflesKey)
+        saveCoverShuffles()
     }
 
-    private static let coverShufflesKey = "coverShuffles"
+    /// Drops counts for playlists and collections that are no longer in the library.
+    private func pruneCoverShuffles() {
+        guard !coverShuffles.isEmpty, let ids = try? database.playlistAndCollectionIDs() else { return }
+        let kept = coverShuffles.filter { ids.contains($0.key) }
+        guard kept.count != coverShuffles.count else { return }
+        coverShuffles = kept
+        saveCoverShuffles()
+    }
+
+    private func saveCoverShuffles() {
+        UserDefaults.standard.set(coverShuffles, forKey: coverShufflesKey)
+    }
 
     /// Whether the account is a server admin. Only admins can change item images, so Upload and
-    /// Remove Cover Image show only for them. Checked once per session.
+    /// Remove Cover Image show only for them.
     private(set) var isAdmin = false
+    /// Admins rename a collection in place. Other accounts rename by recreating it, which needs
+    /// collection management and deletion rights; without both, Rename is hidden for them.
+    private(set) var canRenameCollections = false
 
+    /// Reads the account's permissions: at launch and whenever the app comes back to the
+    /// foreground. A failed check (offline) keeps the last answer instead of hiding the options.
     func loadPermissions() async {
-        isAdmin = (try? await api.isAdministrator()) ?? false
+        guard let policy = try? await api.accountPolicy() else { return }
+        isAdmin = policy.isAdministrator
+        canRenameCollections = policy.isAdministrator || (policy.canManageCollections && policy.canDeleteContent)
     }
 
     var statusText: String? {

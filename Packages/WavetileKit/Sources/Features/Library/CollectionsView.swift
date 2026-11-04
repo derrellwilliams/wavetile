@@ -37,22 +37,7 @@ struct CollectionsView: View {
                     }
                     .buttonStyle(.pressable)
                     .contextMenu {
-                        if store.isAdmin {
-                            Button("Upload Cover Image", glyph: .photo) { pickingCover = collection.id }
-                        }
-                        if collection.imageTag == nil {
-                            Button("Shuffle Cover", glyph: .shuffle) {
-                                withAnimation(theme.motion.snappy) { store.shuffleCover(for: collection.id) }
-                            }
-                        } else if store.isAdmin {
-                            Button("Remove Cover Image", glyph: .close) {
-                                Task {
-                                    do { try await store.editor.removeCoverImage(itemID: collection.id, owner: .collection) } catch {
-                                        actions.errorMessage = "Couldn't remove the cover."
-                                    }
-                                }
-                            }
-                        }
+                        CoverMenuItems(itemID: collection.id, imageTag: collection.imageTag, owner: .collection, pickingCover: $pickingCover)
                         Button("Delete Collection", glyph: .trash, role: .destructive) { pendingDelete = collection }
                     }
                 }
@@ -169,26 +154,13 @@ struct CollectionDetailView: View {
         .detailPageChrome()
         .detailBarButtons {
             Menu {
-                Button("Rename", glyph: .edit) {
-                    newName = collection.name
-                    showRename = true
-                }
-                if store.isAdmin {
-                    Button("Upload Cover Image", glyph: .photo) { pickingCover = collection.id }
-                }
-                if collection.imageTag == nil {
-                    Button("Shuffle Cover", glyph: .shuffle) {
-                        withAnimation(theme.motion.snappy) { store.shuffleCover(for: collection.id) }
-                    }
-                } else if store.isAdmin {
-                    Button("Remove Cover Image", glyph: .close) {
-                        Task {
-                            do { try await store.editor.removeCoverImage(itemID: collection.id, owner: .collection) } catch {
-                                actions.errorMessage = "Couldn't remove the cover."
-                            }
-                        }
+                if store.canRenameCollections {
+                    Button("Rename", glyph: .edit) {
+                        newName = collection.name
+                        showRename = true
                     }
                 }
+                CoverMenuItems(itemID: collection.id, imageTag: collection.imageTag, owner: .collection, pickingCover: $pickingCover)
                 Divider()
                 Button("Delete Collection", glyph: .trash, role: .destructive) { confirmDelete = true }
             } label: {
@@ -210,6 +182,8 @@ struct CollectionDetailView: View {
                             store.moveCoverShuffle(from: collection.id, to: newID)
                             if let record = try? store.database.collection(id: newID) { collection = record }
                         }
+                    } catch is LibraryEditor.DuplicateCollectionError {
+                        actions.errorMessage = "Renamed, but the old copy couldn't be removed, so both are on your server. Delete the old one from Jellyfin."
                     } catch {
                         Log.editFailed("Rename collection", error)
                         actions.errorMessage = "Couldn't rename the collection. Check your connection."

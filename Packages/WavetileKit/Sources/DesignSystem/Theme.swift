@@ -180,6 +180,24 @@ public extension Theme {
     static let all: [Theme] = [.dark, .light]
 }
 
+public extension Theme {
+    /// Colors for generated playlist and collection covers (`CoverArt`): the brand's tan and
+    /// near-black, each with a quieter second fill. Hex values, because covers are drawn with
+    /// Core Graphics off the main thread, where a `Theme` isn't available.
+    nonisolated enum CoverPalette {
+        /// The near-black canvas, as `Theme.dark`'s background.
+        public static let ink: UInt32 = 0x1A1A1A
+        /// The light tan, as `Theme.dark`'s accent.
+        public static let tan: UInt32 = 0xECE4D2
+        /// The quieter second fill on the near-black canvas.
+        public static let inkSecondFill: UInt32 = 0x3A3835
+        /// The quieter second fill on tan.
+        public static let tanSecondFill: UInt32 = 0xB9AE96
+        /// Dark dots, a shade deeper than the canvas so they read on it.
+        public static let darkDot: UInt32 = 0x141414
+    }
+}
+
 public extension EnvironmentValues {
     @Entry var theme: Theme = .dark
 }
