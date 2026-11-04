@@ -59,8 +59,21 @@ struct LibraryPicker: View {
                 if !picked.isEmpty {
                     PrimaryButton("Add \(picked.count) \(noun)", glyph: .add) { add() }
                         .disabled(isAdding)
+                        // The capsule's tint is a faint wash meant for the plain page; floating over
+                        // the list it needs the page color under it, or the rows read through.
+                        .background(theme.palette.background, in: .capsule)
                         .padding(.horizontal, theme.spacing.screenInset)
+                        .padding(.top, theme.spacing.lg)
                         .padding(.bottom, theme.spacing.md)
+                        // The list fades out under the button instead of running into it.
+                        .background {
+                            LinearGradient(
+                                stops: [.init(color: theme.palette.background.opacity(0), location: 0),
+                                        .init(color: theme.palette.background, location: 0.4)],
+                                startPoint: .top, endPoint: .bottom
+                            )
+                            .ignoresSafeArea(edges: .bottom)
+                        }
                 }
             }
             .navigationTitle(isSongs ? "Add Songs" : "Add Albums")
