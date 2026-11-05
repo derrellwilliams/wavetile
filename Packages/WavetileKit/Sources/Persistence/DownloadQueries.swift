@@ -48,7 +48,7 @@ public extension LibraryDatabase {
         }
     }
 
-    /// Replaces a playlist's membership with its current tracks (auto-sync).
+    /// Replaces a synced download's membership (playlist, collection, Favorites) with its current tracks.
     /// Returns (newTrackIDs to download, orphaned file names to delete).
     func syncDownloadedPlaylist(id: String, trackIDs: [String]) async throws -> (added: [String], orphanedFiles: [String]) {
         try await pool.write { db in
@@ -129,8 +129,33 @@ public extension LibraryDatabase {
         }
     }
 
-    func downloadedPlaylistIDs() throws -> [String] {
-        try pool.read { try String.fetchAll($0, sql: "SELECT id FROM downloadCollection WHERE kind = 'playlist'") }
+    /// Downloads that follow their source (playlists, collections, Favorites), to bring up to date
+    /// after a library sync.
+    func syncedDownloads() throws -> [DownloadCollectionRecord] {
+        try pool.read { try DownloadCollectionRecord.filter(["playlist", "collection", "favorites"].contains(Column("kind"))).fetchAll($0) }
+    }
+
+    /// Every song on a collection's albums, album by album in the collection's order.
+    func trackIDs(collectionID: String) throws -> [String] {
+        try pool.read { db in
+            try String.fetchAll(db, sql: """
+                SELECT track.id FROM collectionAlbum JOIN track ON track.albumID = collectionAlbum.albumID
+                WHERE collectionAlbum.collectionID = ?
+                ORDER BY collectionAlbum.position, track.discNumber, track.trackNumber, track.sortTitle
+                """, arguments: [collectionID])
+        }
+    }
+
+    /// What the Favorites download holds: favorite songs, and every song on a favorite album.
+    /// Favorite artists aren't included; a whole discography is too much to pull down at once.
+    func favoritesDownloadTrackIDs() throws -> [String] {
+        try pool.read { db in
+            try String.fetchAll(db, sql: """
+                SELECT id FROM track WHERE isFavorite = 1
+                UNION
+                SELECT track.id FROM track JOIN album ON album.id = track.albumID WHERE album.isFavorite = 1
+                """)
+        }
     }
 
     func downloadStatus(collectionID: String) -> ValueObservation<ValueReducers.Fetch<DownloadStatus>> {

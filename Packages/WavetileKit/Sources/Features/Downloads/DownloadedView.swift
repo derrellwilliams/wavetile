@@ -131,9 +131,11 @@ struct DownloadedView: View {
         let collection = item.collection
         NavigationLink(value: route(for: collection)) {
             VStack(alignment: .leading, spacing: theme.spacing.xs) {
-                ArtworkView(collection.kind == .playlist
-                            ? library.cover(for: collection.id, tag: collection.imageTag, maxPixelWidth: 480)
-                            : library.artwork(itemID: collection.id, tag: collection.imageTag, maxPixelWidth: 480))
+                // Albums have their own art; playlists, collections and Favorites use their cover
+                // (server art, or the generated one).
+                ArtworkView(collection.kind == .album
+                            ? library.artwork(itemID: collection.id, tag: collection.imageTag, maxPixelWidth: 480)
+                            : library.cover(for: collection.id, tag: collection.imageTag, maxPixelWidth: 480))
                     .overlay(alignment: .bottomTrailing) {
                         if item.status.isInProgress {
                             ProgressRing(progress: item.status.progress)
@@ -176,6 +178,12 @@ struct DownloadedView: View {
             let playlist = (try? library.database.pool.read { try PlaylistRecord.fetchOne($0, key: collection.id) })
                 ?? PlaylistRecord(id: collection.id, name: collection.name, imageTag: collection.imageTag, trackCount: 0, durationMs: 0, generation: 0)
             return .playlist(playlist)
+        case .collection:
+            let record = (try? library.database.collection(id: collection.id))
+                ?? CollectionRecord(id: collection.id, name: collection.name, sortName: collection.name, imageTag: collection.imageTag, albumCount: 0, generation: 0)
+            return .collection(record)
+        case .favorites:
+            return .section(.favorites)
         }
     }
 }

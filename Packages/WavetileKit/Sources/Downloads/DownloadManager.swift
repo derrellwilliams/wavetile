@@ -91,12 +91,18 @@ public final class DownloadManager: NSObject, Sendable {
         deleteFiles(files)
     }
 
-    /// Keeps downloaded playlists matching the server after a library sync.
+    /// Keeps downloaded playlists, collections and Favorites matching the library after a sync.
     public func syncPlaylists(quality: Quality, allowCellular: Bool) async {
-        guard let ids = try? database.downloadedPlaylistIDs() else { return }
-        for id in ids {
-            guard let tracks = try? database.tracks(playlistID: id) else { continue }
-            guard let (added, orphans) = try? await database.syncDownloadedPlaylist(id: id, trackIDs: tracks.map(\.id)) else { continue }
+        guard let downloads = try? database.syncedDownloads() else { return }
+        for download in downloads {
+            let trackIDs: [String]? = switch download.kind {
+            case .playlist: try? database.tracks(playlistID: download.id).map(\.id)
+            case .collection: try? database.trackIDs(collectionID: download.id)
+            case .favorites: try? database.favoritesDownloadTrackIDs()
+            case .album: nil
+            }
+            guard let trackIDs,
+                  let (added, orphans) = try? await database.syncDownloadedPlaylist(id: download.id, trackIDs: trackIDs) else { continue }
             await enqueue(added, quality: quality, allowCellular: allowCellular)
             deleteFiles(orphans)
         }

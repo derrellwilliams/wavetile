@@ -39,7 +39,15 @@ struct FavoritesView: View {
         }
         .themedBackground()
         .navigationTitle("Favorites")
-        .listBar()
+        .listBar {
+            TintedBarCapsule {
+                DownloadButton(collectionID: DownloadCollectionRecord.favoritesID) {
+                    let trackIDs = (try? store.database.favoritesDownloadTrackIDs()) ?? []
+                    downloads.downloadFavorites(trackIDs: trackIDs, albumIDs: albums.map(\.id))
+                }
+                .disabled(tracks.isEmpty && albums.isEmpty)
+            }
+        }
         .task { await observe() }
         .enableInjection()
     }

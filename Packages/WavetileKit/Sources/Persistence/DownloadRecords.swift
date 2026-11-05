@@ -1,13 +1,17 @@
 import Foundation
 import GRDB
 
-/// An album or playlist the user chose to download. Playlists stay in sync with the server.
+/// An album, playlist, collection or the Favorites the user chose to download. Everything but
+/// albums stays in sync: songs added later download, songs removed are let go.
 public struct DownloadCollectionRecord: Codable, Hashable, Sendable, Identifiable, FetchableRecord, PersistableRecord {
     public static let databaseTableName = "downloadCollection"
 
     public enum Kind: String, Codable, Sendable {
-        case album, playlist
+        case album, playlist, collection, favorites
     }
+
+    /// The ID of the Favorites download (there's only one; it isn't a Jellyfin item).
+    public static let favoritesID = "favorites"
 
     public var id: String
     public var kind: Kind

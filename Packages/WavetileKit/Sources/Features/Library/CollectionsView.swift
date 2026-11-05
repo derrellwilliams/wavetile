@@ -107,6 +107,7 @@ struct CollectionDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(LibraryStore.self) private var store
     @Environment(LibraryActions.self) private var actions
+    @Environment(DownloadsStore.self) private var downloads
     @State private var collection: CollectionRecord
     @State private var albums: [AlbumRecord] = []
     /// Set after the first read, so the empty state doesn't flash before the albums arrive.
@@ -157,6 +158,11 @@ struct CollectionDetailView: View {
         // Full-bleed art: no bar background or blur band under the navigation bar.
         .detailPageChrome()
         .detailBarButtons {
+            DownloadButton(collectionID: collection.id) {
+                let trackIDs = (try? store.database.trackIDs(collectionID: collection.id)) ?? []
+                downloads.download(collection: collection, trackIDs: trackIDs, albumIDs: albums.map(\.id))
+            }
+            .disabled(albums.isEmpty)
             Menu {
                 // Non-admins rename by recreating, which would drop an uploaded cover.
                 if store.canRenameCollections, store.isAdmin || collection.imageTag == nil {

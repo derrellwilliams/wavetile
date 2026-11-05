@@ -188,6 +188,21 @@ final class DownloadsStore {
         for albumID in Set(albumIDs) { prefetchArtwork(itemID: albumID, tag: nil) }
     }
 
+    func download(collection: CollectionRecord, trackIDs: [String], albumIDs: [String]) {
+        let record = DownloadCollectionRecord(id: collection.id, kind: .collection, name: collection.name, subtitle: "Collection", imageTag: collection.imageTag)
+        start(record, trackIDs: trackIDs)
+        prefetchArtwork(itemID: collection.id, tag: collection.imageTag)
+        for albumID in Set(albumIDs) { prefetchArtwork(itemID: albumID, tag: nil) }
+    }
+
+    /// Favorite songs and the songs on favorite albums, as one download that keeps up as
+    /// favorites change.
+    func downloadFavorites(trackIDs: [String], albumIDs: [String]) {
+        let record = DownloadCollectionRecord(id: DownloadCollectionRecord.favoritesID, kind: .favorites, name: "Favorites", subtitle: "Favorites", imageTag: nil)
+        start(record, trackIDs: trackIDs)
+        for albumID in Set(albumIDs) { prefetchArtwork(itemID: albumID, tag: nil) }
+    }
+
     func remove(collectionID: String) {
         Task { try? await manager?.remove(collectionID: collectionID) }
     }
@@ -196,7 +211,7 @@ final class DownloadsStore {
         Task { try? await manager?.removeAll() }
     }
 
-    /// After a library sync: pull new tracks into downloaded playlists.
+    /// After a library sync: bring downloaded playlists, collections and Favorites up to date.
     func syncPlaylists() async {
         await manager?.syncPlaylists(quality: quality, allowCellular: allowCellular)
     }
