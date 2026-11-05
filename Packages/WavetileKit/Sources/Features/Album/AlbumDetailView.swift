@@ -45,14 +45,17 @@ struct AlbumDetailView: View {
             FavoriteButton(itemID: model.album.id)
             Menu {
                 Button("Add to Playlist", glyph: .addToQueue) { actions.addToPlaylist(model.tracks.map(\.id)) }
+                    .requiresServer()
                     .disabled(model.tracks.isEmpty)
                 Button("Add to Collection", glyph: .collection) { actions.addToCollection([model.album.id]) }
+                    .requiresServer()
                 Divider()
                 Button("Play Next", glyph: .playNext) { player.playNext(queue()) }
                     .disabled(model.tracks.isEmpty)
                 Button("Add to Queue", glyph: .queue) { player.addToQueue(queue()) }
                     .disabled(model.tracks.isEmpty)
                 Button("Start Radio", glyph: .radio) { actions.startRadio(from: model.album.id, store: store, player: player) }
+                    .requiresServer()
             } label: {
                 TintedBarIcon(glyph: .more)
             }

@@ -25,7 +25,9 @@ struct DownloadButton: View {
                     label
                 }
             } else {
+                // Downloading needs the server; removing a download (above) works offline.
                 Button(action: onDownload) { label }
+                    .requiresServer()
             }
         }
         .confirmationDialog("Remove this download?", isPresented: $confirmRemove, titleVisibility: .visible) {

@@ -12,7 +12,6 @@ struct DownloadedView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(LibraryStore.self) private var library
     @Environment(DownloadsStore.self) private var downloads
-    @Environment(Connectivity.self) private var connectivity
     @Environment(PodcastsStore.self) private var podcasts
     @Namespace private var zoom
     @State private var path = NavigationPath()
@@ -32,9 +31,11 @@ struct DownloadedView: View {
             // flash on every switch, since it follows whichever one is on screen.
             ScrollView {
                 VStack(spacing: 0) {
+                    OfflineNotice(gap: theme.spacing.md)
                     filterHeader
                     if showsPodcasts { podcastContent } else { musicContent }
                 }
+                .animatesConnectivity()
             }
             .themedBackground()
             .navigationTitle("Downloads")
@@ -98,14 +99,6 @@ struct DownloadedView: View {
 
     private var musicContent: some View {
         VStack(alignment: .leading, spacing: theme.spacing.lg) {
-            if !connectivity.isOnline {
-                Label(connectivity.hasNetwork ? "Can't reach your server. Downloaded music still plays." : "You're offline. Downloaded music still plays.", glyph: .offline)
-                    .font(theme.typography.itemSubtitle)
-                    .foregroundStyle(theme.palette.textSecondary)
-                    // Drops in from the top and leaves the same way.
-                    .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
-                    .padding(.horizontal, theme.spacing.screenInset)
-            }
             if collectionsLoaded, collections.isEmpty {
                 EmptyPrompt("No Downloaded Music Yet", message: "Download any album or playlist to play it without a connection.")
             } else {
@@ -124,18 +117,13 @@ struct DownloadedView: View {
             }
         }
         .padding(.vertical, theme.spacing.lg)
-        .animation(theme.motion.smooth, value: connectivity.isOnline)
     }
 
     @ViewBuilder private func tile(_ item: DownloadedCollection) -> some View {
         let collection = item.collection
-        NavigationLink(value: route(for: collection)) {
+        NavigationLink(value: library.route(for: collection)) {
             VStack(alignment: .leading, spacing: theme.spacing.xs) {
-                // Albums have their own art; playlists, collections and Favorites use their cover
-                // (server art, or the generated one).
-                ArtworkView(collection.kind == .album
-                            ? library.artwork(itemID: collection.id, tag: collection.imageTag, maxPixelWidth: 480)
-                            : library.cover(for: collection.id, tag: collection.imageTag, maxPixelWidth: 480))
+                ArtworkView(library.artwork(for: collection, maxPixelWidth: 480))
                     .overlay(alignment: .bottomTrailing) {
                         if item.status.isInProgress {
                             ProgressRing(progress: item.status.progress)
@@ -167,23 +155,34 @@ struct DownloadedView: View {
         if item.status.failed > 0 { return "\(item.status.failed) failed" }
         return "\(item.collection.subtitle) · \(ByteCountFormatter.string(fromByteCount: item.bytes, countStyle: .file))"
     }
+}
 
-    private func route(for collection: DownloadCollectionRecord) -> LibraryRoute {
-        switch collection.kind {
+extension LibraryStore {
+    /// Where a download opens: its album, playlist or collection page, or Favorites.
+    func route(for download: DownloadCollectionRecord) -> LibraryRoute {
+        switch download.kind {
         case .album:
-            let year = (try? library.database.album(id: collection.id))?.year
-            let album = AlbumSummary(id: collection.id, title: collection.name, artist: collection.subtitle, year: year, imageTag: collection.imageTag)
-            return .album(AlbumRoute(album: album, sourceID: "downloaded-\(collection.id)"))
+            let year = (try? database.album(id: download.id))?.year
+            let album = AlbumSummary(id: download.id, title: download.name, artist: download.subtitle, year: year, imageTag: download.imageTag)
+            return .album(AlbumRoute(album: album, sourceID: "downloaded-\(download.id)"))
         case .playlist:
-            let playlist = (try? library.database.pool.read { try PlaylistRecord.fetchOne($0, key: collection.id) })
-                ?? PlaylistRecord(id: collection.id, name: collection.name, imageTag: collection.imageTag, trackCount: 0, durationMs: 0, generation: 0)
+            let playlist = (try? database.playlist(id: download.id))
+                ?? PlaylistRecord(id: download.id, name: download.name, imageTag: download.imageTag, trackCount: 0, durationMs: 0, generation: 0)
             return .playlist(playlist)
         case .collection:
-            let record = (try? library.database.collection(id: collection.id))
-                ?? CollectionRecord(id: collection.id, name: collection.name, sortName: collection.name, imageTag: collection.imageTag, albumCount: 0, generation: 0)
+            let record = (try? database.collection(id: download.id))
+                ?? CollectionRecord(id: download.id, name: download.name, sortName: download.name, imageTag: download.imageTag, albumCount: 0, generation: 0)
             return .collection(record)
         case .favorites:
             return .section(.favorites)
         }
+    }
+
+    /// A download's art: an album's own, or the cover of a playlist, collection or Favorites
+    /// (server art, or the generated one).
+    func artwork(for download: DownloadCollectionRecord, maxPixelWidth: Int) -> ArtworkSource {
+        download.kind == .album
+            ? artwork(itemID: download.id, tag: download.imageTag, maxPixelWidth: maxPixelWidth)
+            : cover(for: download.id, tag: download.imageTag, maxPixelWidth: maxPixelWidth)
     }
 }

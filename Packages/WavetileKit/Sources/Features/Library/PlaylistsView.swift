@@ -9,6 +9,7 @@ struct PlaylistsView: View {
     @ObserveInjection var inject
     @Environment(\.theme) private var theme
     @Environment(LibraryStore.self) private var store
+    @Environment(DownloadsStore.self) private var downloads
     @Environment(LibraryActions.self) private var actions
     @State private var playlists: [PlaylistRecord] = []
     @State private var showNew = false
@@ -39,9 +40,11 @@ struct PlaylistsView: View {
                         .lineLimit(1)
                     }
                     .buttonStyle(.pressable)
+                    .offlineDimmed(available: downloads.available.playlistIDs.contains(playlist.id))
                     .contextMenu {
                         CoverMenuItems(itemID: playlist.id, imageTag: playlist.imageTag, owner: .playlist, pickingCover: $pickingCover)
                         Button("Delete Playlist", glyph: .trash, role: .destructive) { pendingDelete = playlist }
+                            .requiresServer()
                     }
                 }
             }
@@ -57,6 +60,7 @@ struct PlaylistsView: View {
                     EmptyPrompt("Make a Playlist", message: "Gather songs for any mood, then find them here and on Home.", button: "New Playlist") {
                         showNew = true
                     }
+                    .requiresServer()
                     .padding(.top, theme.spacing.lg)
                 }
             }
@@ -66,6 +70,7 @@ struct PlaylistsView: View {
         .coverImagePicker(itemID: $pickingCover, owner: .playlist)
         .listBar {
             Button { showNew = true } label: { TintedBarIcon(glyph: .add) }
+                .requiresServer()
                 .accessibilityLabel("New Playlist")
         }
         .alert("New Playlist", isPresented: $showNew) {
@@ -173,11 +178,14 @@ struct PlaylistDetailView: View {
                     newName = playlist.name
                     showRename = true
                 }
+                .requiresServer()
                 CoverMenuItems(itemID: playlist.id, imageTag: playlist.imageTag, owner: .playlist, pickingCover: $pickingCover)
                 Button("Edit Songs", glyph: .playlist) { showEditor = true }
+                    .requiresServer()
                     .disabled(items.isEmpty)
                 Divider()
                 Button("Delete Playlist", glyph: .trash, role: .destructive) { confirmDelete = true }
+                    .requiresServer()
             } label: {
                 TintedBarIcon(glyph: .more)
             }
@@ -231,6 +239,7 @@ struct PlaylistDetailView: View {
         EmptyPrompt("Fill This Playlist", message: "Pick songs from your library, or long-press any song and choose Add to Playlist.", button: "Add Songs") {
             showPicker = true
         }
+        .requiresServer()
     }
 
     private func observe() async {

@@ -8,6 +8,7 @@ struct CollectionsView: View {
     @ObserveInjection var inject
     @Environment(\.theme) private var theme
     @Environment(LibraryStore.self) private var store
+    @Environment(DownloadsStore.self) private var downloads
     @Environment(LibraryActions.self) private var actions
     @State private var collections: [CollectionRecord] = []
     @State private var showNew = false
@@ -38,9 +39,11 @@ struct CollectionsView: View {
                         .lineLimit(1)
                     }
                     .buttonStyle(.pressable)
+                    .offlineDimmed(available: downloads.available.collectionIDs.contains(collection.id))
                     .contextMenu {
                         CoverMenuItems(itemID: collection.id, imageTag: collection.imageTag, owner: .collection, pickingCover: $pickingCover)
                         Button("Delete Collection", glyph: .trash, role: .destructive) { pendingDelete = collection }
+                            .requiresServer()
                     }
                 }
             }
@@ -55,6 +58,7 @@ struct CollectionsView: View {
                 EmptyPrompt("Start a Collection", message: "Group albums you love, then find them here and on Home.", button: "New Collection") {
                     showNew = true
                 }
+                .requiresServer()
                 .padding(.top, theme.spacing.lg)
             }
         }
@@ -63,6 +67,7 @@ struct CollectionsView: View {
         .coverImagePicker(itemID: $pickingCover, owner: .collection)
         .listBar {
             Button { showNew = true } label: { TintedBarIcon(glyph: .add) }
+                .requiresServer()
                 .accessibilityLabel("New Collection")
         }
         .alert("New Collection", isPresented: $showNew) {
@@ -147,6 +152,7 @@ struct CollectionDetailView: View {
                                         }
                                     }
                                 }
+                                .requiresServer()
                             }
                     }
                 }
@@ -170,10 +176,12 @@ struct CollectionDetailView: View {
                         newName = collection.name
                         showRename = true
                     }
+                    .requiresServer()
                 }
                 CoverMenuItems(itemID: collection.id, imageTag: collection.imageTag, owner: .collection, pickingCover: $pickingCover)
                 Divider()
                 Button("Delete Collection", glyph: .trash, role: .destructive) { confirmDelete = true }
+                    .requiresServer()
             } label: {
                 TintedBarIcon(glyph: .more)
             }
@@ -255,6 +263,7 @@ struct CollectionDetailView: View {
         EmptyPrompt("Fill This Collection", message: "Pick albums from your library, or use Add to Collection on any album.", button: "Add Albums") {
             showPicker = true
         }
+        .requiresServer()
         .padding(.top, theme.spacing.lg)
     }
 }

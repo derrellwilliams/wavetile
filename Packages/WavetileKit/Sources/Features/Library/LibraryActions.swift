@@ -178,6 +178,7 @@ struct FavoriteButton: View {
 
     var body: some View {
         button
+            .requiresServer()
             .contentTransition(.symbolEffect(.replace))
             .sensoryFeedback(.impact(weight: .light), trigger: isFavorite)
             .task(id: itemID) {

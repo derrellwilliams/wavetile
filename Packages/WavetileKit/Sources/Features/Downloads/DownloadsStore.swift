@@ -123,6 +123,8 @@ final class DownloadsStore {
 
     /// Fully downloaded track IDs (row badges, offline availability).
     private(set) var downloadedTrackIDs: Set<String> = []
+    /// Albums, playlists and collections with something downloaded, for offline dimming.
+    private(set) var available = OfflineAvailability()
     private(set) var totalBytes: Int64 = 0
 
     var quality: DownloadManager.Quality {
@@ -143,12 +145,17 @@ final class DownloadsStore {
         self.downloadedTrackIDs = (try? library.database.downloadedTrackIDsNow()) ?? []
     }
 
-    /// Long-running: keeps `downloadedTrackIDs` and `totalBytes` live. Run from a view `.task`.
+    /// Long-running: keeps `downloadedTrackIDs`, `available` and `totalBytes` live. Run from a view `.task`.
     func observe() async {
         async let ids: Void = observeTrackIDs()
         async let bytes: Void = observeBytes()
         async let resume: Void = resumePending()
-        _ = await (ids, bytes, resume)
+        async let availability: Void = observeAvailability()
+        _ = await (ids, bytes, resume, availability)
+    }
+
+    private func observeAvailability() async {
+        await library.observe(database.offlineAvailability()) { available = $0 }
     }
 
     private func observeTrackIDs() async {

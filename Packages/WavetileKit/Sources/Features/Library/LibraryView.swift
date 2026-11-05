@@ -18,6 +18,7 @@ struct LibraryView: View {
         NavigationStack(path: $path) {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
+                    OfflineNotice(gap: theme.spacing.md)
                     ForEach(LibrarySection.allCases, id: \.self) { section in
                         NavigationLink(value: LibraryRoute.section(section)) {
                             LinkRow(title: section.title, glyph: section.glyph)
@@ -55,6 +56,8 @@ struct LibraryView: View {
                 .animation(theme.motion.smooth, value: store.syncError)
             }
             .themedBackground()
+            // The offline notice (and dimming) slide in and out.
+            .animatesConnectivity()
             .markRefreshable { await store.syncNow() }
             .navigationTitle("Music")
             .tabRootChrome()

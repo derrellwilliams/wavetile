@@ -29,6 +29,7 @@ struct CoverMenuItems: View {
     var body: some View {
         if store.isAdmin {
             Button("Upload Cover Image", glyph: .photo) { pickingCover = itemID }
+                .requiresServer()
         }
         if imageTag == nil {
             Button("Shuffle Cover", glyph: .shuffle) {
@@ -42,6 +43,7 @@ struct CoverMenuItems: View {
                     }
                 }
             }
+            .requiresServer()
         }
     }
 }

@@ -99,11 +99,14 @@ struct PlayableRow<Label: View>: View {
             if let track = thisTrack() { player.addToQueue([track.requeued()]) }
         }
         Button("Start Radio", glyph: .radio) { actions.startRadio(from: trackID, store: store, player: player) }
+            .requiresServer()
         Divider()
         Button("Add to Playlist", glyph: .addToQueue) { actions.addToPlaylist([trackID]) }
+            .requiresServer()
         Button("Favorite", glyph: .favorite) {
             actions.favorite(trackID, store: store)
         }
+        .requiresServer()
     }
 
     private var tapAction: some View {

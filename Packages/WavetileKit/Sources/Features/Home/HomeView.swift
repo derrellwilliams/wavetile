@@ -12,6 +12,7 @@ struct HomeView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(PodcastsStore.self) private var podcasts
     @Environment(LibraryStore.self) private var store
+    @Environment(Connectivity.self) private var connectivity
     @State var model: HomeModel
     @Namespace private var zoom
     @Binding var path: NavigationPath
@@ -25,6 +26,8 @@ struct HomeView: View {
     @State private var collections: [CollectionRecord] = []
     /// Both, by name, capped: rebuilt when either list changes rather than on every render.
     @State private var libraryItems: [LibraryShelfItem] = []
+    /// Downloads with something playable, for the Downloaded row that leads Home offline.
+    @State private var downloads: [DownloadCollectionRecord] = []
     /// Greets a new listener by name on the welcome card.
     let userName: String
 
@@ -48,6 +51,11 @@ struct HomeView: View {
                     // and collections row only when there are some. (Continue Listening lives at the top of
                     // the Podcasts tab.) With little play history, a welcome card leads and genre
                     // shelves follow Recently Added (the card only for the first visit).
+                    // Offline: say so, then lead with what still plays.
+                    OfflineNotice()
+                    if !connectivity.isOnline, !downloads.isEmpty {
+                        ShelfSection("Downloaded", items: downloads) { DownloadLink(download: $0) }
+                    }
                     if model.showsWelcome, let stats = model.stats, stats.albums > 0 {
                         WelcomeCard(userName: userName, stats: stats)
                     }
@@ -90,6 +98,8 @@ struct HomeView: View {
             .scrollPosition($scrollPosition)
             .overlay { overlay }
             .themedBackground()
+            // The offline notice, Downloaded row and dimming slide in and out.
+            .animatesConnectivity()
             // No title on screen: the wave in the bar is Home's header. The title is for VoiceOver.
             .navigationTitle("Home")
             .toolbarTitleDisplayMode(.inline)
@@ -103,6 +113,14 @@ struct HomeView: View {
                 guard model.showsWelcome, scenePhase == .active,
                       (try? await Task.sleep(for: .seconds(60))) != nil else { return }
                 model.countWelcomeVisit()
+            }
+            .task {
+                // Progress writes re-run this many times a second; only a change in which
+                // downloads have something to play updates the row.
+                await store.observe(store.database.downloadedCollections()) { value in
+                    let playable = value.filter { $0.status.done > 0 }.map(\.collection)
+                    if playable != downloads { downloads = playable }
+                }
             }
             .task { await store.observe(store.database.playlists()) { playlists = $0; rebuildLibraryItems() } }
             .task { await store.observe(store.database.collections()) { collections = $0; rebuildLibraryItems() } }

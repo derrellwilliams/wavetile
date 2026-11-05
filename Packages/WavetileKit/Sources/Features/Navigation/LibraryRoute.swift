@@ -98,6 +98,7 @@ private struct LibraryDestination: View {
 /// Album tile that pushes the album with a zoom transition from the tapped artwork.
 struct AlbumLink: View {
     @Environment(LibraryStore.self) private var store
+    @Environment(DownloadsStore.self) private var downloads
     @Environment(\.pushLibraryRoute) private var push
     @Environment(LibraryActions.self) private var actions
     @Environment(\.zoomNamespace) private var zoom
@@ -118,11 +119,14 @@ struct AlbumLink: View {
             .zoomSource(route.sourceID, in: zoom)
         }
         .buttonStyle(.pressable)
+        .offlineDimmed(available: downloads.available.albumIDs.contains(album.id))
         .contextMenu {
             Button("Add to Collection", glyph: .collection) { actions.addToCollection([album.id]) }
+                .requiresServer()
             Button("Favorite", glyph: .favorite) {
                 actions.favorite(album.id, store: store)
             }
+            .requiresServer()
             // Hidden on the artist's own page.
             if context != "artist", let route = store.artistRoute(albumID: album.id) {
                 Button("Go to Artist", glyph: .artist) { push(route) }

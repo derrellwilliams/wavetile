@@ -83,6 +83,7 @@ struct ArtistDetailView: View {
             FavoriteButton(itemID: artistID)
             Menu {
                 Button("Start Radio", glyph: .radio) { actions.startRadio(from: artistID, store: store, player: player) }
+                    .requiresServer()
             } label: {
                 TintedBarIcon(glyph: .more)
             }

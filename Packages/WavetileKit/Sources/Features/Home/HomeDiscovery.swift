@@ -88,6 +88,7 @@ struct WelcomeCard: View {
 /// Playlist tile for Home shelves.
 struct PlaylistLink: View {
     @Environment(LibraryStore.self) private var store
+    @Environment(DownloadsStore.self) private var downloads
     let playlist: PlaylistRecord
 
     var body: some View {
@@ -100,12 +101,27 @@ struct PlaylistLink: View {
             )
         }
         .buttonStyle(.pressable)
+        .offlineDimmed(available: downloads.available.playlistIDs.contains(playlist.id))
+    }
+}
+
+/// A download's tile for Home's offline Downloaded row: its art, name and kind.
+struct DownloadLink: View {
+    @Environment(LibraryStore.self) private var store
+    let download: DownloadCollectionRecord
+
+    var body: some View {
+        NavigationLink(value: store.route(for: download)) {
+            AlbumTile(title: download.name, subtitle: download.subtitle, artwork: store.artwork(for: download, maxPixelWidth: 480))
+        }
+        .buttonStyle(.pressable)
     }
 }
 
 /// Collection tile for Home shelves.
 struct CollectionLink: View {
     @Environment(LibraryStore.self) private var store
+    @Environment(DownloadsStore.self) private var downloads
     let collection: CollectionRecord
 
     var body: some View {
@@ -118,6 +134,7 @@ struct CollectionLink: View {
             )
         }
         .buttonStyle(.pressable)
+        .offlineDimmed(available: downloads.available.collectionIDs.contains(collection.id))
     }
 }
 

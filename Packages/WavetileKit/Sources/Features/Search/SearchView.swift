@@ -47,6 +47,7 @@ struct SearchView: View {
             .safeAreaInset(edge: .top, spacing: 0) {
                 VStack(alignment: .leading, spacing: 0) {
                     title
+                    OfflineNotice(gap: theme.spacing.md)
                     if podcasts.isEnabled {
                         MediaFilter(selection: $scope, options: MediaKind.allCases)
                     }
@@ -55,6 +56,8 @@ struct SearchView: View {
                 .background(theme.palette.background)
             }
             .themedBackground()
+            // The offline notice (and dimming) slide in and out.
+            .animatesConnectivity()
             // iOS hides the bar's large title while the field is active, and this tab activates it
             // on selection, so the title is drawn above the filter instead. The bar's title stays
             // for VoiceOver and Back, but isn't shown.

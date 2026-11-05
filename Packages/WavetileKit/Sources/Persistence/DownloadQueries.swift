@@ -174,6 +174,20 @@ public extension LibraryDatabase {
         try pool.read(Self.downloadedTrackIDs)
     }
 
+    /// Albums, playlists and collections with at least one downloaded song: what still plays
+    /// offline, so screens can dim the rest.
+    func offlineAvailability() -> ValueObservation<ValueReducers.Fetch<OfflineAvailability>> {
+        ValueObservation.tracking { db in
+            let done = "SELECT trackID FROM downloadedTrack WHERE state = 'done'"
+            let albums = "SELECT DISTINCT albumID FROM track WHERE albumID IS NOT NULL AND id IN (\(done))"
+            return OfflineAvailability(
+                albumIDs: Set(try String.fetchAll(db, sql: albums)),
+                playlistIDs: Set(try String.fetchAll(db, sql: "SELECT DISTINCT playlistID FROM playlistEntry WHERE trackID IN (\(done))")),
+                collectionIDs: Set(try String.fetchAll(db, sql: "SELECT DISTINCT collectionID FROM collectionAlbum WHERE albumID IN (\(albums))"))
+            )
+        }
+    }
+
     private static func downloadedTrackIDs(_ db: Database) throws -> Set<String> {
         Set(try String.fetchAll(db, sql: "SELECT trackID FROM downloadedTrack WHERE state = 'done'"))
     }

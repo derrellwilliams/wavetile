@@ -45,6 +45,7 @@ struct PodcastsView: View {
     private var page: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: theme.spacing.xxl) {
+                OfflineNotice(podcasts: true)
                 if !hasShows {
                     emptyState
                 }
@@ -59,6 +60,8 @@ struct PodcastsView: View {
             .padding(.vertical, theme.spacing.lg)
         }
         .themedBackground()
+        // The offline notice (and dimming) slide in and out.
+        .animatesConnectivity()
         .navigationTitle("Podcasts")
         .markRefreshable { await podcasts.refreshAll() }
         // On the always-present scroll view: a task on a shelf that isn't shown never runs.

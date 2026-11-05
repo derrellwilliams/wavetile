@@ -46,6 +46,7 @@ Native Jellyfin music + podcast player for iPhone (iOS 26.1+, Swift 6, SwiftUI).
 Shelves are read from the local DB on init (first frame, works offline), then `load()` refreshes the history shelves from the server once per session.
 - History: Recently Played → Latest Podcast Episodes (if enabled) → Most Played → Your Playlists & Collections (one row, by name; only when there are some, updates live) → Recently Added.
 - New listener (`HomeModel.isNewListener`: < 6 albums in Recently Played): a welcome card (library counts and a nudge to start listening) on top for the first visit only (`showsWelcome`; a visit counts after a minute on Home), and 2 genre shelves (random from the 6 largest) after Recently Added.
+- Offline (no network, or the server out of reach): the offline notice, then a Downloaded row (anything with downloaded songs) lead the feed.
 - Always at the bottom: up to 3 Artist Spotlights (random artists with 3+ albums, ones with a photo first; none if no artist qualifies).
 - Random picks change on launch and on pull to refresh, not on the server refresh. After the first library sync, `librarySynced()` fills empty shelves.
 
@@ -56,6 +57,7 @@ Shelves are read from the local DB on init (first frame, works offline), then `l
 - Match the surrounding code's comment style; screens observe GRDB via `store.observe(...)`.
 - Bar buttons hide the bar's glass (on iOS 27 it's a pill around a 44pt item) and draw their own: Apple's standard glass in a 44pt circle or capsule on iOS 27 (`TintedBar.drawsGlass`), a tinted circle on iOS 26; iOS keeps its glass behind the system Back regardless: `TintedBarIcon`, `TintedBarCapsule`/`TintedBarGroup`, `TintedSheetButton`, `listBar`/`detailBarButtons` (all in `MainTabView.swift`). Keep the system Back, drawn tinted; never hide it for a custom one (on iOS 27 that kills the swipe back inside UIKit, past any gesture delegate).
 - Song/album/artist actions (favorite, add to playlist, Start Radio = Jellyfin Instant Mix replacing the queue) live in `Features/Library/LibraryActions.swift`.
+- Offline (`Features/Downloads/Offline.swift`): every main tab shows `OfflineNotice` under its title; song rows (`PlayableRow`) and album/playlist/collection tiles (`offlineDimmed(available:)`) dim what isn't downloaded; actions that change the library on the server use `requiresServer()`. Podcasts only count a lost network, since episodes stream from their feeds.
 - Plain HTTP only to LAN hosts; `NSAllowsArbitraryLoadsInMedia` is for podcast audio only. Keep the token off cleartext.
 - Swift 6: closures handed to MediaPlayer/AVFoundation must be built nonisolated.
 - CarPlay (`Features/CarPlay`, `App/CarPlaySceneDelegate.swift`) uses the `com.apple.developer.carplay-audio` entitlement (granted 2026-10-30; set in `project.yml`, which writes `App/Wavetile.entitlements`). Device signing needs CarPlay Audio enabled on the App ID. Test with the CarPlay simulator (I/O → External Displays → CarPlay). Siri phrases live in `App/MusicIntents.swift`.
