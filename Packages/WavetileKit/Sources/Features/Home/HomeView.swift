@@ -114,14 +114,7 @@ struct HomeView: View {
                       (try? await Task.sleep(for: .seconds(60))) != nil else { return }
                 model.countWelcomeVisit()
             }
-            .task {
-                // Progress writes re-run this many times a second; only a change in which
-                // downloads have something to play updates the row.
-                await store.observe(store.database.downloadedCollections()) { value in
-                    let playable = value.filter { $0.status.done > 0 }.map(\.collection)
-                    if playable != downloads { downloads = playable }
-                }
-            }
+            .task { await store.observe(store.database.playableDownloads()) { downloads = $0 } }
             .task { await store.observe(store.database.playlists()) { playlists = $0; rebuildLibraryItems() } }
             .task { await store.observe(store.database.collections()) { collections = $0; rebuildLibraryItems() } }
             .task(id: podcasts.isEnabled) { await observePodcasts(podcasts.database.upNextShelf()) { podcastUpNext = $0 } }

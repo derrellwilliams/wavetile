@@ -16,6 +16,9 @@ public struct Theme: Sendable, Identifiable, Hashable {
     public var motion: Motion
     /// Forced appearance. `nil` follows the system light/dark setting.
     public var colorScheme: ColorScheme?
+    /// How faint something is when it can't be used right now: offline, songs, albums and
+    /// playlists that aren't downloaded. Faint enough to read as unavailable, still legible.
+    public var unavailableOpacity = 0.35
 
     public func hash(into hasher: inout Hasher) { hasher.combine(id) }
 

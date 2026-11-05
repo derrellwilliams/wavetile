@@ -72,7 +72,6 @@ public struct DownloadedTrackRecord: Codable, Hashable, Sendable, Identifiable, 
     }
 }
 
-/// Aggregate status for a collection's download button.
 /// What has something to play offline (at least one downloaded song), by kind.
 public struct OfflineAvailability: Sendable, Equatable {
     public var albumIDs: Set<String> = []
@@ -86,6 +85,7 @@ public struct OfflineAvailability: Sendable, Equatable {
     }
 }
 
+/// Aggregate status for a collection's download button.
 public struct DownloadStatus: Sendable, Equatable {
     public var total: Int
     public var done: Int

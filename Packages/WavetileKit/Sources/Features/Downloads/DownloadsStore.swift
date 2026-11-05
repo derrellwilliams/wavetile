@@ -151,7 +151,17 @@ final class DownloadsStore {
         async let bytes: Void = observeBytes()
         async let resume: Void = resumePending()
         async let availability: Void = observeAvailability()
-        _ = await (ids, bytes, resume, availability)
+        async let favorites: Void = observeFavoritesDownload()
+        _ = await (ids, bytes, resume, availability, favorites)
+    }
+
+    /// Hearting or unhearting updates the Favorites download now, not at the next library sync.
+    private func observeFavoritesDownload() async {
+        await library.observe(database.favoritesDownloadTracks()) { tracks in
+            guard tracks != nil else { return }
+            let quality = quality, cellular = allowCellular
+            Task { await manager?.syncFavorites(quality: quality, allowCellular: cellular) }
+        }
     }
 
     private func observeAvailability() async {
@@ -202,8 +212,8 @@ final class DownloadsStore {
         for albumID in Set(albumIDs) { prefetchArtwork(itemID: albumID, tag: nil) }
     }
 
-    /// Favorite songs and the songs on favorite albums, as one download that keeps up as
-    /// favorites change.
+    /// Favorite songs and the songs on favorite albums, as one download that updates as soon as a
+    /// heart changes (`observeFavoritesDownload`).
     func downloadFavorites(trackIDs: [String], albumIDs: [String]) {
         let record = DownloadCollectionRecord(id: DownloadCollectionRecord.favoritesID, kind: .favorites, name: "Favorites", subtitle: "Favorites", imageTag: nil)
         start(record, trackIDs: trackIDs)

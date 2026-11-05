@@ -95,17 +95,38 @@ public final class DownloadManager: NSObject, Sendable {
     public func syncPlaylists(quality: Quality, allowCellular: Bool) async {
         guard let downloads = try? database.syncedDownloads() else { return }
         for download in downloads {
-            let trackIDs: [String]? = switch download.kind {
-            case .playlist: try? database.tracks(playlistID: download.id).map(\.id)
-            case .collection: try? database.trackIDs(collectionID: download.id)
-            case .favorites: try? database.favoritesDownloadTrackIDs()
-            case .album: nil
-            }
-            guard let trackIDs,
-                  let (added, orphans) = try? await database.syncDownloadedPlaylist(id: download.id, trackIDs: trackIDs) else { continue }
-            await enqueue(added, quality: quality, allowCellular: allowCellular)
-            deleteFiles(orphans)
+            await sync(download, quality: quality, allowCellular: allowCellular)
         }
+    }
+
+    /// Brings the Favorites download up to date (after a heart changes), if there is one.
+    public func syncFavorites(quality: Quality, allowCellular: Bool) async {
+        guard let download = try? await database.pool.read({ try DownloadCollectionRecord.fetchOne($0, key: DownloadCollectionRecord.favoritesID) }) else { return }
+        await sync(download, quality: quality, allowCellular: allowCellular)
+    }
+
+    private func sync(_ download: DownloadCollectionRecord, quality: Quality, allowCellular: Bool) async {
+        // A playlist or collection that's gone (deleted here, or on the server) takes its
+        // download with it, rather than leaving an empty one behind.
+        let sourceExists: Bool = switch download.kind {
+        case .playlist: (try? database.playlist(id: download.id)) != nil
+        case .collection: (try? database.collection(id: download.id)) != nil
+        case .favorites, .album: true
+        }
+        guard sourceExists else {
+            try? await remove(collectionID: download.id)
+            return
+        }
+        let trackIDs: [String]? = switch download.kind {
+        case .playlist: try? database.tracks(playlistID: download.id).map(\.id)
+        case .collection: try? database.trackIDs(collectionID: download.id)
+        case .favorites: try? database.favoritesDownloadTrackIDs()
+        case .album: nil
+        }
+        guard let trackIDs,
+              let (added, orphans) = try? await database.syncDownloadedPlaylist(id: download.id, trackIDs: trackIDs) else { return }
+        await enqueue(added, quality: quality, allowCellular: allowCellular)
+        deleteFiles(orphans)
     }
 
     /// Restarts queued downloads that have no running task (e.g. after the app was killed), and

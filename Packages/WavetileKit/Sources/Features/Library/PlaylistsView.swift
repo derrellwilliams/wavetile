@@ -95,7 +95,10 @@ struct PlaylistsView: View {
             Button("Delete Playlist", role: .destructive) {
                 guard let playlist = pendingDelete else { return }
                 Task {
-                    do { try await store.editor.deletePlaylist(id: playlist.id) } catch {
+                    do {
+                        try await store.editor.deletePlaylist(id: playlist.id)
+                        downloads.remove(collectionID: playlist.id)
+                    } catch {
                         actions.editFailed("delete this playlist", error)
                     }
                 }
@@ -169,10 +172,9 @@ struct PlaylistDetailView: View {
         // Full-bleed art: no bar background or blur band under the navigation bar.
         .detailPageChrome()
         .detailBarButtons {
-            DownloadButton(collectionID: playlist.id) {
+            DownloadButton(collectionID: playlist.id, canDownload: !items.isEmpty) {
                 downloads.download(playlist: playlist, trackIDs: tracks.map(\.id), albumIDs: tracks.compactMap(\.albumID))
             }
-            .disabled(items.isEmpty)
             Menu {
                 Button("Rename", glyph: .edit) {
                     newName = playlist.name
@@ -205,6 +207,7 @@ struct PlaylistDetailView: View {
                 Task {
                     do {
                         try await store.editor.deletePlaylist(id: playlist.id)
+                        downloads.remove(collectionID: playlist.id)
                         dismiss()
                     } catch {
                         actions.editFailed("delete this playlist", error)

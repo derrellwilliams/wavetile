@@ -73,15 +73,24 @@ private struct ConnectivityAnimation: ViewModifier {
 }
 
 private struct OfflineDim: ViewModifier {
+    @Environment(\.theme) private var theme
     @Environment(Connectivity.self) private var connectivity
     let available: Bool
 
     func body(content: Content) -> some View {
         let dimmed = !connectivity.isOnline && !available
-        // The same strength as song rows that can't play.
         content
-            .opacity(dimmed ? 0.35 : 1)
-            .accessibilityHint(dimmed ? "Not downloaded" : "")
+            .opacity(dimmed ? theme.unavailableOpacity : 1)
+            .modifier(DimmedHint(isDimmed: dimmed))
+    }
+}
+
+/// "Not downloaded" for VoiceOver while dimmed; otherwise leaves the tile's own hint alone.
+private struct DimmedHint: ViewModifier {
+    let isDimmed: Bool
+
+    func body(content: Content) -> some View {
+        if isDimmed { content.accessibilityHint("Not downloaded") } else { content }
     }
 }
 

@@ -9,6 +9,9 @@ struct DownloadButton: View {
     @Environment(LibraryStore.self) private var library
     @Environment(DownloadsStore.self) private var downloads
     let collectionID: String
+    /// False when there's nothing to download (an empty playlist or collection). Only Download and
+    /// Retry turn off; removing an existing download always works.
+    var canDownload = true
     let onDownload: () -> Void
     @State private var status = DownloadStatus.none
     @State private var confirmRemove = false
@@ -19,6 +22,8 @@ struct DownloadButton: View {
                 Menu {
                     if status.failed > 0 {
                         Button("Retry \(status.failed) Failed", glyph: .download, action: onDownload)
+                            .disabled(!canDownload)
+                            .requiresServer()
                     }
                     Button("Remove Download", glyph: .trash, role: .destructive) { confirmRemove = true }
                 } label: {
@@ -27,6 +32,7 @@ struct DownloadButton: View {
             } else {
                 // Downloading needs the server; removing a download (above) works offline.
                 Button(action: onDownload) { label }
+                    .disabled(!canDownload)
                     .requiresServer()
             }
         }

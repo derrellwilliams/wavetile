@@ -92,9 +92,12 @@ public extension LibraryDatabase {
     func updateDownload(trackID: String, _ change: @escaping @Sendable (inout DownloadedTrackRecord) -> Void) async throws -> Bool {
         try await pool.write { db in
             guard var record = try DownloadedTrackRecord.fetchOne(db, key: trackID) else { return false }
-            change(&record)
-            record.updatedAt = Date()
-            try record.update(db)
+            // Only the changed columns: a progress tick then doesn't wake observers of `state`
+            // (offline availability, Home's Downloaded row).
+            try record.updateChanges(db) {
+                change(&$0)
+                $0.updatedAt = Date()
+            }
             return true
         }
     }
@@ -149,11 +152,35 @@ public extension LibraryDatabase {
     /// What the Favorites download holds: favorite songs, and every song on a favorite album.
     /// Favorite artists aren't included; a whole discography is too much to pull down at once.
     func favoritesDownloadTrackIDs() throws -> [String] {
-        try pool.read { db in
-            try String.fetchAll(db, sql: """
-                SELECT id FROM track WHERE isFavorite = 1
-                UNION
-                SELECT track.id FROM track JOIN album ON album.id = track.albumID WHERE album.isFavorite = 1
+        try pool.read(Self.favoritesTrackIDs)
+    }
+
+    /// The Favorites download's songs while it exists (nil otherwise), so hearting or unhearting
+    /// something updates it right away rather than at the next library sync.
+    func favoritesDownloadTracks() -> ValueObservation<ValueReducers.Fetch<[String]?>> {
+        ValueObservation.tracking { db in
+            guard try DownloadCollectionRecord.exists(db, key: DownloadCollectionRecord.favoritesID) else { return nil }
+            return try Self.favoritesTrackIDs(db)
+        }
+    }
+
+    private static func favoritesTrackIDs(_ db: Database) throws -> [String] {
+        try String.fetchAll(db, sql: """
+            SELECT id FROM track WHERE isFavorite = 1
+            UNION
+            SELECT track.id FROM track JOIN album ON album.id = track.albumID WHERE album.isFavorite = 1
+            """)
+    }
+
+    /// Downloads with at least one finished song, newest first: Home's Downloaded row. Reads only
+    /// finished state, so it doesn't re-run on every progress tick like `downloadedCollections()`.
+    func playableDownloads() -> ValueObservation<ValueReducers.Fetch<[DownloadCollectionRecord]>> {
+        ValueObservation.tracking { db in
+            try DownloadCollectionRecord.fetchAll(db, sql: """
+                SELECT * FROM downloadCollection WHERE EXISTS (
+                    SELECT 1 FROM downloadMembership m JOIN downloadedTrack d ON d.trackID = m.trackID
+                    WHERE m.collectionID = downloadCollection.id AND d.state = 'done'
+                ) ORDER BY addedAt DESC
                 """)
         }
     }

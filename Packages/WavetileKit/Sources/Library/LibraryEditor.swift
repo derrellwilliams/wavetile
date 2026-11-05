@@ -143,6 +143,15 @@ public struct LibraryEditor: Sendable {
             for (position, albumID) in albumIDs.enumerated() {
                 try CollectionAlbumRecord(collectionID: newID, albumID: albumID, position: position).insert(db)
             }
+            // A downloaded collection's download moves with it, or the next sync would find
+            // nothing under the old ID and delete its songs.
+            if var download = try DownloadCollectionRecord.fetchOne(db, key: id) {
+                download.id = newID
+                download.name = name
+                try download.insert(db)
+                try db.execute(sql: "UPDATE downloadMembership SET collectionID = ? WHERE collectionID = ?", arguments: [newID, id])
+                try DownloadCollectionRecord.deleteOne(db, key: id)
+            }
         }
         try? await sync.refreshCollection(id: newID)
         return newID

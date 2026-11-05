@@ -92,7 +92,10 @@ struct CollectionsView: View {
             Button("Delete Collection", role: .destructive) {
                 guard let collection = pendingDelete else { return }
                 Task {
-                    do { try await store.editor.deleteCollection(id: collection.id) } catch {
+                    do {
+                        try await store.editor.deleteCollection(id: collection.id)
+                        downloads.remove(collectionID: collection.id)
+                    } catch {
                         actions.editFailed("delete this collection", error)
                     }
                 }
@@ -164,11 +167,10 @@ struct CollectionDetailView: View {
         // Full-bleed art: no bar background or blur band under the navigation bar.
         .detailPageChrome()
         .detailBarButtons {
-            DownloadButton(collectionID: collection.id) {
+            DownloadButton(collectionID: collection.id, canDownload: !albums.isEmpty) {
                 let trackIDs = (try? store.database.trackIDs(collectionID: collection.id)) ?? []
                 downloads.download(collection: collection, trackIDs: trackIDs, albumIDs: albums.map(\.id))
             }
-            .disabled(albums.isEmpty)
             Menu {
                 // Non-admins rename by recreating, which would drop an uploaded cover.
                 if store.canRenameCollections, store.isAdmin || collection.imageTag == nil {
@@ -216,6 +218,7 @@ struct CollectionDetailView: View {
                 Task {
                     do {
                         try await store.editor.deleteCollection(id: collection.id)
+                        downloads.remove(collectionID: collection.id)
                         dismiss()
                     } catch {
                         actions.editFailed("delete this collection", error)

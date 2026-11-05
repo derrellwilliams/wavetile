@@ -41,11 +41,10 @@ struct FavoritesView: View {
         .navigationTitle("Favorites")
         .listBar {
             TintedBarCapsule {
-                DownloadButton(collectionID: DownloadCollectionRecord.favoritesID) {
+                DownloadButton(collectionID: DownloadCollectionRecord.favoritesID, canDownload: !(tracks.isEmpty && albums.isEmpty)) {
                     let trackIDs = (try? store.database.favoritesDownloadTrackIDs()) ?? []
                     downloads.downloadFavorites(trackIDs: trackIDs, albumIDs: albums.map(\.id))
                 }
-                .disabled(tracks.isEmpty && albums.isEmpty)
             }
         }
         .task { await observe() }
