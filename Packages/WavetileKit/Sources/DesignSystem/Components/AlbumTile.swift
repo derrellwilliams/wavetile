@@ -37,6 +37,7 @@ public struct AlbumTile: View {
             Text(subtitle)
                 .font(subtitleIsMetadata ? theme.typography.itemMetadata : theme.typography.itemSubtitle)
                 .foregroundStyle(theme.palette.textSecondary)
+                .accessibilityIdentifier("albumTile")
         }
         .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
         .accessibilityElement(children: .combine)

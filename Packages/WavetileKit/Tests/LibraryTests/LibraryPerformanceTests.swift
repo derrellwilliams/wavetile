@@ -1,5 +1,6 @@
 import Foundation
 import GRDB
+import MachO
 import Testing
 @testable import Persistence
 
@@ -39,9 +40,22 @@ struct LibraryPerformanceTests {
         return db
     }()
 
+    /// Address and Thread Sanitizer runs (QA) slow everything several times over, so budgets only
+    /// apply without one; the timings still print.
+    static let sanitized = (0 ..< _dyld_image_count()).contains { index in
+        guard let name = _dyld_get_image_name(index) else { return false }
+        let path = String(cString: name)
+        return path.contains("libclang_rt.asan") || path.contains("libclang_rt.tsan")
+    }
+
     func measure(_ label: String, budget: Duration, _ work: () throws -> Void) rethrows {
         let elapsed = try ContinuousClock().measure(work)
+        check(label, elapsed, budget)
+    }
+
+    func check(_ label: String, _ elapsed: Duration, _ budget: Duration) {
         print("⏱ \(label): \(elapsed.formatted(.units(allowed: [.milliseconds], fractionalPart: .show(length: 1))))")
+        guard !Self.sanitized else { return }
         #expect(elapsed < budget, "\(label) took \(elapsed), budget \(budget)")
     }
 
@@ -72,8 +86,6 @@ struct LibraryPerformanceTests {
         let db = Self.database
         let start = ContinuousClock.now
         for try await _ in observation.values(in: db.pool) { break }
-        let elapsed = ContinuousClock.now - start
-        print("⏱ \(label): \(elapsed.formatted(.units(allowed: [.milliseconds], fractionalPart: .show(length: 1))))")
-        #expect(elapsed < budget, "\(label) took \(elapsed), budget \(budget)")
+        check(label, ContinuousClock.now - start, budget)
     }
 }

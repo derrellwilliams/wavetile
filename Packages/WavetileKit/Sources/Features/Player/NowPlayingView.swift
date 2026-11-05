@@ -104,6 +104,7 @@ struct NowPlayingView: View {
                 Text(player.current?.title ?? "")
                     .font(theme.typography.title)
                     .foregroundStyle(theme.palette.textPrimary)
+                    .accessibilityIdentifier("nowPlayingTitle")
                 // An error takes the subtitle's line rather than adding one, and episodes always
                 // keep a chapter line (blank until chapters load), so neither changes the sheet's height.
                 Group {
@@ -112,6 +113,7 @@ struct NowPlayingView: View {
                             .transition(.opacity)
                     } else {
                         Text(subtitle)
+                            .accessibilityIdentifier("nowPlayingSubtitle")
                     }
                 }
                 .font(theme.typography.lead)

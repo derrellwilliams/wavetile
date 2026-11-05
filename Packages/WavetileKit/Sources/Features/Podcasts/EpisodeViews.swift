@@ -149,6 +149,8 @@ struct EpisodeDownloadButton: View {
                 }
             }
         }
+        // On the control: a Menu drops its label's accessibility label (see `DownloadButton`).
+        .accessibilityLabel(indicator.episodeTitle)
         .animation(theme.motion.smooth, value: indicator)
         .sensoryFeedback(.success, trigger: indicator == .done) { _, done in done }
     }

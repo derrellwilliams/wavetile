@@ -26,7 +26,11 @@ public struct SplashScreen: View {
             }
         }
         .ignoresSafeArea()
-        .accessibilityHidden(true)
+        // One modal element, so VoiceOver (and UI tests) can't reach the app it covers; hiding the
+        // app instead doesn't reach its UIKit-backed tab and navigation views.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Wavetile")
+        .accessibilityAddTraits(.isModal)
     }
 }
 

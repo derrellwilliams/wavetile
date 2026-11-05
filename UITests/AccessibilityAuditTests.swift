@@ -19,9 +19,11 @@ final class AccessibilityAuditTests: XCTestCase {
     /// Known false positives are skipped, each for a specific reason:
     /// - Contrast / clipping for elements under the glass tab bar + mini player, or partly off
     ///   screen (horizontally scrolling shelves): the audit evaluates content behind overlays.
+    ///   Contrast issues with no element are the same artifact (see below).
     /// - Anything outside `visibleWidth` (e.g. the main UI dimmed behind the open settings drawer).
     /// - Dynamic Type on the "Wavetile" wordmark: a fixed-size logo is an HIG-sanctioned exception.
-    /// - Truncation of album tile titles at normal sizes, and "partially unsupported" Dynamic Type
+    /// - Truncation of one-line names at normal sizes (album tile titles and artists, the Now
+    ///   Playing title and artist line), and "partially unsupported" Dynamic Type
     ///   reports caused by deliberate large-text re-layouts (see below).
     @MainActor private func audit(_ app: XCUIApplication, screen: String, visibleWidth: CGFloat? = nil) throws {
         var issues: [String] = []
@@ -35,15 +37,20 @@ final class AccessibilityAuditTests: XCTestCase {
                 let overlayArtifact: XCUIAccessibilityAuditType = [.contrast, .textClipped]
                 if !overlayArtifact.intersection(issue.auditType).isEmpty, !visible.contains(frame) { return true }
                 if issue.auditType == .dynamicType, element.label == "Wavetile" { return true }
-                // Album tile titles are single-line + truncated by design at normal sizes; they
-                // wrap at accessibility sizes and VoiceOver reads the full title.
-                if issue.auditType == .textClipped, element.identifier == "albumTile" { return true }
+                // Album tile titles and artists, and Now Playing's title and artist line, are one
+                // line and truncated by design at normal sizes; they wrap at accessibility sizes and
+                // VoiceOver reads them in full.
+                let oneLineNames: Set = ["albumTile", "nowPlayingTitle", "nowPlayingSubtitle"]
+                if issue.auditType == .textClipped, oneLineNames.contains(element.identifier) { return true }
                 // Track rows and settings rows deliberately re-layout at large sizes (stacking instead
                 // of truncating, per the HIG). The audit reports any re-layout as "partially
                 // unsupported"; scaling was verified visually at AX5. Fully "unsupported" (fixed-size
                 // fonts) is still enforced.
                 if issue.auditType == .dynamicType, issue.compactDescription.localizedCaseInsensitiveContains("partially") { return true }
             }
+            // Contrast with no element: parts of a combined row (album track rows) under the glass
+            // tab bar, the overlay artifact above, which the audit can't map to an element or frame.
+            if issue.element == nil, issue.auditType == .contrast { return true }
             let element = issue.element.map { "\($0.elementType) '\($0.label)' at \($0.frame.integral)" } ?? "screen"
             issues.append("[\(screen)] \(issue.auditType): \(issue.compactDescription) — \(element)")
             return false

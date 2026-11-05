@@ -36,6 +36,9 @@ struct DownloadButton: View {
                     .requiresServer()
             }
         }
+        // On the control itself: in a bar capsule a Menu drops its label's accessibility label,
+        // leaving the Downloaded check unnamed.
+        .accessibilityLabel(title)
         .confirmationDialog("Remove this download?", isPresented: $confirmRemove, titleVisibility: .visible) {
             Button("Remove Download", role: .destructive) { downloads.remove(collectionID: collectionID) }
         } message: {

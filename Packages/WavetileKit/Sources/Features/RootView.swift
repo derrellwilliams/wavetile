@@ -9,6 +9,9 @@ public struct RootView: View {
     /// Covers the first moments after launch with the turning cube over the drifting waves,
     /// picking up from the launch image.
     @State private var showsSplash = true
+    /// False from the moment the splash starts to fade: touches and VoiceOver go to the app, not
+    /// to the splash still fading out over it.
+    @State private var splashCovers = true
 
     public init(app: AppModel) {
         self.app = app
@@ -32,6 +35,8 @@ public struct RootView: View {
             if showsSplash {
                 // Starts as the static launch screen (the cube over "Wavetile"), so launch hands off without a jump.
                 SplashScreen()
+                    .allowsHitTesting(splashCovers)
+                    .accessibilityHidden(!splashCovers)
                     .transition(.opacity)
             }
         }
@@ -51,6 +56,9 @@ public struct RootView: View {
         .task {
             // Two quarter turns and a beat to read the name, then reveal the app.
             try? await Task.sleep(for: .seconds(2 * (WavetileMark.move + WavetileMark.hold) + 0.15))
+            // Hand the screen over first; the removed splash keeps the state it fades out with.
+            splashCovers = false
+            await Task.yield()
             withAnimation(app.theme.motion.smooth) { showsSplash = false }
         }
         .enableInjection()
