@@ -58,6 +58,10 @@ struct SettingsDrawer: View {
 
             downloadsSection
 
+            Section("About") {
+                PrivacyPolicyLink()
+            }
+
             Section {
                 Button {
                     confirmSignOut = true

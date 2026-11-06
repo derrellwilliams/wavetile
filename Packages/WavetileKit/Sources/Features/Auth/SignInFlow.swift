@@ -55,6 +55,9 @@ struct SignInFlow: View {
                     .disabled(model.addressText.isEmpty || model.isWorking)
                     .listRowInsets(.init())
                 }
+                Section {
+                    PrivacyPolicyLink()
+                }
             }
             .themedBackground()
             .navigationDestination(for: SignInModel.Route.self) { route in

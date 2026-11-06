@@ -17,10 +17,8 @@ python3 -m http.server -d site 8080   # then open http://localhost:8080
 Clean URLs (`/privacy`) only work on Vercel. Locally, use `/privacy.html`.
 
 ## At launch
-- `index.html`: uncomment the `apple-itunes-app` meta tag (Smart App Banner) and swap the "Coming soon" badge for Apple's official App Store badge, linked to the listing.
-- Replace the `.qr` placeholder with an SVG QR code for the App Store URL.
-- Add `"offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }` and `downloadUrl` to the `MobileApplication` JSON-LD.
-- Update `lastmod` in `sitemap.xml` whenever a page changes.
+
+Follow the canonical [launch-day checklist](../docs/LAUNCH.md#launch-day--after-the-app-store-listing-is-live) for the App Store badge, Smart App Banner, QR code, structured data and sitemap updates. Track completion there.
 
 ## Screenshots
 `assets/screens/*.webp` are 924×2000 phone captures. Before launch, replace these with captures from a demo library with licensed or public-domain artwork (see `docs/LAUNCH.md`).

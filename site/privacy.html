@@ -50,31 +50,31 @@
 </header>
 <main id="main" class="page">
   <h1 class="title">Privacy Policy</h1>
-  <p class="meta mono">Effective October 28, 2026</p>
+  <p class="meta mono">Effective November 6, 2026</p>
 
-  <p><strong>Short version: Wavetile collects no data.</strong> There's no Wavetile account, no analytics, no ads and no tracking. The developer can't see what you listen to.</p>
+  <p><strong>Short version: Wavetile has no developer-operated analytics or listening-history service.</strong> There's no Wavetile account, and the app includes no analytics or advertising SDKs and does not implement advertising tracking. Podcasts may contain advertising supplied by their publishers. Your chosen Jellyfin server and podcast services receive the requests needed to provide playback and sync, as described below.</p>
 
-  <h2>What stays on your iPhone</h2>
+  <h2>What Wavetile stores on your iPhone</h2>
   <ul>
-    <li>Your Jellyfin server address and username, and the access token from signing in. The token is stored in the iOS Keychain.</li>
+    <li>Your Jellyfin server address and username, and the access token from signing in. The token and a randomly generated device identifier used for Jellyfin sessions are stored in the iOS Keychain.</li>
     <li>A copy of your library (titles, artwork, play history) so the app is fast and works offline.</li>
     <li>Downloaded music and podcast episodes, your podcast subscriptions and listening progress, and your settings.</li>
     <li>Small snapshots for the Home Screen widgets, shared only between the app and its widgets.</li>
   </ul>
-  <p>Deleting the app deletes all of this. Signing out removes the token.</p>
+  <p>Signing out removes the saved access token, cached library, music and podcast downloads, podcast database, recent music searches and widget snapshots from this device. Some preferences remain. Deleting the app removes its local app data, but Keychain entries can persist; sign out before deleting if you want to remove the saved token. Neither action deletes data already stored by your Jellyfin server or podcast hosts.</p>
 
   <h2>Who Wavetile talks to</h2>
   <ul>
-    <li><strong>Your Jellyfin server.</strong> To sign in, sync your library, stream and download music, and report what you've played (so Jellyfin's play counts and Instant Mix work). Your server is run by you or whoever gave you access; their privacy terms apply.</li>
-    <li><strong>Podcast services, only if you turn podcasts on.</strong> Searching podcasts and browsing top shows uses Apple's public podcast directory. Following a show fetches its RSS feed and audio from the podcast's own host. Those hosts see your IP address, as with any podcast app. Subscriptions sync to your Jellyfin server.</li>
+    <li><strong>Your Jellyfin server.</strong> To sign in, sync your library, stream and download music, and report what you've played (so Jellyfin's play counts and Instant Mix work). Requests include your account/session information, app version, device name and randomly generated device identifier. Changes you make to playlists, favorites and uploaded cover images are also sent to your server. Your server is run by you or whoever gave you access; its operator can see this information and its privacy terms apply.</li>
+    <li><strong>Podcast services, only if you turn podcasts on.</strong> Searching podcasts sends your search terms to Apple's public podcast directory; browsing charts also uses Apple services. Feeds, audio, artwork, chapters and transcripts are requested from their publishers or hosting providers, including redirects. These services see your IP address and requested content, and their own privacy and retention practices apply. Wavetile does not attach your Jellyfin access token to podcast requests. Public subscriptions, podcast settings, episode identifiers, playback positions and played timestamps sync to your Jellyfin account and can be read by its administrator. Feed URLs recognized as private are excluded from subscription sync.</li>
   </ul>
-  <p>Wavetile doesn't send data anywhere else and includes no third-party analytics or advertising SDKs.</p>
+  <p>Wavetile includes no third-party analytics or advertising SDKs. Opening this policy or other external links contacts the website you open; its hosting provider receives normal web requests. If you contact support, the developer receives the information you choose to send.</p>
 
   <h2>Siri and widgets</h2>
   <p>Siri requests are handled by Apple under Apple's privacy policy. Widgets and the Live Activity run on your device.</p>
 
   <h2>Children</h2>
-  <p>Wavetile collects no personal information from anyone, including children.</p>
+  <p>Wavetile does not ask children to provide personal information to the developer. The server and podcast connections described above work the same way for all users.</p>
 
   <h2>Changes</h2>
   <p>If this policy changes, the new version will be posted here with a new effective date.</p>

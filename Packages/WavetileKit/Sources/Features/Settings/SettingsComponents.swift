@@ -64,3 +64,15 @@ struct Avatar: View {
             .accessibilityHidden(true)
     }
 }
+
+/// Available before sign-in and from Settings without sending account details to the website.
+struct PrivacyPolicyLink: View {
+    private static let url = URL(string: "https://wavetile.com/privacy")!
+
+    var body: some View {
+        Link(destination: Self.url) {
+            Label("Privacy Policy", glyph: .lock)
+        }
+        .accessibilityHint("Opens the Wavetile privacy policy in your browser")
+    }
+}
