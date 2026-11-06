@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wavetile · Cover Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter&family=Geist+Mono&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#1A1A1A; --tan:#ECE4D2; --dim:#989388; --line:rgba(236,228,210,.12); }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--tan); font:14px/1.4 Inter, system-ui, sans-serif; }
+  .mono { font-family:"Geist Mono", ui-monospace, monospace; }
+  main { display:grid; grid-template-columns:240px minmax(0,1fr); gap:32px; padding:32px; }
+  aside { font-family:"Geist Mono", ui-monospace, monospace; font-size:11px; color:var(--dim); position:sticky; top:32px; align-self:start; }
+  fieldset { border:0; padding:0; margin:0 0 18px; }
+  legend { text-transform:uppercase; letter-spacing:.08em; opacity:.6; margin-bottom:6px; }
+  label { display:flex; align-items:center; gap:8px; padding:2px 0; }
+  label > span:first-child { width:72px; flex-shrink:0; }
+  label output { width:40px; text-align:right; font-variant-numeric:tabular-nums; }
+  input[type=range] { flex:1; min-width:0; appearance:none; background:transparent; height:12px; cursor:pointer; }
+  input[type=range]::-webkit-slider-runnable-track { height:1px; background:rgba(152,147,136,.4); }
+  input[type=range]::-webkit-slider-thumb { appearance:none; width:8px; height:8px; margin-top:-3.5px; border-radius:50%; background:var(--dim); }
+  input[type=range]::-moz-range-track { height:1px; background:rgba(152,147,136,.4); }
+  input[type=range]::-moz-range-thumb { width:8px; height:8px; border:0; border-radius:50%; background:var(--dim); }
+  input[type=text], select { flex:1; min-width:0; background:transparent; color:var(--tan); border:1px solid var(--line); border-radius:6px; padding:5px 7px; font:inherit; }
+  select option { background:#262626; }
+  input[type=checkbox] { accent-color:#989388; }
+  button { background:transparent; color:var(--tan); border:1px solid var(--line); border-radius:999px; padding:6px 12px; font:inherit; cursor:pointer; text-transform:uppercase; letter-spacing:.06em; }
+  button:hover { border-color:rgba(236,228,210,.35); }
+  .row { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+  .stage { display:grid; grid-template-columns:minmax(0,560px) minmax(0,1fr); gap:32px; align-items:start; }
+  .hero canvas { width:100%; aspect-ratio:1; display:block; border-radius:6px; }
+  .hero .meta { margin-top:10px; display:flex; justify-content:space-between; color:var(--dim); font-size:12px; }
+  .hero h1 { font-size:22px; font-weight:400; margin:14px 0 2px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:20px 16px; }
+  .tile { cursor:pointer; }
+  .tile canvas { width:100%; aspect-ratio:1; display:block; border-radius:6px; background:#2E2E2E; }
+  .tile .t { font-size:14px; margin-top:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tile .s { font-size:12px; color:var(--dim); }
+  .tile.active canvas { outline:1px solid var(--tan); outline-offset:3px; }
+  .hint { margin-top:14px; line-height:1.6; opacity:.7; }
+  @media (max-width: 1100px) { .stage { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <aside>
+    <fieldset>
+      <legend>Collection</legend>
+      <label><span>Name</span><input type="text" id="name"></label>
+      <label><span>Item ID</span><input type="text" id="itemID" spellcheck="false"></label>
+      <label><span>Shuffle</span><output id="shuffleOut" style="text-align:left"></output></label>
+      <label><span>Palette</span><select id="palette"></select></label>
+      <label><span>Layout</span><select id="comp"></select></label>
+      <label><span>Render</span>
+        <select id="mode">
+          <option value="color">Color + dots</option>
+          <option value="dots">Dots only</option>
+          <option value="flat">Flat (no dots)</option>
+        </select></label>
+      <label><span>Texture</span>
+        <select id="style">
+          <option value="stipple">Stipple</option>
+          <option value="halftone">Halftone grid</option>
+          <option value="scan">Scanlines</option>
+        </select></label>
+    </fieldset>
+    <fieldset id="sliders"></fieldset>
+    <fieldset>
+      <legend>Overlay</legend>
+      <label><input type="checkbox" id="ovGrid"> <span>Hairline grid</span></label>
+      <label><input type="checkbox" id="ovMarks" checked> <span>Reg. marks</span></label>
+      <label><input type="checkbox" id="ovCode" checked> <span>Mono code</span></label>
+    </fieldset>
+    <div class="row">
+      <button id="reroll">Shuffle</button>
+      <button id="more">New batch</button>
+      <button id="save">PNG</button>
+      <button id="reset">Reset</button>
+    </div>
+    <div class="hint">Space: shuffle · Click a tile to edit it.<br>Seeded like the app (v1 · item ID · shuffle count): paste a playlist or collection ID from Jellyfin to see the exact cover the app draws. Defaults (Color + dots, Stipple, marks + code) are what the app ships.</div>
+  </aside>
+
+  <section class="stage">
+    <div class="hero">
+      <canvas id="hero"></canvas>
+      <h1 id="heroTitle"></h1>
+      <div class="meta mono"><span id="heroInfo"></span><span id="heroSeed"></span></div>
+    </div>
+    <div class="grid" id="grid"></div>
+  </section>
+</main>
+
+<script>
+// ---------- seeded randomness ----------
+function hash(str) { // cyrb53 folded to 32 bits
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for (let i = 0; i < str.length; i++) {
+    const c = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 2654435761); h2 = Math.imul(h2 ^ c, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (h1 ^ h2) >>> 0;
+}
+function mulberry32(seed) {
+  return () => {
+    seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const pick = (r, arr) => arr[Math.floor(r() * arr.length)];
+const range = (r, a, b) => a + r() * (b - a);
+const snap = (v, n = 12) => Math.round(v * n) / n;
+
+// ---------- palettes (no reds: brand rule) ----------
+const PALETTES = [
+  { name: "Wavetile",  bg: "#1A1A1A", fills: ["#ECE4D2", "#3A3835"] },
+  { name: "Tan",       bg: "#ECE4D2", fills: ["#1A1A1A", "#B9AE96"] },
+];
+const LIGHT_INK = "#ECE4D2", DARK_INK = "#141414";
+function lum(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const c = [n >> 16, (n >> 8) & 255, n & 255].map(v => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; });
+  return .2126 * c[0] + .7152 * c[1] + .0722 * c[2];
+}
+const contrastInk = hex => lum(hex) > .22 ? DARK_INK : LIGHT_INK;
+
+// ---------- shapes (unit square, y down) ----------
+// Each shape: path(ctx, S), inside(x,y), bbox [x0,y0,x1,y1], tone(x,y,light) → 0..1 lit, edge(r) → outline point + normal.
+function circle(cx, cy, r) {
+  return {
+    kind: "circle", cx, cy, r,
+    path(ctx, S) { ctx.moveTo((cx + r) * S, cy * S); ctx.arc(cx * S, cy * S, r * S, 0, Math.PI * 2); },
+    inside: (x, y) => (x - cx) ** 2 + (y - cy) ** 2 <= r * r,
+    bbox: [cx - r, cy - r, cx + r, cy + r],
+    tone: (x, y, L) => sphere(x, y, cx, cy, r, L),
+    edge(rand) { const a = rand() * Math.PI * 2; return { x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r, nx: Math.cos(a), ny: Math.sin(a) }; },
+  };
+}
+// Disc clipped to an angular wedge [a0, a1] around (cx, cy): halves (π) and quarters (π/2).
+function wedge(cx, cy, r, a0, a1) {
+  const norm = a => ((a % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+  const span = a1 - a0;
+  return {
+    kind: "wedge", cx, cy, r,
+    path(ctx, S) { ctx.moveTo(cx * S, cy * S); ctx.arc(cx * S, cy * S, r * S, a0, a1); ctx.closePath(); },
+    inside(x, y) {
+      const dx = x - cx, dy = y - cy;
+      if (dx * dx + dy * dy > r * r) return false;
+      return norm(Math.atan2(dy, dx) - a0) <= span;
+    },
+    bbox: [cx - r, cy - r, cx + r, cy + r],
+    tone: (x, y, L) => sphere(x, y, cx, cy, r, L),
+    edge(rand) { const a = a0 + rand() * span; return { x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r, nx: Math.cos(a), ny: Math.sin(a) }; },
+  };
+}
+function rect(x0, y0, w, h) {
+  const horiz = w >= h;
+  return {
+    kind: "rect",
+    path(ctx, S) { ctx.rect(x0 * S, y0 * S, w * S, h * S); },
+    inside: (x, y) => x >= x0 && x <= x0 + w && y >= y0 && y <= y0 + h,
+    bbox: [x0, y0, x0 + w, y0 + h],
+    // Cylinder across the short side: bars read as rods.
+    tone(x, y, L) {
+      const t = horiz ? ((y - y0) / h) * 2 - 1 : ((x - x0) / w) * 2 - 1;
+      const nz = Math.sqrt(Math.max(0, 1 - t * t));
+      return horiz ? lambert(0, t, nz, L) : lambert(t, 0, nz, L);
+    },
+    edge(rand) {
+      const p = rand() * 2 * (w + h);
+      if (p < w) return { x: x0 + p, y: y0, nx: 0, ny: -1 };
+      if (p < w + h) return { x: x0 + w, y: y0 + p - w, nx: 1, ny: 0 };
+      if (p < 2 * w + h) return { x: x0 + p - w - h, y: y0 + h, nx: 0, ny: 1 };
+      return { x: x0, y: y0 + p - 2 * w - h, nx: -1, ny: 0 };
+    },
+  };
+}
+function tri(pts) { // [[x,y]x3]
+  const [a, b, c] = pts;
+  const sign = (p, q, r) => (p[0] - r[0]) * (q[1] - r[1]) - (q[0] - r[0]) * (p[1] - r[1]);
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  const bbox = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+  return {
+    kind: "tri",
+    path(ctx, S) { ctx.moveTo(a[0] * S, a[1] * S); ctx.lineTo(b[0] * S, b[1] * S); ctx.lineTo(c[0] * S, c[1] * S); ctx.closePath(); },
+    inside(x, y) {
+      const p = [x, y], d1 = sign(p, a, b), d2 = sign(p, b, c), d3 = sign(p, c, a);
+      return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
+    },
+    bbox,
+    // Flat plane, lit by a ramp along the light direction.
+    tone(x, y, L) {
+      const u = (x - (bbox[0] + bbox[2]) / 2) * L[0] + (y - (bbox[1] + bbox[3]) / 2) * L[1];
+      const span = Math.max(bbox[2] - bbox[0], bbox[3] - bbox[1]) || 1;
+      return Math.min(1, Math.max(0, .5 + u / span * 1.4));
+    },
+    edge(rand) {
+      const i = Math.floor(rand() * 3), p = pts[i], q = pts[(i + 1) % 3], t = rand();
+      let nx = q[1] - p[1], ny = -(q[0] - p[0]); const l = Math.hypot(nx, ny) || 1;
+      const mx = (a[0] + b[0] + c[0]) / 3, my = (a[1] + b[1] + c[1]) / 3;
+      const ex = p[0] + (q[0] - p[0]) * t, ey = p[1] + (q[1] - p[1]) * t;
+      if ((ex - mx) * nx + (ey - my) * ny < 0) { nx = -nx; ny = -ny; }
+      return { x: ex, y: ey, nx: nx / l, ny: ny / l };
+    },
+  };
+}
+// L = [lx, ly, lz] with y down (canvas space).
+function lambert(nx, ny, nz, L) { return Math.max(0, nx * L[0] + ny * L[1] + nz * L[2]); }
+function sphere(x, y, cx, cy, r, L) {
+  const nx = (x - cx) / r, ny = (y - cy) / r, nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
+  return lambert(nx, ny, nz, L);
+}
+
+// ---------- compositions (snapped to a 12-column grid for a modernist feel) ----------
+const COMPS = {
+  sun(r) {
+    const R = snap(range(r, .2, .34));
+    const cx = snap(range(r, R + .08, 1 - R - .08)), cy = snap(range(r, R + .08, 1 - R - .12));
+    const s = [{ shape: circle(cx, cy, R), fill: 0 }];
+    if (r() < .6) { const y = snap(range(r, .72, .86)); s.unshift({ shape: rect(0, y, 1, snap(range(r, .04, .12), 24)), fill: 1 }); }
+    return s;
+  },
+  halves(r) {
+    const R = snap(range(r, .22, .32)), cy = .5, gap = snap(range(r, 0, .08), 24);
+    const vertical = r() < .5, off = snap(range(r, -.1, .1));
+    if (vertical) return [
+      { shape: wedge(.5 - gap, cy + off, R, Math.PI / 2, Math.PI * 1.5), fill: 0 },
+      { shape: wedge(.5 + gap, cy - off, R, -Math.PI / 2, Math.PI / 2), fill: 1 },
+    ];
+    return [
+      { shape: wedge(.5 + off, .5 - gap, R, Math.PI, Math.PI * 2), fill: 0 },
+      { shape: wedge(.5 - off, .5 + gap, R, 0, Math.PI), fill: 1 },
+    ];
+  },
+  truchet(r) { // quarter discs pivoting on cell corners
+    const n = 2, m = .1, c = (1 - 2 * m) / n, s = [];
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+      if (r() < .18 && (s.length || i + j < 2 * n - 2)) continue;
+      const k = Math.floor(r() * 4);
+      const px = m + (i + (k === 1 || k === 2 ? 1 : 0)) * c, py = m + (j + (k >= 2 ? 1 : 0)) * c;
+      const a0 = [0, Math.PI / 2, Math.PI, Math.PI * 1.5][k];
+      s.push({ shape: wedge(px, py, c, a0, a0 + Math.PI / 2), fill: r() < .75 ? 0 : 1 });
+    }
+    return s;
+  },
+  arches(r) {
+    const n = pick(r, [2, 3, 4]), cx = snap(range(r, .3, .7)), base = snap(range(r, .7, .9)), s = [];
+    const R = snap(range(r, .3, .42)), step = R / n;
+    for (let i = 0; i < n; i++) {
+      const rr = R - i * step;
+      s.push({ shape: wedge(cx, base, rr, Math.PI, Math.PI * 2), fill: i % 2 });
+    }
+    return s;
+  },
+  diagonal(r) {
+    const corner = Math.floor(r() * 4), P = [[0, 0], [1, 0], [1, 1], [0, 1]];
+    const t = tri([P[corner], P[(corner + 1) % 4], P[(corner + 3) % 4]]);
+    const R = snap(range(r, .14, .22));
+    return [{ shape: t, fill: 1 }, { shape: circle(snap(range(r, .3, .7)), snap(range(r, .3, .7)), R), fill: 0 }];
+  },
+  dotgrid(r) {
+    const n = 2, m = .14, c = (1 - 2 * m) / n, R = c * range(r, .3, .46), s = [];
+    const hot = Math.floor(r() * n * n);
+    for (let i = 0; i < n * n; i++) {
+      if (i !== hot && r() < .2) continue;
+      const x = m + (i % n + .5) * c, y = m + (Math.floor(i / n) + .5) * c;
+      s.push({ shape: circle(x, y, i === hot ? c * .48 : R), fill: i === hot ? 0 : 1 });
+    }
+    return s;
+  },
+  pills(r) { // a column of half-discs + bars, like a stacked capsule
+    const n = pick(r, [2, 3, 4]), w = snap(range(r, .28, .46)), x = snap(range(r, .15, .85 - w)), h = .76 / n, s = [];
+    for (let i = 0; i < n; i++) {
+      const y = .12 + i * h, cx = x + w / 2, flip = (i + (r() < .5 ? 0 : 1)) % 2;
+      s.push({ shape: wedge(cx, flip ? y : y + h, w / 2, flip ? 0 : Math.PI, flip ? Math.PI : Math.PI * 2), fill: i % 2 });
+    }
+    return s;
+  },
+};
+const COMP_NAMES = Object.keys(COMPS);
+
+// ---------- spec: everything derived from the seed ----------
+function makeSpec(seedStr, lockPalette, lockComp) {
+  const seed = hash(seedStr), r = mulberry32(seed);
+  const palette = lockPalette != null ? PALETTES[lockPalette] : pick(r, PALETTES);
+  const comp = lockComp != null ? lockComp : pick(r, COMP_NAMES);
+  // One light for the whole cover; mostly from the upper side so it reads as "lit".
+  const az = range(r, Math.PI * 1.05, Math.PI * 1.95), el = range(r, .25, .7);
+  const light = [Math.cos(el) * Math.cos(az), Math.cos(el) * Math.sin(az), Math.sin(el)];
+  const swap = r() < .3;
+  const shapes = COMPS[comp](mulberry32(seed ^ 0x9e3779b9));
+  return { seed, palette, comp, light, swap, shapes };
+}
+
+// ---------- dots ----------
+// Evenly spaced stipple (dart throwing with a tone-dependent minimum gap), as in the
+// portfolio planet: gap = spacing / √density, so density follows tone without clumps.
+function stipple(rand, bbox, spacing, densityAt, emit, budget = 7) {
+  const [x0, y0, x1, y1] = bbox.map((v, i) => Math.min(1, Math.max(0, v)));
+  const w = x1 - x0, h = y1 - y0;
+  if (w <= 0 || h <= 0) return;
+  const cells = [Math.ceil(w / spacing), Math.ceil(h / spacing)];
+  const grid = new Map(), px = [], py = [];
+  const tries = Math.floor((w * h * budget) / (spacing * spacing));
+  for (let n = 0; n < tries; n++) {
+    const x = x0 + rand() * w, y = y0 + rand() * h;
+    const d = densityAt(x, y);
+    if (d < .004) continue;
+    const gap = spacing / Math.sqrt(d), reach = Math.ceil(gap / spacing);
+    const cx = Math.floor((x - x0) / spacing), cy = Math.floor((y - y0) / spacing);
+    let ok = true;
+    search: for (let gy = cy - reach; gy <= cy + reach; gy++) {
+      for (let gx = cx - reach; gx <= cx + reach; gx++) {
+        const cell = grid.get(gy * 100003 + gx);
+        if (!cell) continue;
+        for (const j of cell) if ((px[j] - x) ** 2 + (py[j] - y) ** 2 < gap * gap) { ok = false; break search; }
+      }
+    }
+    if (!ok) continue;
+    const key = cy * 100003 + cx;
+    (grid.get(key) || grid.set(key, []).get(key)).push(px.length);
+    px.push(x); py.push(y);
+    emit(x, y, .85 + rand() * .3);
+  }
+}
+// Ordered dot screen at 45°: dot area follows density.
+function halftone(rand, bbox, spacing, densityAt, emit) {
+  const g = spacing * 2.2, c = Math.SQRT1_2;
+  for (let u = -1.5; u < 1.5; u += g) for (let v = -1.5; v < 1.5; v += g) {
+    const x = .5 + (u - v) * c, y = .5 + (u + v) * c;
+    if (x < bbox[0] || x > bbox[2] || y < bbox[1] || y > bbox[3] || x < 0 || x > 1 || y < 0 || y > 1) continue;
+    const d = densityAt(x, y);
+    if (d > .02) emit(x, y, Math.sqrt(d) * 2.2);
+  }
+}
+// Horizontal scanlines whose dots are kept with probability = density.
+function scan(rand, bbox, spacing, densityAt, emit) {
+  const row = spacing * 2, step = spacing * .55;
+  for (let y = Math.ceil(bbox[1] / row) * row; y <= bbox[3]; y += row) for (let x = bbox[0]; x <= bbox[2]; x += step) {
+    if (x < 0 || x > 1 || y < 0 || y > 1) continue;
+    if (rand() < densityAt(x, y)) emit(x, y, .9);
+  }
+}
+const TEXTURES = { stipple, halftone, scan };
+
+// ---------- render ----------
+const DEFAULTS = { spacing: .0066, dotSize: 1.35, contrast: .9, lightStrength: .51, coverage: 1, grain: .05, stray: 500, rim: .06 };
+
+function render(canvas, spec, opt) {
+  const S = canvas.width, ctx = canvas.getContext("2d");
+  const { palette, shapes, light } = spec;
+  const fills = spec.swap ? [palette.fills[1], palette.fills[0]] : palette.fills;
+  const rand = mulberry32(spec.seed ^ 0x51ed270b);
+  const tex = TEXTURES[opt.style];
+  // Small tiles keep dots at least 0.35pt and widen the gap with them (same as the app).
+  const scale = canvas._scale || 1;
+  const dotPx = Math.max((opt.dotSize * S) / 1000, .35 * scale);
+  const spacing = Math.max(opt.spacing, dotPx * 5.6 / S);
+  const bgInk = contrastInk(palette.bg), bgL = lum(palette.bg);
+
+  // Batched dots per color: one path, one fill.
+  const batches = new Map();
+  const dot = color => (x, y, s) => {
+    let b = batches.get(color); if (!b) batches.set(color, b = []);
+    b.push(x * S, y * S, s * dotPx);
+  };
+  const flush = () => {
+    for (const [color, b] of batches) {
+      ctx.fillStyle = color; ctx.beginPath();
+      for (let i = 0; i < b.length; i += 3) { ctx.moveTo(b[i] + b[i + 2], b[i + 1]); ctx.arc(b[i], b[i + 1], b[i + 2], 0, Math.PI * 2); }
+      ctx.fill();
+    }
+    batches.clear();
+  };
+  const lit = (sh, x, y) => (1 - opt.lightStrength) + opt.lightStrength * (.08 + .92 * sh.tone(x, y, light));
+
+  ctx.fillStyle = palette.bg; ctx.fillRect(0, 0, S, S);
+
+  if (opt.mode !== "flat" && opt.grain > 0) {
+    tex(rand, [0, 0, 1, 1], spacing * 1.4, () => opt.grain, dot(bgInk), 3);
+    flush();
+  }
+
+  shapes.forEach((layer, li) => {
+    const sh = layer.shape, fill = fills[layer.fill];
+    // In dots-only mode later shapes hide the dots of earlier ones.
+    const occluded = (x, y) => { for (let k = li + 1; k < shapes.length; k++) if (shapes[k].shape.inside(x, y)) return true; return false; };
+
+    if (opt.mode !== "dots") { ctx.fillStyle = fill; ctx.beginPath(); sh.path(ctx, S); ctx.fill("evenodd"); }
+
+    if (opt.mode !== "flat") {
+      // Dots mean light when they're lighter than what they sit on, shadow when darker.
+      const base = opt.mode === "dots" ? palette.bg : fill;
+      const ink = opt.mode === "dots" ? fill : contrastInk(fill);
+      const inkIsLight = lum(ink) > lum(base);
+      tex(rand, sh.bbox, spacing, (x, y) => {
+        if (!sh.inside(x, y) || (opt.mode === "dots" && occluded(x, y))) return 0;
+        const t = lit(sh, x, y), v = inkIsLight ? t : 1 - t;
+        return opt.coverage * Math.max(opt.mode === "dots" ? .05 : 0, v) ** opt.contrast;
+      }, dot(ink));
+      flush();
+
+      // Stray dust off the outline, in the shape's pigment, heavier on the lit side.
+      const n = Math.floor(opt.stray * (sh.kind === "rect" || sh.kind === "tri" ? .6 : 1) / Math.max(1, shapes.length ** .5));
+      const emit = dot(fill);
+      for (let i = 0; i < n; i++) {
+        const e = sh.edge(rand), d = -Math.log(1 - rand()) * opt.rim;
+        const x = e.x + e.nx * d, y = e.y + e.ny * d;
+        if (x < 0 || x > 1 || y < 0 || y > 1 || sh.inside(x, y)) continue;
+        const facing = .5 + .5 * Math.max(0, e.nx * light[0] + e.ny * light[1]);
+        if (rand() > facing) continue;
+        emit(x, y, .7 + rand() * .4);
+      }
+      flush();
+    }
+  });
+
+  drawOverlay(ctx, S, spec, opt, bgInk, scale);
+}
+
+function drawOverlay(ctx, S, spec, opt, ink, scale) {
+  ctx.save();
+  ctx.strokeStyle = ink; ctx.fillStyle = ink;
+  const hair = Math.max(1, S / 1000);
+  if (opt.ovGrid) {
+    ctx.globalAlpha = .12; ctx.lineWidth = hair; ctx.beginPath();
+    for (let i = 1; i < 12; i++) { const p = Math.round((i / 12) * S) + .5; ctx.moveTo(p, 0); ctx.lineTo(p, S); ctx.moveTo(0, p); ctx.lineTo(S, p); }
+    ctx.stroke();
+  }
+  ctx.globalAlpha = .7;
+  const m = S * .045, len = S * .018;
+  if (opt.ovMarks) {
+    ctx.lineWidth = hair * 1.2; ctx.beginPath();
+    for (const [x, y] of [[m, m], [S - m, m], [m, S - m], [S - m, S - m]]) { ctx.moveTo(x - len, y); ctx.lineTo(x + len, y); ctx.moveTo(x, y - len); ctx.lineTo(x, y + len); }
+    ctx.stroke();
+  }
+  // The code only on covers 200pt and up, where it's readable.
+  if (opt.ovCode && S / scale >= 200) {
+    const code = spec.seed.toString(16).toUpperCase().padStart(8, "0");
+    ctx.font = `${Math.round(S * .026)}px "Geist Mono", ui-monospace, monospace`;
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText(`WT/${code.slice(0, 4)}·${code.slice(4)}`, m + len * 1.6, S - m + S * .009);
+    ctx.textAlign = "right";
+    ctx.fillText(spec.comp.toUpperCase().slice(0, 3) + "." + String(spec.shapes.length).padStart(2, "0"), S - m - len * 1.6, S - m + S * .009);
+  }
+  ctx.restore();
+}
+
+// ---------- UI ----------
+const $ = id => document.getElementById(id);
+const SLIDERS = [
+  ["spacing", "Spacing", .003, .014, .0001],
+  ["dotSize", "Dot size", .3, 4, .05],
+  ["coverage", "Coverage", .1, 1, .01],
+  ["contrast", "Contrast", .3, 3, .05],
+  ["lightStrength", "Light", 0, 1, .01],
+  ["grain", "Grain", 0, .3, .005],
+  ["stray", "Stray", 0, 3000, 50],
+  ["rim", "Dust reach", .01, .2, .005],
+];
+const opt = { ...DEFAULTS, mode: "color", style: "stipple", ovGrid: false, ovMarks: true, ovCode: true };
+const decimals = s => Math.max(0, -Math.floor(Math.log10(s)));
+
+$("sliders").innerHTML = "<legend>Dots</legend>" + SLIDERS.map(([k, l, a, b, s]) =>
+  `<label><span>${l}</span><input type="range" id="s_${k}" min="${a}" max="${b}" step="${s}"><output id="o_${k}"></output></label>`).join("");
+function syncSliders() {
+  for (const [k, , , , s] of SLIDERS) { $("s_" + k).value = opt[k]; $("o_" + k).textContent = (+opt[k]).toFixed(decimals(s)); }
+}
+for (const [k, , , , s] of SLIDERS) $("s_" + k).addEventListener("input", e => { opt[k] = +e.target.value; $("o_" + k).textContent = opt[k].toFixed(decimals(s)); schedule(); });
+
+$("palette").innerHTML = `<option value="">Auto (seed)</option>` + PALETTES.map((p, i) => `<option value="${i}">${p.name}</option>`).join("");
+$("comp").innerHTML = `<option value="">Auto (seed)</option>` + COMP_NAMES.map(c => `<option>${c}</option>`).join("");
+for (const id of ["palette", "comp", "mode", "style"]) $(id).addEventListener("change", e => { if (id === "mode" || id === "style") opt[id] = e.target.value; schedule(); });
+for (const id of ["ovGrid", "ovMarks", "ovCode"]) { $(id).checked = opt[id]; $(id).addEventListener("change", e => { opt[id] = e.target.checked; schedule(); }); }
+
+const NAMES = ["Late Night Drive", "Sunday Coffee", "Deep Focus", "Gym Rotation", "Rainy Window", "Old Favorites", "Basement Tapes", "Road Trip '24", "Dinner Party", "Slow Mornings", "Warehouse", "Night Bus", "Kitchen Radio", "Summer 2019", "Low Light", "Run Club", "Study Hall", "Vinyl Finds", "Afterhours", "Patio Season", "Cold Brew", "Long Haul", "Quiet Hours", "Static"];
+// Jellyfin-style item IDs (32 hex), like the app's playlists and collections.
+const newID = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, "0")).join("");
+let current = { name: "Late Night Drive", id: newID(), shuffle: 0 };
+let batch = [];
+// Same seed as the app (`CoverArt.seed`): the name doesn't affect the cover, so renaming keeps it.
+const seedStr = c => `v1|${c.id}|${c.shuffle}`;
+const locks = () => [$("palette").value === "" ? null : +$("palette").value, $("comp").value || null];
+
+function size(canvas, css) { const dpr = Math.min(devicePixelRatio || 1, 2); canvas.width = canvas.height = Math.round(css * dpr); canvas._scale = dpr; }
+
+function renderHero() {
+  const c = $("hero"); size(c, c.getBoundingClientRect().width || 560);
+  const spec = makeSpec(seedStr(current), ...locks());
+  const t = performance.now();
+  render(c, spec, opt);
+  $("heroTitle").textContent = current.name;
+  $("heroInfo").textContent = `${spec.palette.name} · ${spec.comp} · ${Math.round(performance.now() - t)}ms`;
+  $("heroSeed").textContent = "0x" + spec.seed.toString(16).toUpperCase().padStart(8, "0");
+}
+
+let gridJob = 0;
+function renderGrid() {
+  const job = ++gridJob, el = $("grid");
+  el.innerHTML = "";
+  const tiles = batch.map((c, i) => {
+    const d = document.createElement("div"); d.className = "tile" + (c === current ? " active" : "");
+    d.innerHTML = `<canvas></canvas><div class="t"></div><div class="s mono"></div>`;
+    d.querySelector(".t").textContent = c.name;
+    d.onclick = () => { current = c; $("name").value = c.name; syncID(); draw(); };
+    el.appendChild(d); return d;
+  });
+  // One tile per frame keeps the sliders responsive.
+  let i = 0;
+  const next = () => {
+    if (job !== gridJob || i >= tiles.length) return;
+    const d = tiles[i], c = batch[i], cv = d.querySelector("canvas");
+    size(cv, cv.getBoundingClientRect().width || 160);
+    const spec = makeSpec(seedStr(c), ...locks());
+    render(cv, spec, opt);
+    d.querySelector(".s").textContent = `${spec.palette.name.toLowerCase()} · ${spec.comp}`;
+    i++; requestAnimationFrame(next);
+  };
+  requestAnimationFrame(next);
+}
+
+function newBatch() {
+  const names = [...NAMES].sort(() => Math.random() - .5).slice(0, 12);
+  batch = names.map(name => ({ name, id: newID(), shuffle: 0 }));
+  current = batch[0]; $("name").value = current.name; syncID();
+}
+let timer = 0;
+function schedule() { clearTimeout(timer); timer = setTimeout(draw, 30); }
+function draw() { renderHero(); renderGrid(); }
+
+function syncID() { $("itemID").value = current.id; $("shuffleOut").textContent = current.shuffle; }
+$("itemID").addEventListener("input", e => { current.id = e.target.value.trim(); current.shuffle = 0; $("shuffleOut").textContent = 0; clearTimeout(timer); timer = setTimeout(draw, 120); });
+$("name").addEventListener("input", e => { current.name = e.target.value; clearTimeout(timer); timer = setTimeout(draw, 120); });
+$("reroll").onclick = () => { current.shuffle++; syncID(); draw(); };
+$("more").onclick = () => { newBatch(); draw(); };
+$("reset").onclick = () => { Object.assign(opt, DEFAULTS); syncSliders(); draw(); };
+$("save").onclick = () => {
+  const c = document.createElement("canvas"); c.width = c.height = 2048;
+  render(c, makeSpec(seedStr(current), ...locks()), opt);
+  const a = document.createElement("a"); a.download = `${current.name.replace(/\W+/g, "-").toLowerCase()}.png`; a.href = c.toDataURL("image/png"); a.click();
+};
+addEventListener("keydown", e => { if (e.code === "Space" && e.target.tagName !== "INPUT") { e.preventDefault(); current.shuffle++; syncID(); draw(); } });
+addEventListener("resize", () => { clearTimeout(timer); timer = setTimeout(draw, 150); });
+
+syncSliders(); newBatch();
+document.fonts.ready.then(draw);
+</script>
+</body>
+</html>
