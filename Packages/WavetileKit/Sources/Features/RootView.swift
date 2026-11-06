@@ -54,8 +54,8 @@ public struct RootView: View {
         .background(app.theme.palette.background.ignoresSafeArea())
         .onAppear { app.restore() }
         .task {
-            // Two quarter turns and a beat to read the name, then reveal the app.
-            try? await Task.sleep(for: .seconds(2 * (WavetileMark.move + WavetileMark.hold) + 0.15))
+            // Hold the splash for one second, then reveal the app.
+            try? await Task.sleep(for: .seconds(1))
             // Hand the screen over first; the removed splash keeps the state it fades out with.
             splashCovers = false
             await Task.yield()
