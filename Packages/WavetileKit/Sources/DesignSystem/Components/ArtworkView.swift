@@ -2,7 +2,7 @@ import Nuke
 import NukeUI
 import SwiftUI
 
-/// Where artwork comes from. `.placeholder` gives previews deterministic, network-free art.
+/// Where artwork comes from. `.placeholder` gives missing artwork and previews a neutral, network-free fallback.
 public enum ArtworkSource: Hashable, Sendable {
     case url(URL?)
     /// Art from a third party that serves one big image (podcast feeds often use 3000px).
@@ -16,7 +16,7 @@ public enum ArtworkSource: Hashable, Sendable {
     public typealias URLProvider = @Sendable (_ pixelWidth: Int) -> URL?
 }
 
-/// Square album artwork with themed corner radius, placeholder, and fade-in.
+/// Square album artwork with themed corner radius, a quiet loading surface, and fade-in.
 public struct ArtworkView: View {
     @Environment(\.theme) private var theme
     @Environment(\.displayScale) private var displayScale
@@ -39,7 +39,7 @@ public struct ArtworkView: View {
                         if let image = state.image {
                             image.resizable().scaledToFill()
                         } else {
-                            placeholder(seed: url?.hashValue ?? 0)
+                            loadingSurface(showsFallback: url == nil || state.error != nil)
                         }
                     }
                 case let .unsized(url, maxPixelWidth):
@@ -49,11 +49,11 @@ public struct ArtworkView: View {
                         if let image = state.image {
                             image.resizable().scaledToFill()
                         } else {
-                            placeholder(seed: url?.hashValue ?? 0)
+                            loadingSurface(showsFallback: url == nil || state.error != nil)
                         }
                     }
-                case let .placeholder(seed):
-                    placeholder(seed: seed)
+                case .placeholder:
+                    loadingSurface(showsFallback: true)
                 case let .generated(seed):
                     GeneratedCover(seed: seed)
                 }
@@ -63,27 +63,17 @@ public struct ArtworkView: View {
             .accessibilityHidden(true)
     }
 
-    private func placeholder(seed: Int) -> some View {
-        let tones = PlaceholderPalette.colors(seed: seed)
-        return LinearGradient(colors: tones, startPoint: .topLeading, endPoint: .bottomTrailing)
+    /// Keeps artwork zooms calm while a larger image loads; missing art gets a discreet icon.
+    private func loadingSurface(showsFallback: Bool) -> some View {
+        theme.palette.surface
             .overlay {
-                Glyph.song.image
-                    .foregroundStyle(theme.palette.textSecondary)
+                if showsFallback {
+                    Glyph.song.image
+                        .foregroundStyle(theme.palette.textSecondary)
+                }
             }
     }
-}
 
-/// Deterministic pleasant gradients for placeholders and previews.
-public enum PlaceholderPalette {
-    private static let hues: [Double] = [0.02, 0.08, 0.13, 0.33, 0.47, 0.55, 0.62, 0.72, 0.83, 0.92]
-
-    public static func colors(seed: Int) -> [Color] {
-        let hue = hues[abs(seed) % hues.count]
-        return [
-            Color(hue: hue, saturation: 0.55, brightness: 0.85),
-            Color(hue: (hue + 0.08).truncatingRemainder(dividingBy: 1), saturation: 0.7, brightness: 0.45),
-        ]
-    }
 }
 
 #Preview {
