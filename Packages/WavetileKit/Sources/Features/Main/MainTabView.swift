@@ -65,12 +65,13 @@ struct MainTabView: View {
         .task { await signedIn.downloads.observe() }
         .task { await signedIn.podcasts.run() }
         .task { await applyPodcastDebugFlags() }
-        // Background library sync: on launch if stale (>1h); pull to refresh in Library forces one.
-        .task { await signedIn.library.syncIfNeeded() }
-        // Permissions decide the edit menus; rechecked on return, so an offline launch recovers.
+        // On launch and return, refresh stale content (>1h) and recheck edit permissions.
         .task(id: scenePhase == .active) {
             guard scenePhase == .active else { return }
-            await signedIn.library.loadPermissions()
+            async let permissions: Void = signedIn.library.loadPermissions()
+            async let music: Void = signedIn.library.syncIfNeeded()
+            async let podcasts: Void = signedIn.podcasts.refreshIfNeeded()
+            _ = await (permissions, music, podcasts)
         }
         .enableInjection()
     }

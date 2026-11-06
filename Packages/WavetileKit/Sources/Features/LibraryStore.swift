@@ -16,6 +16,7 @@ final class LibraryStore {
     let api: LibraryClient
     let editor: LibraryEditor
     private let sync: LibrarySync
+    @ObservationIgnored private var syncTask: Task<Void, Never>?
 
     private(set) var progress: LibrarySync.Progress?
     private(set) var isSyncing = false
@@ -46,7 +47,18 @@ final class LibraryStore {
     }
 
     func syncNow() async {
-        guard !isSyncing else { return }
+        // A manual refresh joins an automatic sync already in flight before reloading shelves.
+        if let syncTask {
+            await syncTask.value
+            return
+        }
+        let task = Task { await performSync() }
+        syncTask = task
+        await task.value
+        syncTask = nil
+    }
+
+    private func performSync() async {
         isSyncing = true
         syncError = nil
         defer {

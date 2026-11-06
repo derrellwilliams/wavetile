@@ -225,7 +225,7 @@ struct NowPlayingView: View {
                 }
             } label: {
                 Text("\(Double(player.podcastRate).formatted())×")
-                    .font(theme.typography.mono(.body))
+                    .font(theme.typography.playbackSpeed)
                     .foregroundStyle(theme.palette.accent)
                     .padding(.horizontal, theme.spacing.sm)
                     .frame(minWidth: 44, minHeight: 44)

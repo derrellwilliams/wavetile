@@ -48,7 +48,8 @@ public struct Theme: Sendable, Identifiable, Hashable {
     }
 
     /// One weight (Inter Regular), seven sizes: 12 · 14 · 16 · 18 · 20 · 22 · 36. Hierarchy comes from size,
-    /// color and the mono face, never weight. Every token scales with Dynamic Type (HIG).
+    /// color and the mono face. Playback speed uses bold to match its neighboring icons.
+    /// Every token scales with Dynamic Type (HIG).
     public struct Typography: Sendable, Equatable {
         public static let scale = (caption: CGFloat(12), small: CGFloat(14), body: CGFloat(16), large: CGFloat(18), lead: CGFloat(20), title: CGFloat(22), display: CGFloat(36))
 
@@ -72,6 +73,10 @@ public struct Theme: Sendable, Identifiable, Hashable {
         public var caption: Font
         /// 36, mono: Quick Connect codes.
         public var code: Font
+        /// 16, Geist Mono Bold: playback speed, matching the weight of adjacent control icons.
+        public var playbackSpeed: Font {
+            BrandFont.font(.body, size: Self.scale.body, family: "GeistMono-Bold")
+        }
         /// Letter-spacing for 36pt titles: big type reads loose, so it's tightened.
         public var displayTracking: CGFloat = -0.5
         /// Extra space between wrapped lines. Inter sets lines at about 1.21× its size, so text gets

@@ -153,10 +153,10 @@ final class HomeModel {
     }
 
     /// After a library sync: fills discovery if it was empty (first launch) without reshuffling
-    /// what's already on screen, and refetches shelves that came back empty mid-sync.
+    /// what's already on screen, and reloads history shelves against the updated library.
     func librarySynced() async {
         if (stats?.albums ?? 0) == 0 { loadDiscovery() }
-        if shelves.isEmpty { await load() }
+        await load()
     }
 
     func load() async {

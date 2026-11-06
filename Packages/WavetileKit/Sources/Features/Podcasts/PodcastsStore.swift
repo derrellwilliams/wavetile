@@ -22,6 +22,7 @@ final class PodcastsStore {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let keyPrefix: String
     @ObservationIgnored private var pushTask: Task<Void, Never>?
+    @ObservationIgnored private var refreshTask: Task<Void, Never>?
     @ObservationIgnored private var isSyncing = false
     @ObservationIgnored private var syncAgain = false
     @ObservationIgnored private let log = Logger(subsystem: "com.derrellwilliams.wavetile", category: "podcasts")
@@ -167,6 +168,11 @@ final class PodcastsStore {
         await downloads?.resumePending(allowCellular: allowCellular)
         if let names = try? await database.removeUnfollowedShows() { downloads?.deleteFiles(names) }
         await sync()
+        await refreshIfNeeded()
+    }
+
+    /// Checks enabled podcast feeds on launch and return, using the one-hour freshness window.
+    func refreshIfNeeded() async {
         guard isEnabled else { return }
         let stale = ((try? database.followedShowsNow()) ?? []).contains { ($0.lastRefreshed ?? .distantPast) < Date().addingTimeInterval(-3600) }
         if stale { await refreshAll() }
@@ -181,7 +187,17 @@ final class PodcastsStore {
 
     /// Refreshes every followed show, then applies auto-download.
     func refreshAll() async {
-        guard !isRefreshing else { return }
+        if let refreshTask {
+            await refreshTask.value
+            return
+        }
+        let task = Task { await performRefresh() }
+        refreshTask = task
+        await task.value
+        refreshTask = nil
+    }
+
+    private func performRefresh() async {
         isRefreshing = true
         defer { isRefreshing = false }
         _ = await fetcher.refreshAll()

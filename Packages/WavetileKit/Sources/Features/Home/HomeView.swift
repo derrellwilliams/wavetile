@@ -20,6 +20,7 @@ struct HomeView: View {
     let reselects: Int
     @State private var scrollPosition = ScrollPosition(edge: .top)
     @State private var didRefresh = false
+    @State private var isRefreshing = false
     @State private var podcastUpNext: [EpisodeItem]
     /// Live, so a playlist or collection made elsewhere in the app shows up right away.
     @State private var playlists: [PlaylistRecord] = []
@@ -118,17 +119,13 @@ struct HomeView: View {
             .task { await store.observe(store.database.playlists()) { playlists = $0; rebuildLibraryItems() } }
             .task { await store.observe(store.database.collections()) { collections = $0; rebuildLibraryItems() } }
             .task(id: podcasts.isEnabled) { await observePodcasts(podcasts.database.upNextShelf()) { podcastUpNext = $0 } }
-            .markRefreshable {
-                await model.loadDiscovery()
-                await model.load()
-            }
-            // First launch: the library is still syncing when Home appears.
+            .markRefreshable { await refresh() }
             .onChange(of: reselects) {
                 // Tapping Home again from a pushed screen goes back to Home; at Home, to the top.
                 if path.isEmpty { scrollToTop() } else { path = NavigationPath() }
             }
             .onChange(of: store.isSyncing) { _, syncing in
-                guard !syncing else { return }
+                guard !syncing, !isRefreshing else { return }
                 Task { await model.librarySynced() }
             }
             .task {
@@ -144,6 +141,22 @@ struct HomeView: View {
             }
         }
         .enableInjection()
+    }
+
+    private func refresh() async {
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        defer { isRefreshing = false }
+        async let music: Void = store.syncNow()
+        async let feeds: Void = refreshPodcasts()
+        _ = await (music, feeds)
+        model.loadDiscovery()
+        await model.load()
+    }
+
+    private func refreshPodcasts() async {
+        guard podcasts.isEnabled else { return }
+        await podcasts.refreshAll()
     }
 
     /// The user's own playlists and collections in one row, by name, just above Recently Added

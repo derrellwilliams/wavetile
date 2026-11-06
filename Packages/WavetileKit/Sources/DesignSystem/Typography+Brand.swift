@@ -5,7 +5,7 @@ import UIKit
 /// Brand typefaces, bundled in `Resources/Fonts` (SIL OFL 1.1, see the OFL files).
 ///
 /// `family` is Inter, Regular only, so every weight resolves to it; `monoFamily` is Geist Mono
-/// Regular (there's no Inter Mono). One weight throughout keeps the type even.
+/// Regular (there's no Inter Mono). Geist Mono Bold is reserved for the playback-speed control.
 /// To change a font: drop new .ttf/.otf files in `Resources/Fonts` and update the family name.
 public enum BrandFont {
     public static let family = "Inter"
