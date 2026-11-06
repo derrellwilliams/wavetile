@@ -53,14 +53,17 @@ extension DetailHeader where Subtitle == EmptyView {
 public struct DetailSubtitle: View {
     @Environment(\.theme) private var theme
     private let text: String
+    private let compact: Bool
 
-    public init(_ text: String) {
+    /// `compact` uses 18pt for show names beneath episode titles.
+    public init(_ text: String, compact: Bool = false) {
         self.text = text
+        self.compact = compact
     }
 
     public var body: some View {
         Text(text)
-            .font(theme.typography.lead)
+            .font(compact ? theme.typography.sectionHeader : theme.typography.lead)
             .foregroundStyle(theme.palette.textPrimary)
     }
 }

@@ -128,7 +128,7 @@ struct EpisodeDetailView: View {
                 // Episode titles run far longer than album names, so they use the smaller text-face title.
                 DetailHeader(item.episode.title, metadata: metadata(item), compact: true) {
                     Button { push(.show(ShowRoute(item.show))) } label: {
-                        DetailSubtitle(item.show.title)
+                        DetailSubtitle(item.show.title, compact: true)
                     }
                     .buttonStyle(.plain)
                     .accessibilityHint("Shows the podcast")
