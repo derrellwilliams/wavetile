@@ -136,14 +136,11 @@ struct NowPlayingView: View {
         .animation(theme.motion.smooth, value: player.current?.queueID)
     }
 
-    /// Close only, a tinted circle like the bar buttons (opaque, so it reads over any artwork);
+    /// Close only, using the same circle treatment as the navigation bar buttons;
     /// what's playing reads in the info block and the queue is in the capsule.
     private var closeButton: some View {
         Button { dismiss() } label: {
-            Glyph.dismiss.image
-                .foregroundStyle(theme.palette.accent)
-                .frame(width: 44, height: 44)
-                .background { TintedBarFill(shape: .circle) }
+            TintedBarIcon(glyph: .dismiss)
         }
         .buttonStyle(.pressable)
         .accessibilityLabel("Close")
