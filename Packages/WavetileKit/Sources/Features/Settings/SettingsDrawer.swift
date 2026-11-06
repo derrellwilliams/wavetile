@@ -81,13 +81,18 @@ struct SettingsDrawer: View {
     @ViewBuilder private var downloadsSection: some View {
         @Bindable var downloads = downloads
         Section("Downloads") {
-            Picker(selection: $downloads.quality) {
-                Text("MP3 (256 kbps)").tag(DownloadManager.Quality.high)
-                Text("Original (lossless when possible)").tag(DownloadManager.Quality.original)
+            Menu {
+                Picker("Quality", selection: $downloads.quality) {
+                    Text("MP3 (256 kbps)").tag(DownloadManager.Quality.high)
+                    Text("Original (lossless when possible)").tag(DownloadManager.Quality.original)
+                }
             } label: {
-                Label("Quality", glyph: .download)
+                LabeledContent {
+                    Text(downloads.quality == .high ? "MP3" : "Original")
+                } label: {
+                    Label("Quality", glyph: .download)
+                }
             }
-            .pickerStyle(.menu)
             Toggle(isOn: $downloads.allowCellular) {
                 Label("Use Cellular Data", glyph: .address)
             }
