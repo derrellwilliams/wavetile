@@ -5,7 +5,7 @@ The single working checklist for App Store preparation, launch and follow-up. Up
 - Evidence behind the gates: [qa-evidence.md](qa-evidence.md) (security, privacy, Release/config, sanitizer records).
 - App Store, web search and LLM discoverability notes (ASO, SEO, GEO): [search-optimization.md](search-optimization.md).
 
-Consolidated 2026-11-06 from this file, project-memory `pre-submission-qa.md` and `app-store-readiness.md`, and `site/README.md`; reorganized 2026-11-07 (tiers below, evidence and search notes split out). The memory files are historical. Historical test results are preserved, not rerun or certification of the latest build. This plan doesn't itself authorize uploads, CI setup, delegation, commits or public posts.
+Consolidated 2026-11-06 and reorganized 2026-11-07 (tiers below, evidence and search notes split out). Historical test results are preserved, not rerun or certification of the latest build. This plan doesn't itself authorize uploads, CI setup, delegation, commits or public posts.
 
 ## Current status — 2026-11-07
 
@@ -53,14 +53,24 @@ Project goals, not Apple requirements. Each has a "done when" so it can't run fo
 
 | ID | Status | Owner | Done when |
 |---|---|---|---|
-| QA-3 | Partial, Nov 7 | Engineering + User | Done: API/OPML fixes, Keychain retry, background-download redirect containment (uncompiled until tests run), policy wording (deploy with the site). Remaining: **User** verifies AVFoundation streaming redirects with a redirecting proxy and Keychain cleanup on device; recheck dependency advisories on the final archive. Further resource-exhaustion testing is accepted residual risk |
-| QA-2 | Partial, Nov 7 | Engineering | All listed areas reviewed; fixes made for an endless skip loop, unbounded server-sync decoding and an empty-feed prune (details in qa-evidence.md). Remaining: **run the tests** (the Claude session can't run `xcodebuild`; all Nov 7 edits are uncompiled), confirm in a debug run that the `Environment` warning is gone (ButtonStyle bodies now wrap a View) and decide the `AVAudioSession` one (keep for 1.0 and cover on device), and note the CarPlay items for the device pass. Any second-opinion review (was QA-10) is optional |
+| QA-3 | Partial, Nov 7 | Engineering + User | Security review. Fixed: API/OPML bounds, Keychain retry, background-download redirect containment, policy wording. Open items under "QA-2 / QA-3 remaining" below. Further resource-exhaustion testing is accepted residual risk |
+| QA-2 | Partial, Nov 7 | Engineering | Code review of Playback, Downloads, Persistence/Sync, Podcasts, JellyfinKit and CarPlay. Fixed: an endless skip loop, unbounded server-sync decoding, an empty-feed prune (details in qa-evidence.md). Open items under "QA-2 / QA-3 remaining" below. A second-opinion review (was QA-10) is optional |
 | QA-8 | Partial | Engineering + User | Remaining items are P0 (policy deploy, privacy answers, reviewer access) plus runtime background audio and CarPlay checks from QA-6. Privacy slice Nov 6 and Release/config slice Nov 7 are done |
 | QA-6 | Open | User + Engineering | P0 device scenarios below pass on the RC; failures investigated |
 | QA-4 | Open | Engineering | Database migration tests and unusual-server-data tests added (the first update will exercise migrations). Download manager/engine and AudioPlayer engine tests are P2 |
 | QA-5 | Open | Engineering | Xcode Analyze triaged and results recorded (the compiler warnings from the Release build included) |
 | QA-7 | Ongoing | User | Organizer/TestFlight crash reports inspected during beta and before submission; record build, period and unresolved crashes |
 | QA-1 | Done Nov 5 | Engineering | Sanitizer runs complete. Retest affected paths after later fixes |
+
+### QA-2 / QA-3 remaining
+
+- [ ] **Engineering:** run the package and UI tests on the Nov 7 edits. They are uncompiled, and the Claude session's sandbox can't run `xcodebuild`.
+- [ ] **Engineering:** in a debug run, confirm the `Environment<Theme/Bool>` warning is gone (ButtonStyle bodies now wrap a View).
+- [ ] **Engineering:** decide the `AVAudioSession`-on-main-thread warning (proposed: keep for 1.0 and cover on device).
+- [ ] **Engineering:** note the CarPlay review items for the device pass (QA-6).
+- [ ] **User:** verify AVFoundation streaming redirects with a redirecting proxy.
+- [ ] **User:** verify Keychain cleanup on device.
+- [ ] **Engineering:** recheck dependency advisories on the final archive.
 
 ### Real-device checklist (QA-6)
 
