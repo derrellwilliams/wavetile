@@ -61,7 +61,7 @@
     <li>Downloaded music and podcast episodes, your podcast subscriptions and listening progress, and your settings.</li>
     <li>Small snapshots for the Home Screen widgets, shared only between the app and its widgets.</li>
   </ul>
-  <p>Signing out removes the saved access token, cached library, music and podcast downloads, podcast database, recent music searches and widget snapshots from this device. Some preferences remain. Deleting the app removes its local app data, but Keychain entries can persist; sign out before deleting if you want to remove the saved token. Neither action deletes data already stored by your Jellyfin server or podcast hosts.</p>
+  <p>Signing out signs the session out on this device and removes the saved access token, cached library, music and podcast downloads, podcast database, recent music searches and widget snapshots from this device. Some preferences remain. If iOS refuses to delete the token (for example while the device is locked), the app retries the next time it runs, and the token can't be used to restore the session in the meantime. Signing out also asks your Jellyfin server to end the session, but only when the device can reach it, so you can also revoke the device from your server's dashboard. Deleting the app removes its local app data, but Keychain entries can persist; sign out before deleting if you want to remove the saved token. Neither action deletes data already stored by your Jellyfin server or podcast hosts.</p>
 
   <h2>Who Wavetile talks to</h2>
   <ul>

@@ -23,7 +23,7 @@ Native Jellyfin music + podcast player for iPhone (iOS 26.1+, Swift 6, SwiftUI).
 | `Widgets/`, `Shared/` | Widget extension (Now Playing, Recently Played, download Live Activity); playback intents shared with the app |
 | `site/` | Marketing site for wavetile.com (static, Vercel root directory `site`; see `site/README.md`) |
 | `scripts/` | `testflight.sh`, `fetch-icons.sh` (adds Phosphor icons to the DesignSystem asset catalog), `design-system.py` (writes the gallery) |
-| `docs/` | `design-system.html`, the generated design system gallery |
+| `docs/` | `design-system.html` (the generated design system gallery), `LAUNCH.md` (release plan), `qa-evidence.md` (dated QA records), `search-optimization.md` (ASO, SEO, GEO) |
 | `Packages/WavetileKit/Sources/JellyfinKit` | API client (jellyfin-sdk-swift), auth, Quick Connect, Keychain, Instant Mix |
 | `Persistence` | GRDB library mirror; read queries in `Queries.swift`, `Genres.swift`, `Discovery.swift` |
 | `Library` | Full library sync, record → UI mapping |
@@ -65,7 +65,7 @@ Shelves are read from the local DB on init (first frame, works offline), then `l
 - Debug launch flags (`DebugFlags` in `MainTabView.swift`, compiled out of Release): `-freshHome` (Home as a new listener sees it), `-tab <name>`, `-openSettings`, `-openFirstAlbum [-albumIndex N] [-autoplay] [-openNowPlaying] [-autodownload] [-openArtist]`, `-tab music -openSection <albums|songs|playlists|…>`, `-enablePodcasts`, `-followFeed <url>`, `-playLatestEpisode`, `-openLatestEpisode`.
 
 ## Release planning
-- `docs/LAUNCH.md` is the single working checklist for prerelease QA, App Store readiness, launch and follow-up. Read it when resuming release work and update dated status/evidence there. It supersedes the older `pre-submission-qa.md` and `app-store-readiness.md` project-memory checklists.
+- `docs/LAUNCH.md` is the single working checklist for prerelease QA, App Store readiness, launch and follow-up. Read it when resuming release work and update dated status there; dated QA evidence goes in `docs/qa-evidence.md`, ASO/SEO/GEO notes live in `docs/search-optimization.md`. It supersedes the older `pre-submission-qa.md` and `app-store-readiness.md` project-memory checklists.
 
 ## Git
 Commit and push only when asked; always land on `main`.

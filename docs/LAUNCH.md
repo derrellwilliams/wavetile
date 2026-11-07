@@ -1,348 +1,115 @@
-# Wavetile release, launch & growth plan
+# Wavetile release & launch plan
 
-This is the single working checklist for App Store preparation, launch and follow-up. Update status here, with a date and evidence; do not maintain competing checklists in agent memory. An unchecked item is unfinished or unverified, not necessarily a known defect.
+The single working checklist for App Store preparation, launch and follow-up. Update status here with a date and evidence; don't keep competing checklists in agent memory. An unchecked item is unfinished or unverified, not necessarily a known defect.
 
-Consolidated 2026-11-06 from `docs/LAUNCH.md`, project-memory `pre-submission-qa.md` (updated 2026-11-05), `app-store-readiness.md` (initially 2026-10-24, later CarPlay update), and `site/README.md`. The memory files remain historical sources; this document supersedes their next-step instructions. Historical test results below are preserved, not newly rerun or certification of the latest build.
+- Evidence behind the gates: [qa-evidence.md](qa-evidence.md) (security, privacy, Release/config, sanitizer records).
+- App Store, web search and LLM discoverability notes (ASO, SEO, GEO): [search-optimization.md](search-optimization.md).
+
+Consolidated 2026-11-06 from this file, project-memory `pre-submission-qa.md` and `app-store-readiness.md`, and `site/README.md`; reorganized 2026-11-07 (tiers below, evidence and search notes split out). The memory files are historical. Historical test results are preserved, not rerun or certification of the latest build. This plan doesn't itself authorize uploads, CI setup, delegation, commits or public posts.
 
 ## Current status — 2026-11-07
 
 | Area | State / evidence |
 |---|---|
-| Candidate | Version 1.0.0, build 202611061835, from commit `2a52299`; archive and TestFlight upload succeeded November 6 (includes shortened download quality label). Xcode reported uploaded package processing; processing completion and external availability not verified |
-| Public beta | Build 202610281900 previously approved for external testing; public link https://testflight.apple.com/join/pk9dyfMq. Approval of that build does not establish approval of the latest one |
-| Signing / CarPlay | Developer team, app record and App Group setup completed sufficiently for uploads. CarPlay Audio granted and enabled on App ID; signed CarPlay build 202610301302 uploaded October 30 (`8af183f`) |
-| Automated QA | November 5: 94/94 package tests under ASan and TSan, no reports; final plain UI run 17/17. See evidence below |
-| Website / repo | Site, support/privacy pages, guides, llms.txt, JSON-LD and sitemap in place; MPL-2.0 license and user-facing README. Live service/account configuration not reverified November 6 |
-| Review access | Previously used `https://demo.jellyfin.org/stable`, username `demo`, blank password. Revalidate before submission; use an isolated read-only demo server if unreliable |
-| Contact | realslimscrawny@gmail.com (site, support and privacy) |
-| Privacy readiness | QA-8 privacy source review completed November 6: policy links on sign-in and in Settings, corrected policy wording, existing required-reason declarations validated. Release simulator build and packaged-manifest checks passed. App link changes require a future TestFlight build; website deployment and final App Store privacy answers still need verification |
-| Immediate next step | Finish the remaining QA-8 checks (reviewer access, background audio, CarPlay, final archive/privacy answers), then security review (QA-3) and area reviews (QA-2). Device testing can run alongside these |
+| Candidate | Version 1.0.0, build 202611061835, from `2a52299`; uploaded Nov 6, processing and external availability not verified. **Fixes since then are in no build** (RedirectGuard, OPML bound, Keychain retry, privacy links), so the RC must be a new build |
+| Public beta | Build 202610281900 approved for external testing; link https://testflight.apple.com/join/pk9dyfMq. That approval doesn't cover newer builds |
+| Signing / CarPlay | Team, app record and App Group done. CarPlay Audio granted and enabled; signed CarPlay build 202610301302 uploaded Oct 30 (`8af183f`) |
+| Automated QA | Nov 5: 94/94 package tests under ASan and TSan, no reports; plain UI run 17/17. Later targeted runs in qa-evidence.md |
+| Website / repo | Site, support/privacy pages, guides, llms.txt, JSON-LD, sitemap live; MPL-2.0 and README in place. Service/account configuration not reverified Nov 6 |
+| Review access | Earlier plan: `https://demo.jellyfin.org/stable`, user `demo`, blank password. **Decision needed:** see P0 |
+| Contact | realslimscrawny@gmail.com (site, support, privacy) |
+| Privacy | Source review done Nov 6: policy links on sign-in and in Settings, policy wording corrected, required-reason declarations validated. Policy is local until the site is deployed; App Store privacy answers not yet entered |
+
+**Next steps, in order**
+1. Quick wins (minutes each): deploy the corrected privacy policy with the site; confirm agreements, pricing and territories in App Store Connect; verify domain transfer lock, DNSSEC and Cloudflare 2FA.
+2. Decide the reviewer demo server (P0, first row).
+3. Run the tests on the Nov 7 QA-3/QA-2 edits (the Claude session's sandbox can't run `xcodebuild`), then finish QA-3 and QA-2 against the table below. Both are otherwise down to the device checks and the two warnings.
+4. Early device pass on CarPlay and background audio on the current TestFlight build, since those can force large fixes.
+5. Freeze, cut one RC build, run the full QA-6 device checklist and the P0 listing work on it.
 
 ## Before submission
 
-These are our release gates. Finish them or record an explicit deferral and rationale; distinguish project quality goals from Apple's submission requirements. Original QA numbers are retained so older conversations still map to this list. Owner “Engineering” means the coding work; “User” means device/account or release decisions. This plan does not itself authorize uploads, CI setup, delegation, commits or public posts.
+Release gates. Finish each or record an explicit deferral with rationale. Original QA numbers are kept so older conversations still map. Owner "Engineering" is coding work; "User" is device, account and release decisions.
 
-### Engineering and review readiness
+### P0 — Apple submission blockers
 
-| ID | Status | Owner | Work / completion evidence |
-|---|---|---|---|
-| QA-1 | Done Nov 5 | Engineering | Sanitizer investigation and runs; detailed historical results below. Retest affected paths after subsequent fixes |
-| QA-8 | Partial — privacy Nov 6; Release/config review Nov 7 | Engineering + User | Privacy links added before sign-in and in Settings; policy corrected; required-reason declarations checked. See privacy evidence below. Remaining: deploy policy, confirm App Store privacy answers and final archive report; Release debug guards and background-audio/CarPlay source configuration reviewed Nov 7 (see evidence); runtime background audio, reviewer access and CarPlay checks remain open |
-| QA-3 | Partial — Nov 7 | Engineering | Security review: access tokens and Keychain, cleartext rules and redirects, media ATS exception, feed/OPML parsing. Resolve findings and document residual risks |
-| QA-2 | Open | Engineering | Review Playback, Downloads, Persistence/Sync, Podcasts, JellyfinKit and CarPlay. Investigate recorded runtime warnings: AVAudioSession activated on main thread; Environment<Theme/Bool> accessed outside a View |
-| QA-4 | Open | Engineering | Add meaningful tests for download resume/cancel/low disk, database migrations and unusual server data. Existing bookkeeping tests do not establish manager/engine coverage; AudioPlayer engine coverage remains a gap to assess |
-| QA-5 | Open | Engineering | Xcode Analyze and a small SwiftLint rule set; triage findings and record results |
-| QA-6 | Open | User + Engineering | Complete real-device checklist below; Engineering investigates failures |
-| QA-7 | Ongoing | User | Inspect Organizer/TestFlight crash reports during beta and before submission; record build, period checked and any unresolved crashes |
-| QA-9 | Proposed | Engineering + User | GitHub Actions package-test CI, pending user approval; explicitly defer if not needed for first submission |
-| QA-10 | Open | User + Engineering | Planned second-opinion review from another provider; choose provider/model when requested, record findings and disposition |
-| RC | Open | Engineering + User | After fixes, record final commit/build, run relevant automated regressions and device smoke tests, and confirm TestFlight processing. Do not equate an uploaded build with a tested/approved release |
+Nothing ships without these.
 
-### Real-device checklist (QA-6)
-
-Record device, iOS version, build, date and pass/fail for each scenario. Check normal behavior and recovery after the interruption.
-
-- [ ] Fresh install, upgrade with existing data, login/Quick Connect, sign-out and expired-token recovery.
-- [ ] Lock Screen / Control Center controls, AirPlay, headphone unplug, calls/audio interruptions and background playback.
-- [ ] Download resume/cancel, network loss mid-download, server outage and background completion. Record expected iOS behavior separately for system termination versus user force-quit.
-- [ ] Airplane-mode playback of downloaded music and podcasts; unavailable content and reconnect recovery.
-- [ ] 50k-track library, Low Power Mode and low-storage handling.
-- [ ] Widgets, deep links and download Live Activity.
-- [ ] CarPlay connection, browsing, playback and reconnect.
-- [ ] Podcasts: search, follow, stream/download, progress, chapters/transcripts and subscription sync.
-- [ ] VoiceOver, larger text, light/dark appearance and first interactions after splash.
-
-### Store listing and reviewer package
-
-- [ ] Revalidate review login and playable content from a fresh install; write exact login steps (including blank password if using the public demo). Keep review access available throughout review.
-- [ ] Prepare licensed/public-domain demo music and artwork; retain source/license notes. Remove real server addresses, usernames and tokens from captures.
-- [ ] Capture current UI for site and App Store in required sizes. Sequence/copy: see [App Store (ASO)](#app-store-aso).
-- [ ] Finalize name, subtitle, keywords, description, categories, support URL and privacy URL in App Store Connect.
-- [ ] Complete age-rating questionnaire, privacy answers, content-rights and export-compliance information. Confirm privacy claims against QA-8; do not assume “Data Not Collected” solely from the manifest.
-- [ ] Confirm pricing, territories, applicable agreements/account information and release timing.
-- [ ] Review notes explain Jellyfin requirement, optional podcasts, background audio and CarPlay; verify feature claims such as lossless playback against actual settings.
-- [ ] Select the tested final build, resolve submission warnings and submit when requested. Record submission date/build and review outcome here.
+- [ ] **Reviewer access.** Use an isolated Jellyfin instance with a non-admin, read-only account and only royalty-free or public-domain music; assume the credentials will leak and keep it apart from the personal server. The public demo (`demo.jellyfin.org`) is the fallback only: it isn't ours, resets, has content we don't control, and review can take days. Validate login and playable content from a fresh install, write exact steps (including a blank password if used), and keep access up throughout review.
+- [ ] **Privacy.** Deploy the policy; enter App Store privacy answers and confirm them against qa-evidence.md (QA-8). Don't assume "Data Not Collected" from the manifest alone. Check Xcode's aggregate privacy report on the final archive. Claims must match the app: "Data Not Collected" is wrong if analytics or crash reporting is added later.
+- [ ] **Listing.** Finalize name, subtitle, keywords, description, categories, support URL and privacy URL (draft copy in [search-optimization.md](search-optimization.md#app-store-aso)).
+- [ ] **Screenshots** in required sizes from the demo library (licensed/public-domain music and artwork; keep source and license notes). Strip real server addresses, usernames and tokens from every capture and video.
+- [ ] **Compliance.** Age-rating questionnaire, content rights, export compliance.
+- [ ] **Commercial.** Pricing, territories, applicable agreements and account information, release timing.
+- [ ] **Review notes** explain the Jellyfin requirement, optional podcasts, background audio and CarPlay. Verify feature claims (such as lossless playback) against actual settings. Note that "Jellyfin" appears in the subtitle and description as a nominative reference, not in the app name.
+- [ ] **RC (Engineering + User).** Record final commit and build, run relevant automated regressions and the device checklist, confirm TestFlight processing. An uploaded build isn't a tested or approved one.
+- [ ] **Submit** the tested build, resolve warnings, and record submission date, build and review outcome here.
 
 Apple references: [submission](https://developer.apple.com/help/app-store-connect/manage-submissions-to-app-review/submit-an-app), [review access](https://developer.apple.com/help/app-review/before-submitting-for-review/complete-review/), [privacy](https://developer.apple.com/app-store/app-privacy-details/), [review guidelines](https://developer.apple.com/app-store/review/guidelines/). Recheck current requirements when filling the submission.
 
+### P1 — Quality gates
+
+Project goals, not Apple requirements. Each has a "done when" so it can't run forever; anything beyond it is recorded as accepted residual risk.
+
+| ID | Status | Owner | Done when |
+|---|---|---|---|
+| QA-3 | Partial, Nov 7 | Engineering + User | Done: API/OPML fixes, Keychain retry, background-download redirect containment (uncompiled until tests run), policy wording (deploy with the site). Remaining: **User** verifies AVFoundation streaming redirects with a redirecting proxy and Keychain cleanup on device; recheck dependency advisories on the final archive. Further resource-exhaustion testing is accepted residual risk |
+| QA-2 | Partial, Nov 7 | Engineering | All listed areas reviewed; fixes made for an endless skip loop, unbounded server-sync decoding and an empty-feed prune (details in qa-evidence.md). Remaining: **run the tests** (the Claude session can't run `xcodebuild`; all Nov 7 edits are uncompiled), confirm in a debug run that the `Environment` warning is gone (ButtonStyle bodies now wrap a View) and decide the `AVAudioSession` one (keep for 1.0 and cover on device), and note the CarPlay items for the device pass. Any second-opinion review (was QA-10) is optional |
+| QA-8 | Partial | Engineering + User | Remaining items are P0 (policy deploy, privacy answers, reviewer access) plus runtime background audio and CarPlay checks from QA-6. Privacy slice Nov 6 and Release/config slice Nov 7 are done |
+| QA-6 | Open | User + Engineering | P0 device scenarios below pass on the RC; failures investigated |
+| QA-4 | Open | Engineering | Database migration tests and unusual-server-data tests added (the first update will exercise migrations). Download manager/engine and AudioPlayer engine tests are P2 |
+| QA-5 | Open | Engineering | Xcode Analyze triaged and results recorded (the compiler warnings from the Release build included) |
+| QA-7 | Ongoing | User | Organizer/TestFlight crash reports inspected during beta and before submission; record build, period and unresolved crashes |
+| QA-1 | Done Nov 5 | Engineering | Sanitizer runs complete. Retest affected paths after later fixes |
+
+### Real-device checklist (QA-6)
+
+Record device, iOS version, build, date and pass/fail. Check normal behavior and recovery after the interruption.
+
+**P0 (on the RC)**
+- [ ] Fresh install, upgrade with existing data, login/Quick Connect, sign-out and expired-token recovery.
+- [ ] Lock Screen / Control Center controls, AirPlay, headphone unplug, calls and audio interruptions, background playback.
+- [ ] Download resume/cancel, network loss mid-download, server outage, background completion.
+- [ ] Airplane-mode playback of downloaded music and podcasts; reconnect recovery.
+- [ ] CarPlay connection, browsing, playback and reconnect.
+- [ ] VoiceOver, larger text, light/dark, first interactions after splash.
+
+**P1**
+- [ ] Widgets, deep links, download Live Activity.
+- [ ] Podcasts: search, follow, stream/download, progress, chapters/transcripts, subscription sync.
+- [ ] 50k-track library, Low Power Mode, low-storage handling. Record expected iOS behavior for system termination versus user force-quit.
+
+### P2 — Deferred (explicit)
+
+- QA-9: GitHub Actions package-test CI. Revisit after first submission.
+- SwiftLint rule set (the Analyze half of QA-5 stays in P1).
+- Download manager/engine and AudioPlayer engine tests (migration tests stay in QA-4).
+- Offline-play reporting to Jellyfin, incremental library sync, multi-account support, collection rename (see the backlog in qa-evidence.md).
+
 ## Launch preparation — can run alongside QA
 
-These support a good launch; marketing work does not block App Review.
+Supports a good launch; none of it blocks App Review.
 
-- [x] Domain bought, auto-renew recorded on; site live with Home, guides, Privacy, Support, llms.txt, JSON-LD and sitemap (Oct 29 record).
-- [x] AI crawlers allowed in robots.txt; Cloudflare recorded as DNS only (Oct 29).
+- [x] Domain bought, auto-renew on; site live with Home, guides, Privacy, Support, llms.txt, JSON-LD, sitemap (Oct 29).
+- [x] AI crawlers allowed in robots.txt; Cloudflare DNS only (Oct 29).
 - [x] Public beta link enabled and linked on site (Oct 29).
-- [x] GitHub homepage/topics, MPL-2.0 license and user-facing README ready (Oct 29).
-- [ ] Domain hardening: verify transfer lock, DNSSEC and Cloudflare 2FA (User).
-- [ ] Trademark search (USPTO classes 9, 41); consider filing (User; retained planning item, not asserted Apple requirement).
-- [ ] Verify Google Search Console and Bing Webmaster Tools; submit sitemap.
-- [ ] Draft launch posts and prepare press kit: icon, licensed screenshots, 30-second video, description and contact.
-- [ ] Recruit beta testers / submit awesome-jellyfin listing when requested. Keep jellyfin.org for after launch and eligibility.
-- [ ] Local deployment-account cleanup: `vercel logout` when deploys are done (User).
+- [x] GitHub homepage/topics, MPL-2.0 license, user-facing README (Oct 29).
+- [ ] Domain hardening: transfer lock, DNSSEC, Cloudflare 2FA (User; quick win above).
+- [ ] Verify Google Search Console and Bing Webmaster Tools; submit the sitemap.
 
 ## Launch day — after the App Store listing is live
 
 - [ ] Confirm the public listing and install path work; record the App Store ID/URL.
-- [ ] Replace site beta/coming-soon calls to action with the App Store badge/link as appropriate; retain beta access only where intentional.
-- [ ] Enable `apple-itunes-app` Smart App Banner in `site/index.html`; replace the `.qr` placeholder with an SVG QR code for the listing.
+- [ ] Replace site beta/coming-soon calls to action with the App Store badge/link; keep beta access only where intentional.
+- [ ] Enable the `apple-itunes-app` Smart App Banner in `site/index.html`; replace the `.qr` placeholder with an SVG QR code for the listing.
 - [ ] Add `downloadUrl` and an `offers` object to MobileApplication JSON-LD, matching actual price/currency. Add ratings only once real reviews exist.
 - [ ] Update site guides, llms.txt, README and GitHub links; update sitemap `lastmod` for changed pages.
-- [ ] Publish release notes/changelog and launch announcements when requested; use [Launch channels](#launch-channels).
-- [ ] Check support inbox and crash reports after release.
+- [ ] Publish release notes/changelog.
+- [ ] Check the support inbox and crash reports after release.
 
 ## After launch
 
-- [ ] Submit selfh.st, AlternativeTo and other relevant listings; follow up on awesome-jellyfin.
-- [ ] Apply to jellyfin.org only after its eligibility requirements are met; gather traction evidence first. See [Getting listed](#getting-listed).
-- [ ] Monitor crashes, reviews and support; prioritize a maintenance update from actual findings.
-- [ ] Consider a well-timed in-app rating prompt, screenshot experiments, press outreach and appropriate In-App Events.
-- [ ] Track acquisition and search visibility using [Metrics](#metrics); publish dated changelogs.
-
-## QA evidence and deferred scope
-
-### QA-3 security review — November 7, 2026 (in progress)
-
-Reviewed Keychain/session storage, server transport classification and identity checks, API redirects, media request construction, podcast networking, feed parsing and OPML import. No personal credentials or live account data inspected.
-
-- **Fixed: cross-origin credential-body redirects.** `RedirectGuard` previously removed only Authorization, permitting a redirected POST body (password or Quick Connect secret) to leave the original origin. It now refuses cross-origin requests unless they are body-free GET/HEAD requests, and refuses unknown origins. Same-origin login redirects and header-stripped CDN reads remain supported. Added regression cases for write methods, body streams and missing origins.
-- **Fixed: OPML allocation before size check.** The importer previously loaded the whole file before enforcing its 5 MB limit. It now bounds the file read itself and closes the handle after use.
-- **Storage:** tokens use device-only, after-first-unlock Keychain accessibility; session metadata uses UserDefaults. Keychain deletion errors are currently ignored on sign-out; assess failure/recovery semantics before closing this gate.
-- **Transport:** remote HTTP sign-in is rejected; LAN HTTP remains intentionally allowed. Matching a public Jellyfin server ID helps detect a different machine after network changes but does not authenticate an HTTP peer against an active attacker. HTTPS remains necessary for that protection.
-- **Media residual risk:** stream requests ask Jellyfin not to redirect, but this does not enforce origin restrictions against a reverse proxy. AVFoundation header behavior and background URLSession redirects require dedicated verification; the API redirect fix does not certify those paths.
-- **Podcast parsing:** separate ephemeral networking disables cookies/credential storage; feed downloads have a 15 MB cap, XML external entity resolution is disabled, and feed/OPML URLs are filtered to HTTP(S). OPML entries are capped at 2,000 and episodes at 3,000. No claim of exhaustive malicious-XML/resource-exhaustion coverage.
-
-**Verification:** targeted JellyfinKitTests + PodcastsTests passed on iPhone 18 Pro Max / iOS 27.0: 63 tests, 98 runs including parameterized cases, zero failures/skips. Result: `build/Logs/Test/Test-WavetileKit-Package-2026.11.07_06-33-20--0700.xcresult`. Package build also compiled the changed Features importer. `git diff --check` passed. The documented iPhone 18 Pro destination was unavailable; use the installed Pro Max for this run.
-
-**Contained follow-up — November 7:** added five hostile-input test cases (eight runs with parameterization): controlled temporary-file external entities cannot leak into feed titles or inject OPML subscriptions; oversized inputs retain at most 3,000 episodes / 2,000 subscriptions; OPML rejects file, JavaScript, data and app URL schemes while retaining a valid subscription. The file fixtures are generated by the tests and removed afterward; no user files are accessed. The initial run hit a Swift Testing macro evaluation issue with optional expressions; assigning concrete strings before assertions fixed the test harness, with no production parser change.
-
-**Verification:** PodcastsTests passed on iPhone 18 Pro Max / iOS 27.0 (45 tests, 61 runs including parameterized cases, zero failures/skips). Result: `build/Logs/Test/Test-WavetileKit-Package-2026.11.07_11-31-33--0700.xcresult`. `git diff --check` passed. These checks cover retained-content limits and local external-entity handling, not exhaustive parser CPU/memory limits or network entity fetch observation.
-
-**Keychain failure review — November 7:** added an internal credential-store seam and five injected-failure tests; the public initializer still uses the real Keychain and runtime storage behavior is unchanged. Verified that failed deletion removes active-session metadata and prevents restoration even when the orphaned token remains readable; failed writes do not publish a new session or replace previous metadata; missing/unreadable tokens cannot restore a session; transient read errors preserve metadata for a later successful read. Tests use isolated UserDefaults suites and synthetic credentials, never the user's Keychain.
-
-**Initial finding (local retry fixed below):** `SessionStore.clear()` ignored deletion errors and forgot the account needed to retry. The token can remain in Keychain, although it cannot independently restore a session. `AppModel.signOut()` also revokes remotely on a best-effort basis, so offline/unreadable-token sign-out cannot guarantee server invalidation. Follow-up: persist/retry failed local cleanup without permitting session restoration, test device lock/unlock behavior, and align the policy's unconditional token-removal wording if cleanup cannot be guaranteed. A transient read failure currently shows signed-out UI until another restore/relaunch; automatic unlock recovery was not tested.
-
-**Verification:** JellyfinKitTests passed on iPhone 18 Pro Max / iOS 27.0: 28 tests, 50 runs including parameters, no failures/skips. Result: `build/Logs/Test/Test-WavetileKit-Package-2026.11.07_12-02-16--0700.xcresult`. `git diff --check` passed. This establishes store-level failure semantics, not actual OS Keychain failure reproduction or full AppModel sign-out coverage.
-
-**Keychain cleanup fix — November 7:** sign-out now queues the Keychain account identifier before clearing active-session metadata, and retries failed deletions on subsequent session loads, saves and clears. No token is copied to UserDefaults. A pending deletion blocks restoration even if clear was interrupted before metadata removal. Successful sign-in removes that account from pending cleanup after writing its replacement token; failed sign-in leaves cleanup pending. Added four regression tests for relaunch retry, replacement-token preservation, failed sign-in and interrupted clear.
-
-**Verification:** JellyfinKitTests passed on iPhone 18 Pro Max / iOS 27.0: 32 tests, 54 runs including parameters, zero failures/skips. Result: `build/Logs/Test/Test-WavetileKit-Package-2026.11.07_12-07-55--0700.xcresult`. `git diff --check` passed. Tests simulate Keychain failures; real-device lock/unlock testing remains. Cleanup waits for a later store operation if the OS continues refusing deletion, and cannot discover tokens orphaned by older versions after their account metadata was discarded. Remote revocation remains best-effort. Policy wording and device validation remain open; this fix does not close QA-3.
-
-**Dependency advisory check — November 7:** reviewed all ten pins in the tracked `Packages/WavetileKit/Package.resolved` against upstream GitHub security pages. All ten revisions match the cached build workspace state. This is a published-advisory review, not a vulnerability scan or latest-release audit; recheck the final archive dependency graph before submission. No package changes were required by the advisories reviewed.
-
-| Dependency | Pinned version | Upstream advisory result |
-|---|---|---|
-| [get](https://github.com/kean/Get/security) | 2.2.1 | No published advisories listed |
-| [grdb.swift](https://github.com/groue/GRDB.swift/security) | 7.11.1 | No published advisories listed |
-| [inject](https://github.com/krzysztofzablocki/Inject/security) | 1.6.0 | No published advisories listed |
-| [jellyfin-sdk-swift](https://github.com/jellyfin/jellyfin-sdk-swift/security) | 3.3.0 | No published advisories listed |
-| [nuke](https://github.com/kean/Nuke/security) | 13.2.0 | No published advisories listed |
-| [swift-atomics](https://github.com/apple/swift-atomics/security) | 1.3.1 | No published advisories listed |
-| [swift-collections](https://github.com/apple/swift-collections/security) | 1.7.4 | No published advisories listed |
-| [swift-nio](https://github.com/apple/swift-nio/security) | 2.104.0 | Six published advisories; pinned version is beyond their patched thresholds (details below) |
-| [swift-nio-transport-services](https://github.com/apple/swift-nio-transport-services/security) | 1.28.0 | No published advisories listed |
-| [swift-system](https://github.com/apple/swift-system/security) | 1.8.1 | No published advisories listed |
-
-SwiftNIO 2.104.0 is newer than the fixes for [WebSocket length crash](https://github.com/apple/swift-nio/security/advisories/GHSA-qcc5-f287-vgmq) (2.101.0); [ByteBuffer overflow](https://github.com/apple/swift-nio/security/advisories/GHSA-r3rc-9hpw-54v9), [unbounded headers](https://github.com/apple/swift-nio/security/advisories/GHSA-rj37-6j9x-74q6) and [outbound CRLF injection](https://github.com/apple/swift-nio/security/advisories/GHSA-cq87-8r7h-962v) (2.100.0); [response splitting](https://github.com/apple/swift-nio/security/advisories/GHSA-7fj7-39wj-c64f) (2.42.0 mainline); and [request smuggling](https://github.com/apple/swift-nio/security/advisories/GHSA-mgc4-wqv7-4pxm) (2.14.0 mainline). The SDK brings in NIO through NIOTransportServices; conclusions are version-based, not a claim that all vulnerable modules are reachable.
-
-Scope limits: upstream pages can lag disclosure. Apple OS frameworks/system SQLite, build tools, private advisories and supply-chain provenance are outside this check. No claim that the final distribution archive matches the local package pins. Documentation-only change; `git diff --check` passed, no new build/test run needed.
-
-Remaining: verify media/background-download redirects, validate Keychain cleanup on-device and reconcile privacy wording, and further resource-exhaustion coverage before marking QA-3 complete; refresh dependency advisories against the final archive.
-
-### QA-8 Release/configuration slice — November 7, 2026
-
-Scope: source review at `07bb7d0`, plus a Release simulator build. No device interaction, reviewer login, distribution archive, upload or account changes. This does not close QA-8 or certify background playback/CarPlay behavior.
-
-| Surface | Evidence / disposition |
-|---|---|
-| Debug launch actions | `Features/Main/MainTabView.swift`: every `DebugFlags` value has an inert Release default (false, nil, zero or Home); argument/UserDefaults overrides are inside `#if DEBUG` |
-| Database safety | `Persistence/LibraryDatabase.swift`: `eraseDatabaseOnSchemaChange` is DEBUG-only; Release retains migration behavior |
-| Hot reload | `project.yml` and generated Xcode project restrict `-interposable` to Debug. Resolved Inject source guards runtime loading with DEBUG and provides inert Release implementations; importing the package alone does not activate injection |
-| Background audio | `project.yml`/`App/Info.plist` declare `audio`. `Playback/AudioPlayer.swift` configures playback/long-form audio, interruption handling, route-loss pausing and remote commands. Lock/background playback, AirPlay and interruptions still require QA-6 device evidence |
-| CarPlay | Source entitlement enables CarPlay audio; scene configuration names `CarPlaySceneDelegate`. Delegate connects/disconnects `CarPlayController`; disconnect clears database watches and cancels pending refresh. Source configuration does not establish final provisioning or successful connection/browsing/reconnect |
-| QA-2 follow-up | Confirmed `AudioPlayer.activateSession()` executes on its main-actor class and discards category/activation errors with `try?`. Investigate the recorded main-thread warning and activation-failure recovery during Playback review; no threading change made without engine regression coverage |
-
-**Verification:** Release simulator build (arm64 + x86_64) completed with exit 0. Source and freshly built app plists passed assertions for background audio and CarPlay scene/delegate; source CarPlay entitlement passed. Compiler warnings and stale-file warnings from the old build location remain for QA-5; no claim of a warning-free build. No runtime test or final distribution-signing check was performed.
-
-Remaining QA-8 gates: live policy deployment, reviewer fresh-install login/playable content, device background-audio and CarPlay checks, final distribution archive/privacy report and App Store privacy answers. Next independent engineering work: QA-3 security review.
-
-### QA-8 privacy slice — November 6, 2026
-
-Scope: source-level privacy/data-flow review and small fixes only. No packet capture, credentials inspection, full security review, dependency vulnerability audit, App Store Connect edits or upload. The live policy URL returned HTTP 200; policy changes below are local until deployed.
-
-| Surface | Findings / disposition |
-|---|---|
-| App required-reason APIs | `SessionStore`, app preferences and feature stores use standard UserDefaults: existing `CA92.1` fits. `WidgetBridge` reads modification dates in the app-group container; music/podcast downloads read local file sizes: existing `C617.1` fits. No first-party disk-capacity, boot-time or active-keyboard API use found. No manifest changes needed |
-| Widget | `WidgetStore` shares JSON/artwork files, not App Group UserDefaults. No direct required-reason APIs found in widget/shared code; empty API list retained. App-group entitlement alone does not require a UserDefaults reason |
-| Dependencies | Inspected resolved packages and existing November 6 archive: app, widget, GRDB and NIOPosix manifests are packaged. GRDB declares no collected data; NIOPosix declares file timestamp wrapper reason `0A2A.1`. Nuke caches local image files (app container metadata covered by `C617.1`). Get/Jellyfin SDK provide requested networking; Inject's runtime injection is under DEBUG. No analytics/advertising SDK found. Recheck Xcode's aggregate privacy report on the final distribution archive |
-| Jellyfin | Authentication, library requests, playback reporting, edits and cover uploads go to the selected server. `ClientIdentity` sends app/version, device name and a stable random Keychain identifier. Server operator retention is outside the developer's control |
-| Podcasts | Apple directory receives queries/chart requests. Publisher/CDN hosts receive feed, audio, artwork, chapter and transcript requests, including IP addresses. Podcast request configuration separates Jellyfin credentials. `PodcastSyncState` syncs public feed URLs, enabled state, episode IDs, positions and played timestamps to Jellyfin; only recognized private feed URLs are excluded, not a blanket promise that all private-podcast activity stays local |
-| Local storage / deletion | Session token and random device ID use Keychain; library, downloads, preferences and widget snapshots are local. Sign-out clears account caches/downloads/token but retains some preferences/device ID. Removed inaccurate uninstall-erases-everything claim; server-side history is not deleted by uninstall/sign-out |
-| Policy access | Shared native `PrivacyPolicyLink` in Settings → About and initial sign-in form, opening the HTTPS policy in the browser. No session details/query parameters included |
-
-**Privacy-label assessment:** no developer-operated collection, tracking or advertising integration was found in the reviewed code. “Data Not Collected” remains the proposed label, not a certified answer based merely on an empty manifest. Apple defines collection in terms of retention by the developer or third-party partners; Apple-service collection is handled separately. Before submitting, confirm whether any configured third-party service is a developer partner retaining app-user data, rather than a user-selected server/content host; disclose applicable categories if so. Do not represent podcast requests or Jellyfin playback history as staying entirely on-device. App Store Connect answers were not inspected or changed.
-
-**Policy corrections:** describe Jellyfin client identifiers, uploaded covers, podcast search/content requests and progress sync; distinguish local deletion from Keychain/server retention; explain external links and voluntary support contact. These clarify existing behavior and do not introduce telemetry.
-
-**Verification:** Release simulator build succeeded (arm64 + x86_64, existing compiler warnings); app/widget manifests pass plist validation and match their packaged copies. GRDB and NIOPosix manifests are present and parse successfully in the built app. Sitemap XML and `git diff --check` passed. Live policy URL returned HTTP 200. Manual VoiceOver/browser-opening smoke check remains for QA-6. Publish the policy changes with the site before submitting the app.
-
-Sources: [Apple required-reason API categories](https://developer.apple.com/documentation/bundleresources/app-privacy-configuration/nsprivacyaccessedapitypes/nsprivacyaccessedapitype), [Apple privacy-label definitions](https://developer.apple.com/app-store/app-privacy-details/). Source evidence: `App/PrivacyInfo.xcprivacy`, `Widgets/PrivacyInfo.xcprivacy`, `JellyfinKit/{ClientIdentity,SessionStore}.swift`, `Features/Widgets/WidgetBridge.swift`, `Podcasts/{DirectoryClient,PodcastSync}.swift`, `Features/{AppModel,Podcasts/PodcastsStore}.swift`, `WidgetShared/WidgetSnapshots.swift` (paths under `Packages/WavetileKit/Sources/` where applicable).
-
-
-**QA-1, November 5 (imported record):** 94/94 package tests under both Address Sanitizer and Thread Sanitizer, no reports. The 17 UI tests were exercised under ASan, TSan and plain runs with no sanitizer reports; earlier functional failures were not sanitizer bugs. Final plain run: **17/17**. This does not claim all sanitized UI runs passed functionally or that all manual device testing is complete.
-
-Fixes committed in `92cc0cb`: splash is a modal accessibility element and stops intercepting touches before fading; album/episode download controls retain VoiceOver labels inside menus; performance budgets are skipped under sanitizers. User-approved audit exceptions: one-line names (tile artist and Now Playing title/artist) and element-less contrast findings for album rows beneath the glass tab bar. Reassess if those layouts change. Later splash and Home-refresh changes are included in the November 6 candidate and need relevant regression coverage.
-
-The original November 4 inventory was 111 tests (94 package + 17 UI), five UI suites, no CI or lint, and gaps around Downloads/Persistence/Features. This is historical, not a current coverage measurement. Useful test logging: use `XCTContext.runActivity(named:)` when print output is absent from result bundles; inspect bundles using `xcrun xcresulttool get test-results`.
-
-**Older readiness items now resolved:** app icon/launch artwork, developer signing/team, App Group/app record, matching app/widget versions, encryption declaration and first TestFlight upload. Rive was removed October 24; no release work remains for it. CarPlay capability was enabled October 30. InjectionNext companion setup is developer convenience, not a release gate.
-
-**October 24 nonblocking backlog — revalidate before scheduling:** offline-play reporting to Jellyfin, incremental library sync, multi-account support, collection rename and AudioPlayer engine tests. Do not infer these are still missing from an old note; engine coverage is explicitly assessed in QA-4. iPhone/portrait-only support is intentional.
-
-## Marketing reference
-
-Goal: when someone searches or asks an LLM for “a Jellyfin music app for iPhone”, Wavetile is in the answer. The sections below hold copy and channel details; completion status lives in the phase checklists above.
-
-## Positioning
-Use one line, word for word, everywhere (App Store, site, GitHub, posts):
-
-> **Wavetile: your Jellyfin music and your podcasts, in one app.**
-
-| Differentiator | Proof point |
-|---|---|
-| Native, iOS 26 design | SwiftUI, Liquid Glass, widgets, Live Activity |
-| Fast and offline | Full local library mirror; the first frame comes from the device |
-| Gapless playback | AVQueuePlayer queue |
-| Podcasts built in (optional) | Directory, OPML, chapters, transcripts, synced through Jellyfin |
-| Private | No Wavetile account or analytics; music connects to your Jellyfin server. Optional podcasts also connect to Apple’s directory and podcast hosts |
-
-Spell the name **Wavetile**: one word, capital W only. "Wave tile" brings up flooring and acoustic panels.
-
-## App Store (ASO)
-| Field | Limit | Draft |
-|---|---|---|
-| Name | 30 | `Wavetile Music` (current App Store Connect name). Keep "Jellyfin" out of the name: Jellyfin's [branding guidelines](https://jellyfin.org/docs/general/contributing/branding/) ask third-party apps not to use it, which would block the jellyfin.org listing. Reference it in the subtitle and description instead |
-| Subtitle | 30 | `Music & podcasts for Jellyfin` |
-| Keywords | 100 | `selfhosted,offline,gapless,player,flac,audio,library,radio,carplay,widget,opml,homelab,nas,stream` |
-| Category | | Music (primary), Entertainment (secondary) |
-| Privacy label | | "Data Not Collected" if that's still true. It's a selling point |
-
-Keyword rules: separate with commas and no spaces, and don't repeat words that are already in the name or subtitle (Apple indexes those too). Never use competitor trademarks (Plex, Emby, Spotify); App Review rejects them.
-
-**Screenshots** (the first 3 count most): 1. Home feed: "Your Jellyfin library, beautifully". 2. Now Playing: "Gapless, offline, lossless". 3. Downloads/offline. 4. Podcasts. 5. Widgets and Lock Screen. 6. Light/Dark. Use the demo library, so no real server URLs or names appear.
-
-**Description:** put the positioning line first, then a feature list that uses the words people search (Jellyfin, offline, gapless, FLAC, CarPlay, podcasts, self-hosted).
-
-**After launch:**
-- Use `SKStoreReviewController` at a good moment, e.g. after the 3rd listening session or a finished download, never on first launch.
-- Reply to every review.
-- Use In-App Events for big updates (CarPlay, for example).
-- Use Product Page Optimization to A/B test the screenshots once traffic exists.
-
-## Search (SEO) — wavetile.com
-| Item | Notes |
-|---|---|
-| Home page `<title>` | `Wavetile: Jellyfin Music & Podcast Player for iPhone` |
-| Pages | Live: Home, Why Wavetile (`/why-wavetile`), Podcasts with Jellyfin (`/jellyfin-podcasts`), Download (`/getting-started`), Support, Privacy. Guides linked from the header nav on every page. Later: Changelog, Press |
-| Structured data | `MobileApplication` JSON-LD (live). At launch add `offers`, `downloadUrl`, and rating once reviews exist |
-| Smart App Banner | `<meta name="apple-itunes-app" content="app-id=…">` |
-| Compare | `/why-wavetile` covers "X vs Y" searches honestly: it names Finamp, Jellify and Manet as good options and says when to pick Wavetile. Don't claim features of other apps without checking them |
-| Changelog | Every release on its own dated page. Fresh content for crawlers |
-| Search consoles | Submit the sitemap to Google Search Console and Bing Webmaster Tools (Bing also feeds ChatGPT search and Copilot) |
-
-## LLM visibility (GEO)
-LLMs recommend what is written about consistently in many places they trust.
-
-1. **Don't block AI crawlers.** Cloudflare can block AI bots (AI Crawl Control / managed robots.txt). Allow GPTBot, OAI-SearchBot, ClaudeBot, PerplexityBot and Google-Extended on wavetile.com.
-2. **`/llms.txt`**: a plain-text summary of what Wavetile is, who it's for, its features, the App Store link and FAQs.
-3. **Answer questions the way people ask them**, in the first sentence: the guide pages do this ("Podcasts with Jellyfin, on iPhone", "Getting started"). The home page stays short by design.
-4. **Get listed on third-party sites** (this matters most). See [Getting listed](#getting-listed).
-5. **GitHub**: put the positioning line in the repo description, add topics (`jellyfin`, `ios`, `music-player`, `podcast`, `swiftui`, `selfhosted`), and link the App Store and site.
-6. **Check it monthly**: ask ChatGPT, Claude, Perplexity and Gemini "best Jellyfin music app for iPhone" and log the results.
-
-## Getting listed
-Jellyfin users find clients in a few places, and LLMs learn from the same ones. Community places (forum, Reddit, awesome-jellyfin) work during the beta; jellyfin.org has strict rules and comes later.
-
-| Where | How | When |
-|---|---|---|
-| jellyfin.org/downloads/clients | PR to `jellyfin/jellyfin.org`: add an entry to `src/data/clients.ts` in the third-party list (`ClientType.ThirdParty`, `DeviceType.Mobile`, `Platform.IOS`) with App Store, GitHub and website links. Must meet the [requirements for inclusion](https://jellyfin.org/docs/general/clients/#requirements-for-inclusion-in-clients-list), below | **After launch**, once the requirements are met |
-| awesome-jellyfin | PR adding a line under Clients | Beta |
-| Jellyfin forum (third-party clients), r/jellyfin, r/selfhosted | A post with screenshots, the TestFlight link and what you want feedback on | Beta (recruit testers), again at launch |
-| selfh.st (apps directory and weekly newsletter) | Submit on their site | Launch |
-| AlternativeTo | Add Wavetile as an alternative to Finamp, Manet and others | Launch |
-| r/iosapps, roundup sites (jellywatch.app, appshunter) | Post or submit | Launch |
-| ~~awesome-selfhosted~~ | Skip: it lists self-hostable server software, not client apps | — |
-
-**jellyfin.org requirements** (all must be met; the Jellyfin team decides, and client PRs often wait months for review):
-
-| Requirement | Wavetile (2026-10-29) |
-|---|---|
-| Server URL configurable, Jellyfin as a first-class citizen | Met |
-| Free and open source under an FSF-listed license | Met: MPL-2.0 since 2026-10-29 |
-| Traction: 1 year of active development, or significant user interest as judged by the team | **Not met:** development started 2026-10-23. Build the user-interest case: TestFlight and App Store numbers, forum and Reddit threads, GitHub stars |
-| A unique feature, live in a public release | Podcasts built in. Strongest once it's on the App Store |
-| Follow the community standards and branding guidelines | No "Jellyfin" in the app name, no Jellyfin logo shape in the icon |
-
-**Draft entry** for the end of `thirdPartyClients` in `src/data/clients.ts` (fill in the App Store ID at launch; their style is one line of plain description, no marketing):
-
-```ts
-  {
-    id: 'wavetile',
-    name: 'Wavetile',
-    description:
-      'A native iPhone music player with a full podcast player built in: gapless playback, offline downloads and podcast subscriptions synced through Jellyfin.',
-    clientType: ClientType.ThirdParty,
-    deviceTypes: [DeviceType.Mobile],
-    platforms: [Platform.IOS],
-    primaryLinks: [
-      {
-        id: 'app-store',
-        name: 'App Store',
-        url: 'https://apps.apple.com/app/idXXXXXXXXXX'
-      }
-    ],
-    secondaryLinks: [
-      {
-        id: 'github',
-        name: 'GitHub',
-        url: 'https://github.com/derrellwilliams/wavetile'
-      },
-      {
-        id: 'website',
-        name: 'Website',
-        url: 'https://wavetile.com'
-      }
-    ]
-  }
-```
-
-PR description: what Wavetile is, the unique feature (podcasts alongside music, synced through Jellyfin preferences), the license, and evidence of user interest (testers, ratings, community threads). Expect to be asked about each requirement.
-
-**Before opening any listing PR:** the repo should be ready for a maintainer's quick look (license, a user-facing README with the beta link and screenshots, topics). Say "(beta)" in descriptions so people expect a few rough edges. Ship the newest TestFlight build first.
-
-## Launch channels
-| Channel | When | Angle |
-|---|---|---|
-| TestFlight public beta link (site hero, r/jellyfin, r/selfhosted) | As soon as Beta App Review approves | Recruit testers, collect quotes, fix bugs |
-| r/jellyfin, r/selfhosted | Launch day | Lead with screenshots, a dev's story, and "what I'd love feedback on" |
-| Show HN | Launch week | Technical angle: GRDB mirror, 50k-track performance, gapless |
-| selfh.st weekly newsletter | Launch week | Submit the app |
-| Product Hunt | Launch week (Tue–Thu) | Visual gallery |
-| Mastodon / Bluesky (#jellyfin, #selfhosted) | Ongoing | Short clips of motion and widgets |
-| iOS blogs / YouTubers (MacStories, 9to5Mac, homelab channels) | After the first reviews | Press kit + promo codes |
-
-**Press kit** (`wavetile.com/press`): icon, screenshots, a 30-second video, a one-paragraph description, a contact.
-
-## Metrics
-| Metric | Where |
-|---|---|
-| Impressions → page views → downloads | App Store Connect Analytics |
-| Search terms people used | App Store Connect → Acquisition |
-| Rating and review count | App Store Connect |
-| Site traffic and queries | Search Console, Cloudflare Web Analytics (cookieless) |
-| LLM mentions | Monthly manual check (above) |
-
-## Security
-- **App Review demo server:** a separate Jellyfin instance with a non-admin, read-only account and only royalty-free/public-domain music. Expect the credentials to leak, and keep it away from your personal server.
-- **Screenshots and videos:** no real server addresses, usernames or tokens.
-- **Privacy claims** must match the app. "Data Not Collected" is wrong if you add analytics or crash reporting later.
-- **Site:** HTTPS only. Use HSTS once it's stable, and set no third-party trackers if you're advertising privacy.
+- [ ] Monitor crashes, reviews and support; prioritize a maintenance update from real findings.
+- [ ] Add an in-app rating prompt at a good moment (never first launch); reply to every review.
+- [ ] Trademark search (USPTO classes 9, 41) and consider filing (User; planning item, not an Apple requirement).
+- [ ] Monthly (GEO): ask ChatGPT, Claude, Perplexity and Gemini "best Jellyfin music app for iPhone" and log the results.
