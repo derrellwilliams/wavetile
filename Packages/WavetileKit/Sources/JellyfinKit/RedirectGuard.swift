@@ -4,7 +4,7 @@ import Foundation
 ///
 /// Security: URLSession keeps every header on a redirect, `Authorization` included, so a reverse
 /// proxy that answers 302 to another host (or to HTTP) would hand that host the token. Redirects
-/// on the same origin keep it; any other drops it.
+/// on the same origin keep it; cross-origin reads drop it and writes are refused.
 public final class RedirectGuard: NSObject, URLSessionTaskDelegate, Sendable {
     public static let shared = RedirectGuard()
 
@@ -15,9 +15,14 @@ public final class RedirectGuard: NSObject, URLSessionTaskDelegate, Sendable {
         completionHandler(Self.request(request, redirectedFrom: task.originalRequest?.url))
     }
 
-    /// The redirected request, without the `Authorization` header when it leaves `original`'s origin.
-    public static func request(_ request: URLRequest, redirectedFrom original: URL?) -> URLRequest {
-        guard let original, let target = request.url, !isSameOrigin(original, target) else { return request }
+    /// Safe redirected reads lose Authorization off-origin; off-origin writes return nil.
+    public static func request(_ request: URLRequest, redirectedFrom original: URL?) -> URLRequest? {
+        guard let original, let target = request.url else { return nil }
+        guard !isSameOrigin(original, target) else { return request }
+        // 307/308 can preserve a login password or Quick Connect secret in the body.
+        // Stripping Authorization alone does not protect those credentials.
+        guard ["GET", "HEAD"].contains(request.httpMethod ?? "GET"),
+              request.httpBody == nil, request.httpBodyStream == nil else { return nil }
         var request = request
         request.setValue(nil, forHTTPHeaderField: "Authorization")
         return request

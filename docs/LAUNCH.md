@@ -28,7 +28,7 @@ These are our release gates. Finish them or record an explicit deferral and rati
 |---|---|---|---|
 | QA-1 | Done Nov 5 | Engineering | Sanitizer investigation and runs; detailed historical results below. Retest affected paths after subsequent fixes |
 | QA-8 | Partial — privacy Nov 6; Release/config review Nov 7 | Engineering + User | Privacy links added before sign-in and in Settings; policy corrected; required-reason declarations checked. See privacy evidence below. Remaining: deploy policy, confirm App Store privacy answers and final archive report; Release debug guards and background-audio/CarPlay source configuration reviewed Nov 7 (see evidence); runtime background audio, reviewer access and CarPlay checks remain open |
-| QA-3 | Open | Engineering | Security review: access tokens and Keychain, cleartext rules and redirects, media ATS exception, feed/OPML parsing. Resolve findings and document residual risks |
+| QA-3 | Partial — Nov 7 | Engineering | Security review: access tokens and Keychain, cleartext rules and redirects, media ATS exception, feed/OPML parsing. Resolve findings and document residual risks |
 | QA-2 | Open | Engineering | Review Playback, Downloads, Persistence/Sync, Podcasts, JellyfinKit and CarPlay. Investigate recorded runtime warnings: AVAudioSession activated on main thread; Environment<Theme/Bool> accessed outside a View |
 | QA-4 | Open | Engineering | Add meaningful tests for download resume/cancel/low disk, database migrations and unusual server data. Existing bookkeeping tests do not establish manager/engine coverage; AudioPlayer engine coverage remains a gap to assess |
 | QA-5 | Open | Engineering | Xcode Analyze and a small SwiftLint rule set; triage findings and record results |
@@ -99,6 +99,21 @@ These support a good launch; marketing work does not block App Review.
 - [ ] Track acquisition and search visibility using [Metrics](#metrics); publish dated changelogs.
 
 ## QA evidence and deferred scope
+
+### QA-3 security review — November 7, 2026 (in progress)
+
+Reviewed Keychain/session storage, server transport classification and identity checks, API redirects, media request construction, podcast networking, feed parsing and OPML import. No personal credentials or live account data inspected.
+
+- **Fixed: cross-origin credential-body redirects.** `RedirectGuard` previously removed only Authorization, permitting a redirected POST body (password or Quick Connect secret) to leave the original origin. It now refuses cross-origin requests unless they are body-free GET/HEAD requests, and refuses unknown origins. Same-origin login redirects and header-stripped CDN reads remain supported. Added regression cases for write methods, body streams and missing origins.
+- **Fixed: OPML allocation before size check.** The importer previously loaded the whole file before enforcing its 5 MB limit. It now bounds the file read itself and closes the handle after use.
+- **Storage:** tokens use device-only, after-first-unlock Keychain accessibility; session metadata uses UserDefaults. Keychain deletion errors are currently ignored on sign-out; assess failure/recovery semantics before closing this gate.
+- **Transport:** remote HTTP sign-in is rejected; LAN HTTP remains intentionally allowed. Matching a public Jellyfin server ID helps detect a different machine after network changes but does not authenticate an HTTP peer against an active attacker. HTTPS remains necessary for that protection.
+- **Media residual risk:** stream requests ask Jellyfin not to redirect, but this does not enforce origin restrictions against a reverse proxy. AVFoundation header behavior and background URLSession redirects require dedicated verification; the API redirect fix does not certify those paths.
+- **Podcast parsing:** separate ephemeral networking disables cookies/credential storage; feed downloads have a 15 MB cap, XML external entity resolution is disabled, and feed/OPML URLs are filtered to HTTP(S). OPML entries are capped at 2,000 and episodes at 3,000. No claim of exhaustive malicious-XML/resource-exhaustion coverage.
+
+**Verification:** targeted JellyfinKitTests + PodcastsTests passed on iPhone 18 Pro Max / iOS 27.0: 63 tests, 98 runs including parameterized cases, zero failures/skips. Result: `build/Logs/Test/Test-WavetileKit-Package-2026.11.07_06-33-20--0700.xcresult`. Package build also compiled the changed Features importer. `git diff --check` passed. The documented iPhone 18 Pro destination was unavailable; use the installed Pro Max for this run.
+
+Remaining: verify media/background-download redirects, Keychain failure behavior, dependency advisories/patch status and broader hostile-input tests before marking QA-3 complete.
 
 ### QA-8 Release/configuration slice — November 7, 2026
 

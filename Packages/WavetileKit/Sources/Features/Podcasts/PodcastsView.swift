@@ -149,8 +149,13 @@ private struct OPMLImporter: ViewModifier {
                 Task {
                     let access = url.startAccessingSecurityScopedResource()
                     defer { if access { url.stopAccessingSecurityScopedResource() } }
-                    // OPML files are small; refuse anything absurd.
-                    guard let data = try? Data(contentsOf: url), data.count < 5_000_000 else {
+                    // Bound the read itself, before allocating memory for an untrusted file.
+                    guard let file = try? FileHandle(forReadingFrom: url) else {
+                        message = "That file couldn't be read."
+                        return
+                    }
+                    defer { try? file.close() }
+                    guard let data = try? file.read(upToCount: 5_000_000), data.count < 5_000_000 else {
                         message = "That file couldn't be read."
                         return
                     }
