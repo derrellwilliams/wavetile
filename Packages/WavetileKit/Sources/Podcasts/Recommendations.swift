@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// A show suggested on Home's Recommended for You shelf.
+/// A show suggested on the Podcasts tab's Recommended for You shelf.
 public struct RecommendedShow: Codable, Hashable, Sendable, Identifiable, FetchableRecord, PersistableRecord {
     public static let databaseTableName = "recommendation"
 

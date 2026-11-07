@@ -2,7 +2,7 @@ import DesignSystem
 import Podcasts
 import SwiftUI
 
-/// A tile on Home's Recommended for You shelf: opens the show to preview and follow it. The
+/// A tile on the Podcasts tab's Recommended for You shelf: opens the show to preview and follow it. The
 /// subtitle says why it's suggested, and Not Interested keeps it from coming back.
 struct RecommendedShowLink: View {
     @Environment(PodcastsStore.self) private var podcasts

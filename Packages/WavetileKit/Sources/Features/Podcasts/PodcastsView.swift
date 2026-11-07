@@ -4,9 +4,9 @@ import Podcasts
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// The Podcasts tab: Continue Listening, a row of the latest episodes, then the library
-/// shortcuts, and nothing below (user-specified order). Latest Podcast Episodes stays on Home. The
-/// gear opens the podcast settings; the profile drawer only holds the on/off switch.
+/// The Podcasts tab: Continue Listening, a row of the latest episodes, Recommended for You, then
+/// the library shortcuts, and nothing below (user-specified order). Latest Podcast Episodes also
+/// stays on Home. The gear opens the podcast settings; the profile drawer only holds the on/off switch.
 struct PodcastsView: View {
     @ObserveInjection var inject
     @Environment(\.theme) private var theme
@@ -14,6 +14,7 @@ struct PodcastsView: View {
     @Environment(\.openPodcastSearch) private var openPodcastSearch
     @State private var continueListening: [EpisodeItem] = []
     @State private var latest: [EpisodeItem] = []
+    @State private var recommended: [RecommendedShow] = []
     @State private var hasShows = true
     @State private var path = NavigationPath()
     @Namespace private var zoom
@@ -55,6 +56,9 @@ struct PodcastsView: View {
                 if !latest.isEmpty {
                     EpisodeShelf(title: "Latest Episodes", items: latest)
                 }
+                if !recommended.isEmpty {
+                    ShelfSection("Recommended for You", items: recommended) { RecommendedShowLink(show: $0) }
+                }
                 libraryLinks
             }
             .padding(.vertical, theme.spacing.lg)
@@ -63,7 +67,10 @@ struct PodcastsView: View {
         // The offline notice (and dimming) slide in and out.
         .animatesConnectivity()
         .navigationTitle("Podcasts")
-        .markRefreshable { await podcasts.refreshAll() }
+        .markRefreshable {
+            await podcasts.refreshAll()
+            await podcasts.refreshRecommendations()
+        }
         // On the always-present scroll view: a task on a shelf that isn't shown never runs.
         .task { await observe(podcasts.database.continueListening()) { continueListening = $0 } }
         .task {
@@ -76,6 +83,8 @@ struct PodcastsView: View {
             }
         }
         .task { await observe(podcasts.database.followedShows()) { hasShows = !$0.isEmpty } }
+        .task { await observe(podcasts.database.recommendedShows()) { recommended = $0 } }
+        .task { await podcasts.refreshRecommendations() }
         .sheet(isPresented: $showAddFeed) { AddFeedSheet() }
         .opmlImporter(isPresented: $showImporter, message: $importMessage)
     }

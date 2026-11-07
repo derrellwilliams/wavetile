@@ -22,7 +22,6 @@ struct HomeView: View {
     @State private var didRefresh = false
     @State private var isRefreshing = false
     @State private var podcastUpNext: [EpisodeItem]
-    @State private var recommended: [RecommendedShow] = []
     /// Live, so a playlist or collection made elsewhere in the app shows up right away.
     @State private var playlists: [PlaylistRecord] = []
     @State private var collections: [CollectionRecord] = []
@@ -47,11 +46,10 @@ struct HomeView: View {
         NavigationStack(path: $path) {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: theme.spacing.xxl) {
-                    // Order: Recently Played, Most Played, Latest Podcast Episodes, Recommended for
-                    // You (podcasts), Your Playlists & Collections, Recently Added, then up to three
-                    // Artist Spotlights. The podcast shelves appear only when podcasts are on and they
-                    // have something to show (recommendations need follows or plays); the playlists
-                    // and collections row only when there are some. (Continue Listening lives at the top of
+                    // Order: Recently Played, Most Played, Latest Podcast Episodes, Your Playlists &
+                    // Collections, Recently Added, then up to three Artist Spotlights. The podcast
+                    // shelf appears only when podcasts are on and it has something to show; the
+                    // playlists and collections row only when there are some. (Continue Listening lives at the top of
                     // the Podcasts tab.) With little play history, a welcome card leads and genre
                     // shelves follow Recently Added (the card only for the first visit).
                     // Offline: say so, then lead with what still plays.
@@ -63,7 +61,7 @@ struct HomeView: View {
                         WelcomeCard(userName: userName, stats: stats)
                     }
                     if podcastAnchor == nil {
-                        podcastShelves
+                        podcastUpNextShelf
                     }
                     ForEach(model.shelves) { shelf in
                         if shelf.kind == .recentlyAdded {
@@ -79,7 +77,7 @@ struct HomeView: View {
                             )
                         }
                         if shelf.kind == podcastAnchor {
-                            podcastShelves
+                            podcastUpNextShelf
                         }
                     }
                     if !model.shelves.contains(where: { $0.kind == .recentlyAdded }) {
@@ -121,13 +119,6 @@ struct HomeView: View {
             .task { await store.observe(store.database.playlists()) { playlists = $0; rebuildLibraryItems() } }
             .task { await store.observe(store.database.collections()) { collections = $0; rebuildLibraryItems() } }
             .task(id: podcasts.isEnabled) { await observePodcasts(podcasts.database.upNextShelf()) { podcastUpNext = $0 } }
-            .task(id: podcasts.isEnabled) {
-                await observePodcasts(podcasts.database.recommendedShows()) { recommended = $0 }
-            }
-            .task(id: podcasts.isEnabled) {
-                guard podcasts.isEnabled else { return }
-                await podcasts.refreshRecommendations()
-            }
             .markRefreshable { await refresh() }
             .onChange(of: reselects) {
                 // Tapping Home again from a pushed screen goes back to Home; at Home, to the top.
@@ -159,7 +150,6 @@ struct HomeView: View {
         async let music: Void = store.syncNow()
         async let feeds: Void = refreshPodcasts()
         _ = await (music, feeds)
-        if podcasts.isEnabled { Task { await podcasts.refreshRecommendations() } }
         model.loadDiscovery()
         await model.load()
     }
@@ -205,14 +195,6 @@ struct HomeView: View {
     @ViewBuilder private var podcastUpNextShelf: some View {
         if podcasts.isEnabled, !podcastUpNext.isEmpty, !DebugFlags.freshHome {
             EpisodeShelf(title: "Latest Podcast Episodes", items: podcastUpNext, showsStatus: false)
-        }
-    }
-
-    /// Latest Podcast Episodes, then Recommended for You.
-    @ViewBuilder private var podcastShelves: some View {
-        podcastUpNextShelf
-        if podcasts.isEnabled, !recommended.isEmpty, !DebugFlags.freshHome {
-            ShelfSection("Recommended for You", items: recommended) { RecommendedShowLink(show: $0) }
         }
     }
 
