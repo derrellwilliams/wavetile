@@ -12,12 +12,13 @@ public struct TintedButtonStyle: ButtonStyle {
     var dimsWhenDisabled = true
 
     public func makeBody(configuration: Configuration) -> some View {
-        Body(configuration: configuration, size: size, dimsWhenDisabled: dimsWhenDisabled)
+        StyledBody(configuration: configuration, size: size, dimsWhenDisabled: dimsWhenDisabled)
     }
 
     /// The environment is read here, inside a View, not in the style itself: a style's own
     /// `@Environment` reads can happen outside a view ("Accessing Environment outside of a View").
-    private struct Body: View {
+    /// Not named `Body`: that collides with `ButtonStyle.Body` on the iOS 27 SDK.
+    private struct StyledBody: View {
         @Environment(\.theme) private var theme
         @Environment(\.isEnabled) private var isEnabled
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -67,11 +68,11 @@ public extension ButtonStyle where Self == TintedButtonStyle {
 /// leading glyph, dims while pressed.
 public struct TextButtonStyle: ButtonStyle {
     public func makeBody(configuration: Configuration) -> some View {
-        Body(configuration: configuration)
+        StyledBody(configuration: configuration)
     }
 
     /// Environment reads live in a View (see `TintedButtonStyle`).
-    private struct Body: View {
+    private struct StyledBody: View {
         @Environment(\.theme) private var theme
         @Environment(\.isEnabled) private var isEnabled
         let configuration: ButtonStyleConfiguration

@@ -51,11 +51,11 @@ public struct PressableButtonStyle: ButtonStyle {
     public init() {}
 
     public func makeBody(configuration: Configuration) -> some View {
-        Body(configuration: configuration)
+        StyledBody(configuration: configuration)
     }
 
     /// Environment reads live in a View (see `TintedButtonStyle`).
-    private struct Body: View {
+    private struct StyledBody: View {
         @Environment(\.theme) private var theme
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
         let configuration: ButtonStyleConfiguration
