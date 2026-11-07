@@ -72,6 +72,33 @@ struct FeedParserTests {
         #expect(!text.contains("localhost"))
     }
 
+    @Test func externalEntityCannotReadLocalFile() throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let marker = "private-marker-" + UUID().uuidString
+        try Data(marker.utf8).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+        let xml = """
+        <!DOCTYPE rss [<!ENTITY secret SYSTEM "\(file.absoluteString)">]>
+        <rss><channel><title>&secret;</title><item><guid>a</guid><title>&secret;</title>
+        <enclosure url="https://example.com/a.mp3"/></item></channel></rss>
+        """
+        let feed = try? FeedParser.parse(Data(xml.utf8))
+        let title = feed?.title ?? ""
+        let episodeTitle = feed?.episodes.first?.title ?? ""
+        #expect(!title.contains(marker))
+        #expect(!episodeTitle.contains(marker))
+    }
+
+    @Test func oversizedEpisodeListIsBounded() throws {
+        let items = (0..<3_100).map {
+            "<item><guid>\($0)</guid><title>Episode \($0)</title><enclosure url=\"https://example.com/\($0).mp3\"/></item>"
+        }.joined()
+        let feed = try FeedParser.parse(Data("<rss><channel><title>Large</title>\(items)</channel></rss>".utf8))
+        #expect(feed.episodes.count == 3_000)
+        #expect(feed.episodes.contains { $0.guid == "0" })
+        #expect(!feed.episodes.contains { $0.guid == "3000" })
+    }
+
     @Test func rejectsNonFeeds() {
         #expect(throws: FeedError.notAFeed) { try FeedParser.parse(Data("<html><body>Hi</body></html>".utf8)) }
     }
@@ -124,6 +151,35 @@ struct ShowNotesTests {
 }
 
 struct OPMLTests {
+    @Test func oversizedSubscriptionListIsBounded() {
+        let outlines = (0..<2_100).map {
+            "<outline text=\"Show \($0)\" xmlUrl=\"https://example.com/\($0).xml\"/>"
+        }.joined()
+        let entries = OPML.parse(Data("<opml><body>\(outlines)</body></opml>".utf8))
+        #expect(entries.count == 2_000)
+        #expect(entries.first?.title == "Show 0")
+        #expect(entries.last?.title == "Show 1999")
+    }
+
+    @Test func externalEntityCannotInjectSubscriptions() throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try Data(#"<outline text="Injected" xmlUrl="https://example.com/injected.xml"/>"#.utf8).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+        let xml = """
+        <!DOCTYPE opml [<!ENTITY injected SYSTEM "\(file.absoluteString)">]>
+        <opml><body><outline text="Safe" xmlUrl="https://example.com/safe.xml"/>&injected;</body></opml>
+        """
+        let entries = OPML.parse(Data(xml.utf8))
+        #expect(entries.map(\.title) == ["Safe"])
+    }
+
+    @Test(arguments: ["file:///private/test.xml", "javascript:alert(1)", "data:text/xml,test", "wavetile://album/1"])
+    func rejectsUnsafeSubscriptionSchemes(_ url: String) {
+        let xml = "<opml><body><outline xmlUrl=\"\(url)\"/><outline text=\"Safe\" xmlUrl=\"https://example.com/feed.xml\"/></body></opml>"
+        let entries = OPML.parse(Data(xml.utf8))
+        #expect(entries.map(\.title) == ["Safe"])
+    }
+
     @Test func parsesDedupesAndFilters() throws {
         let url = try #require(Bundle.module.url(forResource: "subscriptions", withExtension: "opml", subdirectory: "Fixtures"))
         let entries = OPML.parse(try Data(contentsOf: url))

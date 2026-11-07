@@ -19,15 +19,29 @@ public struct ServerSession: Codable, Hashable, Sendable {
     var tokenAccount: String { "token.\(serverID).\(userID)" }
 }
 
+/// Internal seam for exercising OS Keychain failures without accessing real credentials.
+protocol SessionCredentials: Sendable {
+    func string(for account: String) throws -> String?
+    func set(_ value: String, for account: String) throws
+    func remove(_ account: String) throws
+}
+
+extension Keychain: SessionCredentials {}
+
 /// Persists the active session. Metadata goes to UserDefaults, the access token to the Keychain.
 public struct SessionStore: Sendable {
-    private let keychain: Keychain
+    private let keychain: any SessionCredentials
     private let defaultsKey = "activeSession"
     // UserDefaults is documented thread-safe but not marked Sendable.
     nonisolated(unsafe) private let defaults: UserDefaults
 
     public init(keychain: Keychain = Keychain(), defaults: UserDefaults = .standard) {
         self.keychain = keychain
+        self.defaults = defaults
+    }
+
+    init(credentials: any SessionCredentials, defaults: UserDefaults) {
+        self.keychain = credentials
         self.defaults = defaults
     }
 
