@@ -32,6 +32,7 @@ extension Keychain: SessionCredentials {}
 public struct SessionStore: Sendable {
     private let keychain: any SessionCredentials
     private let defaultsKey = "activeSession"
+    private let cleanupKey = "pendingSessionTokenCleanup"
     // UserDefaults is documented thread-safe but not marked Sendable.
     nonisolated(unsafe) private let defaults: UserDefaults
 
@@ -46,23 +47,56 @@ public struct SessionStore: Sendable {
     }
 
     public func load() -> (session: ServerSession, token: String)? {
-        guard let data = defaults.data(forKey: defaultsKey),
-              let session = try? JSONDecoder().decode(ServerSession.self, from: data),
+        // A pending deletion also marks a signed-out session if clear was interrupted.
+        if let session = savedSession, pendingCleanup.contains(session.tokenAccount) {
+            defaults.removeObject(forKey: defaultsKey)
+        }
+        retryCleanup()
+        guard let session = savedSession,
               let token = try? keychain.string(for: session.tokenAccount)
         else { return nil }
         return (session, token)
     }
 
     public func save(_ session: ServerSession, token: String) throws {
+        let data = try JSONEncoder().encode(session)
         try keychain.set(token, for: session.tokenAccount)
-        defaults.set(try JSONEncoder().encode(session), forKey: defaultsKey)
+        // A successful new sign-in replaces the old secret; never delete its new token.
+        pendingCleanup = pendingCleanup.filter { $0 != session.tokenAccount }
+        defaults.set(data, forKey: defaultsKey)
+        retryCleanup()
     }
 
     public func clear() {
-        if let data = defaults.data(forKey: defaultsKey),
-           let session = try? JSONDecoder().decode(ServerSession.self, from: data) {
-            try? keychain.remove(session.tokenAccount)
+        if let session = savedSession {
+            pendingCleanup = Array(Set(pendingCleanup + [session.tokenAccount]))
         }
         defaults.removeObject(forKey: defaultsKey)
+        retryCleanup()
+    }
+
+    private var savedSession: ServerSession? {
+        defaults.data(forKey: defaultsKey).flatMap { try? JSONDecoder().decode(ServerSession.self, from: $0) }
+    }
+
+    /// Only account identifiers are retained; tokens never leave the Keychain.
+    private var pendingCleanup: [String] {
+        get { defaults.stringArray(forKey: cleanupKey) ?? [] }
+        nonmutating set {
+            if newValue.isEmpty { defaults.removeObject(forKey: cleanupKey) }
+            else { defaults.set(newValue, forKey: cleanupKey) }
+        }
+    }
+
+    /// Retry on session load, save and clear; persistent OS failures remain queued.
+    private func retryCleanup() {
+        pendingCleanup = pendingCleanup.filter { account in
+            do {
+                try keychain.remove(account)
+                return false
+            } catch {
+                return true
+            }
+        }
     }
 }

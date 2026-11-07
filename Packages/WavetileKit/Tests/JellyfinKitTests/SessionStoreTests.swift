@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import os
 @testable import JellyfinKit
 
 struct SessionStoreTests {
@@ -12,6 +13,84 @@ struct SessionStoreTests {
         func string(for account: String) throws -> String? { try read(account) }
         func set(_ value: String, for account: String) throws { try write(value, account) }
         func remove(_ account: String) throws { try delete(account) }
+    }
+
+    private final class MemoryCredentials: SessionCredentials {
+        struct State {
+            var values: [String: String] = [:]
+            var failsDeletion = true
+            var failsWrite = false
+        }
+        let state = OSAllocatedUnfairLock(initialState: State())
+        func string(for account: String) throws -> String? { state.withLock { $0.values[account] } }
+        func set(_ value: String, for account: String) throws {
+            try state.withLock {
+                if $0.failsWrite { throw Failure.unavailable }
+                $0.values[account] = value
+            }
+        }
+        func remove(_ account: String) throws {
+            try state.withLock {
+                if $0.failsDeletion { throw Failure.unavailable }
+                $0.values.removeValue(forKey: account)
+            }
+        }
+    }
+
+    @Test func retriesDeletionAfterRelaunch() throws {
+        try withDefaults { defaults in
+            let credentials = MemoryCredentials()
+            let store = SessionStore(credentials: credentials, defaults: defaults)
+            try store.save(session, token: "old-token")
+            store.clear()
+            #expect(try credentials.string(for: session.tokenAccount) == "old-token")
+            #expect(store.load() == nil)
+            credentials.state.withLock { $0.failsDeletion = false }
+            #expect(SessionStore(credentials: credentials, defaults: defaults).load() == nil)
+            #expect(try credentials.string(for: session.tokenAccount) == nil)
+            #expect(defaults.stringArray(forKey: "pendingSessionTokenCleanup") == nil)
+        }
+    }
+
+    @Test func newSignInProtectsReplacementToken() throws {
+        try withDefaults { defaults in
+            let credentials = MemoryCredentials()
+            let store = SessionStore(credentials: credentials, defaults: defaults)
+            try store.save(session, token: "old-token")
+            store.clear()
+            try store.save(session, token: "new-token")
+            credentials.state.withLock { $0.failsDeletion = false }
+            #expect(store.load()?.token == "new-token")
+            #expect(defaults.stringArray(forKey: "pendingSessionTokenCleanup") == nil)
+        }
+    }
+
+    @Test func failedSignInPreservesPendingCleanup() throws {
+        try withDefaults { defaults in
+            let credentials = MemoryCredentials()
+            let store = SessionStore(credentials: credentials, defaults: defaults)
+            try store.save(session, token: "old-token")
+            store.clear()
+            credentials.state.withLock { $0.failsWrite = true }
+            #expect(throws: Failure.self) { try store.save(session, token: "new-token") }
+            credentials.state.withLock { $0.failsDeletion = false }
+            #expect(store.load() == nil)
+            #expect(try credentials.string(for: session.tokenAccount) == nil)
+        }
+    }
+
+    @Test func interruptedClearCannotRestoreSession() throws {
+        try withDefaults { defaults in
+            let credentials = MemoryCredentials()
+            let store = SessionStore(credentials: credentials, defaults: defaults)
+            try store.save(session, token: "old-token")
+            // Clear recorded its intent, but was interrupted before metadata removal.
+            defaults.set([session.tokenAccount], forKey: "pendingSessionTokenCleanup")
+            credentials.state.withLock { $0.failsDeletion = false }
+            #expect(store.load() == nil)
+            #expect(defaults.data(forKey: "activeSession") == nil)
+            #expect(try credentials.string(for: session.tokenAccount) == nil)
+        }
     }
 
     private let session = ServerSession(
