@@ -23,6 +23,7 @@ final class PodcastsStore {
     @ObservationIgnored private let keyPrefix: String
     @ObservationIgnored private var pushTask: Task<Void, Never>?
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
+    @ObservationIgnored private var recommendTask: Task<Void, Never>?
     @ObservationIgnored private var isSyncing = false
     @ObservationIgnored private var syncAgain = false
     @ObservationIgnored private let log = Logger(subsystem: "com.derrellwilliams.wavetile", category: "podcasts")
@@ -186,6 +187,34 @@ final class PodcastsStore {
     // MARK: - Shows
 
     /// Refreshes every followed show, then applies auto-download.
+    /// Rebuilds Recommended for You when the user's taste changed or the picks are a day old.
+    /// Overlapping calls share the in-flight work; a failure (offline) leaves the old picks.
+    func refreshRecommendations(force: Bool = false) async {
+        if let recommendTask {
+            await recommendTask.value
+            return
+        }
+        let recommender = PodcastRecommender(database: database, directory: directory)
+        let log = log
+        let task = Task {
+            do { try await recommender.refresh(force: force) } catch is CancellationError {} catch {
+                log.error("Recommendations failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+        recommendTask = task
+        await task.value
+        recommendTask = nil
+    }
+
+    /// "Not Interested" on a recommended show.
+    func dismissRecommendation(_ show: RecommendedShow) {
+        Task {
+            do { try await database.dismissRecommendation(feedURL: show.feedURL) } catch {
+                log.error("Dismiss failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+    }
+
     func refreshAll() async {
         if let refreshTask {
             await refreshTask.value

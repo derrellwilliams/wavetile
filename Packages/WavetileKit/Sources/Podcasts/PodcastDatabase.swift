@@ -138,6 +138,31 @@ public final class PodcastDatabase: Sendable {
         migrator.registerMigration("v5-feed-body-hash") { db in
             try db.alter(table: "show") { t in t.add(column: "bodyHash", .text) }
         }
+        // Recommended for You: Apple genres of the shows the user's taste is read from (looked up
+        // once, a few per run), the cached picks, and the picks the user waved away.
+        migrator.registerMigration("v6-recommendations") { db in
+            try db.create(table: "showGenre") { t in
+                t.primaryKey("showID", .text).references("show", onDelete: .cascade)
+                t.column("genreIDs", .text).notNull()
+                t.column("resolvedAt", .datetime).notNull()
+            }
+            try db.create(table: "recommendation") { t in
+                t.primaryKey("directoryID", .integer)
+                t.column("sortOrder", .integer).notNull()
+                t.column("title", .text).notNull()
+                t.column("author", .text).notNull()
+                t.column("artworkURL", .text)
+                t.column("feedURL", .text).notNull()
+                t.column("genre", .text)
+                t.column("reason", .text).notNull()
+                t.column("signature", .text).notNull()
+                t.column("fetchedAt", .datetime).notNull()
+            }
+            try db.create(table: "dismissedShow") { t in
+                t.primaryKey("showID", .text)
+                t.column("dismissedAt", .datetime).notNull()
+            }
+        }
         return migrator
     }
 }
@@ -498,7 +523,9 @@ public extension PodcastDatabase {
                     try episode.insert(db)
                 }
             }
-            // Episodes that left the feed: everything this fetch didn't see.
+            // Episodes that left the feed: everything this fetch didn't see. A fetch that saw none is
+            // more likely a publisher glitch than every episode being withdrawn, so it prunes nothing.
+            guard !seen.isEmpty else { return UpsertResult(show: show, newEpisodeIDs: newIDs) }
             try db.execute(sql: "CREATE TEMP TABLE IF NOT EXISTS seenEpisode (id TEXT PRIMARY KEY)")
             try db.execute(sql: "DELETE FROM seenEpisode")
             let insert = try db.makeStatement(sql: "INSERT OR IGNORE INTO seenEpisode (id) VALUES (?)")

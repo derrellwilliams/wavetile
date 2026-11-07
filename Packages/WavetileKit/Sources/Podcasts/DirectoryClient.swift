@@ -11,6 +11,9 @@ public struct DirectoryShow: Hashable, Sendable, Identifiable {
     /// Apple genre IDs, most specific first ("26" is the catch-all Podcasts genre).
     var genreIDs: [String] = []
 
+    /// The most specific genre ("26" is Apple's catch-all, so it never counts).
+    var primaryGenreID: String? { genreIDs.first { $0 != "26" } }
+
     public init(id: Int, title: String, author: String, artworkURL: URL?, feedURL: URL?, genre: String?) {
         self.id = id
         self.title = title
@@ -70,17 +73,29 @@ public struct DirectoryClient: Sendable {
     /// Popular shows in the same Apple genre: the show is found by searching its title and
     /// matching the feed, then that genre's top chart is read. Sends only the show's title.
     public func similarShows(title: String, feedURL: URL, limit: Int = 12) async throws -> [DirectoryShow] {
-        let matches = try await search(title, limit: 10)
-        let show = matches.first { Self.sameFeed($0.feedURL, feedURL) }
-            ?? matches.first { $0.title.localizedCaseInsensitiveCompare(title) == .orderedSame }
-        guard let genre = show?.genreIDs.first(where: { $0 != "26" }) else { return [] }
+        let show = try await findShow(title: title, feedURL: feedURL)
+        guard let genre = show?.primaryGenreID else { return [] }
+        return try await popularShows(genre: genre)
+            .filter { $0.id != show?.id && !Self.sameFeed($0.feedURL, feedURL) }
+            .prefix(limit)
+            .map(\.self)
+    }
 
-        let chart = URL(string: "https://itunes.apple.com/\(country)/rss/toppodcasts/limit=30/genre=\(genre)/json")!
+    /// The directory's entry for a show we already hold, found by searching its title and
+    /// matching the feed (or, failing that, the exact title). nil when the directory lacks it.
+    func findShow(title: String, feedURL: URL) async throws -> DirectoryShow? {
+        let matches = try await search(title, limit: 10)
+        return matches.first { Self.sameFeed($0.feedURL, feedURL) }
+            ?? matches.first { $0.title.localizedCaseInsensitiveCompare(title) == .orderedSame }
+    }
+
+    /// A genre's top chart (most popular first), resolved to shows with feed URLs.
+    func popularShows(genre: String, chartLimit: Int = 30) async throws -> [DirectoryShow] {
+        let chart = URL(string: "https://itunes.apple.com/\(country)/rss/toppodcasts/limit=\(chartLimit)/genre=\(genre)/json")!
         let (data, response) = try await session.data(from: chart)
         try PodcastNetwork.check(response)
         let ids = try JSONDecoder().decode(GenreChart.self, from: data).feed.entry
             .compactMap { Int($0.id.attributes.id) }
-            .filter { $0 != show?.id }
         guard !ids.isEmpty else { return [] }
         var components = URLComponents(string: "https://itunes.apple.com/lookup")!
         components.queryItems = [
@@ -89,10 +104,7 @@ public struct DirectoryClient: Sendable {
             .init(name: "country", value: country),
         ]
         let byID = try await lookupResults(components.url!).reduce(into: [Int: DirectoryShow]()) { $0[$1.id] = $1 }
-        return ids.compactMap { byID[$0] }
-            .filter { $0.feedURL != nil && !Self.sameFeed($0.feedURL, feedURL) }
-            .prefix(limit)
-            .map(\.self)
+        return ids.compactMap { byID[$0] }.filter { $0.feedURL != nil }
     }
 
     /// Feed URLs often differ only in scheme or a trailing slash.

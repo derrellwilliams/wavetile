@@ -22,6 +22,7 @@ struct HomeView: View {
     @State private var didRefresh = false
     @State private var isRefreshing = false
     @State private var podcastUpNext: [EpisodeItem]
+    @State private var recommended: [RecommendedShow] = []
     /// Live, so a playlist or collection made elsewhere in the app shows up right away.
     @State private var playlists: [PlaylistRecord] = []
     @State private var collections: [CollectionRecord] = []
@@ -46,9 +47,10 @@ struct HomeView: View {
         NavigationStack(path: $path) {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: theme.spacing.xxl) {
-                    // Order: Recently Played, Latest Podcast Episodes, Most Played, Your Playlists &
-                    // Collections, Recently Added, then up to three Artist Spotlights. Latest Podcast
-                    // Episodes appears only when podcasts are on and it has episodes; the playlists
+                    // Order: Recently Played, Most Played, Latest Podcast Episodes, Recommended for
+                    // You (podcasts), Your Playlists & Collections, Recently Added, then up to three
+                    // Artist Spotlights. The podcast shelves appear only when podcasts are on and they
+                    // have something to show (recommendations need follows or plays); the playlists
                     // and collections row only when there are some. (Continue Listening lives at the top of
                     // the Podcasts tab.) With little play history, a welcome card leads and genre
                     // shelves follow Recently Added (the card only for the first visit).
@@ -60,8 +62,8 @@ struct HomeView: View {
                     if model.showsWelcome, let stats = model.stats, stats.albums > 0 {
                         WelcomeCard(userName: userName, stats: stats)
                     }
-                    if !hasRecentlyPlayed {
-                        podcastUpNextShelf
+                    if podcastAnchor == nil {
+                        podcastShelves
                     }
                     ForEach(model.shelves) { shelf in
                         if shelf.kind == .recentlyAdded {
@@ -76,8 +78,8 @@ struct HomeView: View {
                                     : nil
                             )
                         }
-                        if shelf.kind == .recentlyPlayed {
-                            podcastUpNextShelf
+                        if shelf.kind == podcastAnchor {
+                            podcastShelves
                         }
                     }
                     if !model.shelves.contains(where: { $0.kind == .recentlyAdded }) {
@@ -119,6 +121,13 @@ struct HomeView: View {
             .task { await store.observe(store.database.playlists()) { playlists = $0; rebuildLibraryItems() } }
             .task { await store.observe(store.database.collections()) { collections = $0; rebuildLibraryItems() } }
             .task(id: podcasts.isEnabled) { await observePodcasts(podcasts.database.upNextShelf()) { podcastUpNext = $0 } }
+            .task(id: podcasts.isEnabled) {
+                await observePodcasts(podcasts.database.recommendedShows()) { recommended = $0 }
+            }
+            .task(id: podcasts.isEnabled) {
+                guard podcasts.isEnabled else { return }
+                await podcasts.refreshRecommendations()
+            }
             .markRefreshable { await refresh() }
             .onChange(of: reselects) {
                 // Tapping Home again from a pushed screen goes back to Home; at Home, to the top.
@@ -150,6 +159,7 @@ struct HomeView: View {
         async let music: Void = store.syncNow()
         async let feeds: Void = refreshPodcasts()
         _ = await (music, feeds)
+        if podcasts.isEnabled { Task { await podcasts.refreshRecommendations() } }
         model.loadDiscovery()
         await model.load()
     }
@@ -185,18 +195,28 @@ struct HomeView: View {
         withAnimation(theme.motion.smooth) { scrollPosition.scrollTo(edge: .top) }
     }
 
-    private var hasRecentlyPlayed: Bool {
-        model.shelves.contains { $0.kind == .recentlyPlayed }
+    /// The shelf Latest Podcast Episodes follows: Most Played, else Recently Played; nil puts it
+    /// first among the music shelves.
+    private var podcastAnchor: HomeModel.Shelf.Kind? {
+        [HomeModel.Shelf.Kind.mostPlayed, .recentlyPlayed].first { kind in model.shelves.contains { $0.kind == kind } }
     }
 
-    /// Latest Podcast Episodes: after Recently Played, or first among the music shelves without it.
+    /// Latest Podcast Episodes: after Most Played (see `podcastAnchor`).
     @ViewBuilder private var podcastUpNextShelf: some View {
         if podcasts.isEnabled, !podcastUpNext.isEmpty, !DebugFlags.freshHome {
             EpisodeShelf(title: "Latest Podcast Episodes", items: podcastUpNext, showsStatus: false)
         }
     }
 
-    private func observePodcasts(_ observation: GRDBObservation<[EpisodeItem]>, update: ([EpisodeItem]) -> Void) async {
+    /// Latest Podcast Episodes, then Recommended for You.
+    @ViewBuilder private var podcastShelves: some View {
+        podcastUpNextShelf
+        if podcasts.isEnabled, !recommended.isEmpty, !DebugFlags.freshHome {
+            ShelfSection("Recommended for You", items: recommended) { RecommendedShowLink(show: $0) }
+        }
+    }
+
+    private func observePodcasts<T: Sendable & Equatable & ExpressibleByArrayLiteral>(_ observation: GRDBObservation<T>, update: (T) -> Void) async {
         guard podcasts.isEnabled else {
             update([])
             return
