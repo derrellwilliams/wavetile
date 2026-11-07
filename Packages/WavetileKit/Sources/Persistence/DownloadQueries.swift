@@ -232,7 +232,10 @@ public extension LibraryDatabase {
                 FROM downloadMembership m JOIN downloadedTrack t ON t.trackID = m.trackID
                 GROUP BY m.collectionID
                 """)
-            let stats = Dictionary(rows.map { (String($0["id"]) ?? "", $0) }, uniquingKeysWith: { first, _ in first })
+            let stats: [String: Row] = Dictionary(
+                rows.compactMap { row in (row["id"] as String?).map { ($0, row) } },
+                uniquingKeysWith: { first, _ in first }
+            )
             return try DownloadCollectionRecord.order(Column("addedAt").desc).fetchAll(db).map { collection in
                 guard let row = stats[collection.id] else { return DownloadedCollection(collection: collection, status: .none, bytes: 0) }
                 return DownloadedCollection(collection: collection, status: Self.status(row), bytes: row["bytes"] ?? 0)
