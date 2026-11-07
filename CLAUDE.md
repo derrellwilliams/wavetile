@@ -4,7 +4,7 @@ Native Jellyfin music + podcast player for iPhone (iOS 26.1+, Swift 6, SwiftUI).
 
 ## Build & run
 - `Wavetile.xcodeproj` is generated: edit `project.yml`, then `xcodegen generate` (also after adding/removing files in `App/`).
-- Build: `xcodebuild -project Wavetile.xcodeproj -scheme Wavetile -destination 'platform=iOS Simulator,name=iPhone 18 Pro' -derivedDataPath build build`
+- Build: `xcodebuild -project Wavetile.xcodeproj -scheme Wavetile -destination 'platform=iOS Simulator,name=iPhone 18 Pro Max' -derivedDataPath build build`
 - Run (two separate commands; an `&&` chain keeps them in the sandbox, where they fail): `xcrun simctl install booted build/Build/Products/Debug-iphonesimulator/Wavetile.app`, then `xcrun simctl launch booted com.derrellwilliams.wavetile [flags]`
 - Check the screen: `xcrun simctl io booted screenshot <path>.png`, then read the PNG.
 - Tests: package scheme `WavetileKit-Package` (incl. a 50k-track perf suite); UI tests (incl. an accessibility audit) in `UITests/`, run from the `Wavetile` scheme.
