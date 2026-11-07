@@ -4,7 +4,7 @@ This is the single working checklist for App Store preparation, launch and follo
 
 Consolidated 2026-11-06 from `docs/LAUNCH.md`, project-memory `pre-submission-qa.md` (updated 2026-11-05), `app-store-readiness.md` (initially 2026-10-24, later CarPlay update), and `site/README.md`. The memory files remain historical sources; this document supersedes their next-step instructions. Historical test results below are preserved, not newly rerun or certification of the latest build.
 
-## Current status — 2026-11-06
+## Current status — 2026-11-07
 
 | Area | State / evidence |
 |---|---|
@@ -27,7 +27,7 @@ These are our release gates. Finish them or record an explicit deferral and rati
 | ID | Status | Owner | Work / completion evidence |
 |---|---|---|---|
 | QA-1 | Done Nov 5 | Engineering | Sanitizer investigation and runs; detailed historical results below. Retest affected paths after subsequent fixes |
-| QA-8 | Partial — privacy source review done Nov 6 | Engineering + User | Privacy links added before sign-in and in Settings; policy corrected; required-reason declarations checked. See privacy evidence below. Remaining: deploy policy, confirm App Store privacy answers and final archive report; background audio, reviewer access, CarPlay and broader Release-debug checks remain open |
+| QA-8 | Partial — privacy Nov 6; Release/config review Nov 7 | Engineering + User | Privacy links added before sign-in and in Settings; policy corrected; required-reason declarations checked. See privacy evidence below. Remaining: deploy policy, confirm App Store privacy answers and final archive report; Release debug guards and background-audio/CarPlay source configuration reviewed Nov 7 (see evidence); runtime background audio, reviewer access and CarPlay checks remain open |
 | QA-3 | Open | Engineering | Security review: access tokens and Keychain, cleartext rules and redirects, media ATS exception, feed/OPML parsing. Resolve findings and document residual risks |
 | QA-2 | Open | Engineering | Review Playback, Downloads, Persistence/Sync, Podcasts, JellyfinKit and CarPlay. Investigate recorded runtime warnings: AVAudioSession activated on main thread; Environment<Theme/Bool> accessed outside a View |
 | QA-4 | Open | Engineering | Add meaningful tests for download resume/cancel/low disk, database migrations and unusual server data. Existing bookkeeping tests do not establish manager/engine coverage; AudioPlayer engine coverage remains a gap to assess |
@@ -99,6 +99,23 @@ These support a good launch; marketing work does not block App Review.
 - [ ] Track acquisition and search visibility using [Metrics](#metrics); publish dated changelogs.
 
 ## QA evidence and deferred scope
+
+### QA-8 Release/configuration slice — November 7, 2026
+
+Scope: source review at `07bb7d0`, plus a Release simulator build. No device interaction, reviewer login, distribution archive, upload or account changes. This does not close QA-8 or certify background playback/CarPlay behavior.
+
+| Surface | Evidence / disposition |
+|---|---|
+| Debug launch actions | `Features/Main/MainTabView.swift`: every `DebugFlags` value has an inert Release default (false, nil, zero or Home); argument/UserDefaults overrides are inside `#if DEBUG` |
+| Database safety | `Persistence/LibraryDatabase.swift`: `eraseDatabaseOnSchemaChange` is DEBUG-only; Release retains migration behavior |
+| Hot reload | `project.yml` and generated Xcode project restrict `-interposable` to Debug. Resolved Inject source guards runtime loading with DEBUG and provides inert Release implementations; importing the package alone does not activate injection |
+| Background audio | `project.yml`/`App/Info.plist` declare `audio`. `Playback/AudioPlayer.swift` configures playback/long-form audio, interruption handling, route-loss pausing and remote commands. Lock/background playback, AirPlay and interruptions still require QA-6 device evidence |
+| CarPlay | Source entitlement enables CarPlay audio; scene configuration names `CarPlaySceneDelegate`. Delegate connects/disconnects `CarPlayController`; disconnect clears database watches and cancels pending refresh. Source configuration does not establish final provisioning or successful connection/browsing/reconnect |
+| QA-2 follow-up | Confirmed `AudioPlayer.activateSession()` executes on its main-actor class and discards category/activation errors with `try?`. Investigate the recorded main-thread warning and activation-failure recovery during Playback review; no threading change made without engine regression coverage |
+
+**Verification:** Release simulator build (arm64 + x86_64) completed with exit 0. Source and freshly built app plists passed assertions for background audio and CarPlay scene/delegate; source CarPlay entitlement passed. Compiler warnings and stale-file warnings from the old build location remain for QA-5; no claim of a warning-free build. No runtime test or final distribution-signing check was performed.
+
+Remaining QA-8 gates: live policy deployment, reviewer fresh-install login/playable content, device background-audio and CarPlay checks, final distribution archive/privacy report and App Store privacy answers. Next independent engineering work: QA-3 security review.
 
 ### QA-8 privacy slice — November 6, 2026
 
