@@ -52,6 +52,14 @@ struct PodcastDatabaseTests {
         #expect(try db.episodeNow(id: id("c")) == nil)
     }
 
+    @Test func aFetchThatSawNoEpisodesPrunesNothing() async throws {
+        let db = try PodcastDatabase.temporary()
+        _ = try await db.upsert(feed: feed([episode("a", daysAgo: 2), episode("b", daysAgo: 1)]), feedURL: feedURL, validators: nil, follow: true)
+        _ = try await db.upsert(feed: feed([]), feedURL: feedURL, validators: nil, follow: false)
+        #expect(try db.episodeNow(id: id("a")) != nil)
+        #expect(try db.episodeNow(id: id("b")) != nil)
+    }
+
     @Test func finishingNearTheEndMarksPlayedAndLeavesUpNext() async throws {
         let db = try PodcastDatabase.temporary()
         _ = try await db.upsert(feed: feed([episode("a", daysAgo: 1)]), feedURL: feedURL, validators: nil, follow: true)
@@ -177,6 +185,20 @@ struct PodcastSyncTests {
         #expect(merged.positions["z"]?.seconds == 5)
         #expect(merged.positions["y"] == nil)
         #expect(merged.played["y"] == t2)
+    }
+
+    @Test func serverCopyIsReadWithLimits() {
+        func json(_ value: some Encodable) -> String { String(decoding: (try? JSONEncoder().encode(value)) ?? Data(), as: UTF8.self) }
+        let subscriptions = (0 ..< 2500).map { "https://example.com/feed/\($0)" }
+        var positions = Dictionary(uniqueKeysWithValues: (0 ..< 500).map { ("e\($0)", [Double($0), Double(1000 + $0)]) })
+        positions["negative"] = [-5, 9999]
+        let played = Dictionary(uniqueKeysWithValues: (0 ..< 2500).map { ("p\($0)", Double($0)) })
+        let state = PodcastSyncState(customPrefs: ["subs": json(subscriptions), "pos": json(positions), "played": json(played)])
+        #expect(state.subscriptions.count == PodcastSyncState.maxSubscriptions)
+        #expect(state.positions.count == PodcastSyncState.maxPositions)
+        #expect(state.positions["negative"] == nil, "a negative position is dropped")
+        #expect(state.positions["e499"] != nil && state.positions["e0"] == nil, "the newest positions are kept")
+        #expect(state.played.count == PodcastSyncState.maxPlayed)
     }
 
     @Test func privateFeedDetection() {

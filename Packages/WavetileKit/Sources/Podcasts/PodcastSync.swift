@@ -29,6 +29,9 @@ public struct PodcastSyncState: Equatable, Sendable {
     public static let preferencesID = "wavetile-podcasts"
     static let maxPositions = 200
     static let maxPlayed = 2000
+    /// Same ceiling as an OPML import. The server's copy is read with these limits too, so a
+    /// huge or hostile preferences blob can't queue thousands of feed fetches.
+    static let maxSubscriptions = 2000
     static let playedWindow: TimeInterval = 90 * 24 * 3600
 
     public init(enabled: Bool? = nil, enabledUpdated: Date? = nil, subscriptions: [URL] = [], subscriptionsUpdated: Date? = nil,
@@ -71,15 +74,19 @@ public struct PodcastSyncState: Equatable, Sendable {
         func date(_ key: String) -> Date? { prefs[key].flatMap(Double.init).map(Date.init(timeIntervalSince1970:)) }
         enabled = prefs["enabled"].map { $0 == "1" }
         enabledUpdated = date("enabledUpdated")
-        subscriptions = (prefs["subs"].flatMap { try? JSONDecoder().decode([String].self, from: Data($0.utf8)) } ?? [])
+        subscriptions = Array((prefs["subs"].flatMap { try? JSONDecoder().decode([String].self, from: Data($0.utf8)) } ?? [])
             .compactMap(FeedParser.webURL)
+            .prefix(Self.maxSubscriptions))
         subscriptionsUpdated = date("subsUpdated")
         let rawPositions = prefs["pos"].flatMap { try? JSONDecoder().decode([String: [Double]].self, from: Data($0.utf8)) } ?? [:]
-        positions = rawPositions.compactMapValues { pair in
-            pair.count == 2 ? Position(seconds: pair[0], updated: Date(timeIntervalSince1970: pair[1])) : nil
-        }
+        // Keep the newest few; a position must be a real, non-negative time.
+        positions = Dictionary(uniqueKeysWithValues: rawPositions.compactMap { id, pair -> (String, Position)? in
+            guard pair.count == 2, pair[0].isFinite, pair[0] >= 0 else { return nil }
+            return (id, Position(seconds: pair[0], updated: Date(timeIntervalSince1970: pair[1])))
+        }.sorted { $0.1.updated > $1.1.updated }.prefix(Self.maxPositions))
         let rawPlayed = prefs["played"].flatMap { try? JSONDecoder().decode([String: Double].self, from: Data($0.utf8)) } ?? [:]
-        played = rawPlayed.mapValues(Date.init(timeIntervalSince1970:))
+        played = Dictionary(uniqueKeysWithValues: rawPlayed.sorted { $0.value > $1.value }.prefix(Self.maxPlayed)
+            .map { ($0.key, Date(timeIntervalSince1970: $0.value)) })
     }
 
     public var customPrefs: [String: String] {

@@ -7,39 +7,51 @@ import SwiftUI
 public struct TintedButtonStyle: ButtonStyle {
     public enum Size: Sendable { case regular, small }
 
-    @Environment(\.theme) private var theme
-    @Environment(\.isEnabled) private var isEnabled
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let size: Size
     /// Off while a button shows its spinner: it's busy, not unavailable, so it stays solid.
     var dimsWhenDisabled = true
 
     public func makeBody(configuration: Configuration) -> some View {
-        let pressed = configuration.isPressed
-        sized(configuration.label)
-            .foregroundStyle(theme.palette.accent)
-            .background(pressed ? theme.palette.tintPressed : theme.palette.tint, in: .capsule)
-            // A pill is shorter than a finger; its tap area still reaches 44pt.
-            .frame(minHeight: 44)
-            .contentShape(.rect)
-            .scaleEffect(pressed && !reduceMotion ? theme.motion.pressedScale : 1)
-            .animation(pressed ? theme.motion.pressIn : theme.motion.snappy, value: pressed)
-            .opacity(isEnabled || !dimsWhenDisabled ? 1 : 0.4)
+        Body(configuration: configuration, size: size, dimsWhenDisabled: dimsWhenDisabled)
     }
 
-    @ViewBuilder private func sized(_ label: Configuration.Label) -> some View {
-        switch size {
-        case .regular:
-            label
-                .font(theme.typography.body)
-                // md, not lg: three capsules (Play, Shuffle, About) share a row.
-                .padding(.horizontal, theme.spacing.md)
-                .frame(minHeight: 48)
-        case .small:
-            label
-                .font(theme.typography.caption)
-                .padding(.horizontal, theme.spacing.md)
-                .frame(minHeight: 28)
+    /// The environment is read here, inside a View, not in the style itself: a style's own
+    /// `@Environment` reads can happen outside a view ("Accessing Environment outside of a View").
+    private struct Body: View {
+        @Environment(\.theme) private var theme
+        @Environment(\.isEnabled) private var isEnabled
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+        let configuration: ButtonStyleConfiguration
+        let size: Size
+        let dimsWhenDisabled: Bool
+
+        var body: some View {
+            let pressed = configuration.isPressed
+            sized(configuration.label)
+                .foregroundStyle(theme.palette.accent)
+                .background(pressed ? theme.palette.tintPressed : theme.palette.tint, in: .capsule)
+                // A pill is shorter than a finger; its tap area still reaches 44pt.
+                .frame(minHeight: 44)
+                .contentShape(.rect)
+                .scaleEffect(pressed && !reduceMotion ? theme.motion.pressedScale : 1)
+                .animation(pressed ? theme.motion.pressIn : theme.motion.snappy, value: pressed)
+                .opacity(isEnabled || !dimsWhenDisabled ? 1 : 0.4)
+        }
+
+        @ViewBuilder private func sized(_ label: ButtonStyleConfiguration.Label) -> some View {
+            switch size {
+            case .regular:
+                label
+                    .font(theme.typography.body)
+                    // md, not lg: three capsules (Play, Shuffle, About) share a row.
+                    .padding(.horizontal, theme.spacing.md)
+                    .frame(minHeight: 48)
+            case .small:
+                label
+                    .font(theme.typography.caption)
+                    .padding(.horizontal, theme.spacing.md)
+                    .frame(minHeight: 28)
+            }
         }
     }
 }
@@ -54,17 +66,25 @@ public extension ButtonStyle where Self == TintedButtonStyle {
 /// Low-emphasis actions with no background (Read More, Sign Out): accent label, optional
 /// leading glyph, dims while pressed.
 public struct TextButtonStyle: ButtonStyle {
-    @Environment(\.theme) private var theme
-    @Environment(\.isEnabled) private var isEnabled
-
     public func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(theme.typography.body)
-            .foregroundStyle(theme.palette.accent)
-            .frame(minHeight: 44)
-            .contentShape(.rect)
-            .opacity(configuration.isPressed ? 0.5 : isEnabled ? 1 : 0.4)
-            .animation(theme.motion.snappy, value: configuration.isPressed)
+        Body(configuration: configuration)
+    }
+
+    /// Environment reads live in a View (see `TintedButtonStyle`).
+    private struct Body: View {
+        @Environment(\.theme) private var theme
+        @Environment(\.isEnabled) private var isEnabled
+        let configuration: ButtonStyleConfiguration
+
+        var body: some View {
+            configuration.label
+                .font(theme.typography.body)
+                .foregroundStyle(theme.palette.accent)
+                .frame(minHeight: 44)
+                .contentShape(.rect)
+                .opacity(configuration.isPressed ? 0.5 : isEnabled ? 1 : 0.4)
+                .animation(theme.motion.snappy, value: configuration.isPressed)
+        }
     }
 }
 

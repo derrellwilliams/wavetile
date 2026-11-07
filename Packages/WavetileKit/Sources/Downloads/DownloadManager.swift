@@ -253,6 +253,10 @@ extension DownloadManager: URLSessionDownloadDelegate {
 
     public func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
         guard let trackID = downloadTask.taskDescription else { return }
+        if redirectedOffOrigin(downloadTask) {
+            stopAfterOffOriginRedirect(trackID)
+            return
+        }
         if let http = downloadTask.response as? HTTPURLResponse, !(200 ..< 300).contains(http.statusCode) {
             markFailed(trackID, "Server returned \(http.statusCode)")
             return
@@ -283,17 +287,31 @@ extension DownloadManager: URLSessionDownloadDelegate {
         }
     }
 
-    /// Drops the token if the server redirects a download to another host (see `RedirectGuard`).
-    public func urlSession(
-        _ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
-        newRequest request: URLRequest, completionHandler: @escaping @Sendable (URLRequest?) -> Void
-    ) {
-        completionHandler(RedirectGuard.request(request, redirectedFrom: task.originalRequest?.url))
+    // Security: a background session follows redirects on its own and never asks its delegate
+    // (so `RedirectGuard` can't run here), and the request carries the token in a header. The
+    // check below runs afterwards: a download that ended on another origin stops the queue, so a
+    // misbehaving server or proxy exposes the token to one request, not every track and retry.
+    private func redirectedOffOrigin(_ task: URLSessionTask) -> Bool {
+        RedirectGuard.leftOrigin(requested: task.originalRequest?.url, ended: task.currentRequest?.url ?? task.response?.url)
+    }
+
+    private func stopAfterOffOriginRedirect(_ trackID: String) {
+        log.error("Download of \(trackID, privacy: .public) was redirected to another host; stopping all downloads")
+        let message = "The server redirected this download to another host, so downloads were stopped to protect your sign-in."
+        Task {
+            for task in await session.allTasks { task.cancel() }
+            for pending in (try? database.pendingDownloads()) ?? [] { markFailed(pending.trackID, message) }
+            markFailed(trackID, message)
+        }
     }
 
     public func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: (any Error)?) {
         guard let error, let trackID = task.taskDescription else { return }
         if (error as? URLError)?.code == .cancelled { return }
+        if redirectedOffOrigin(task) {
+            stopAfterOffOriginRedirect(trackID)
+            return
+        }
         log.error("Download failed for \(trackID, privacy: .public): \(error.localizedDescription, privacy: .public)")
         let attempt = state.withLock { state -> Int in
             let attempt = (state.retries[trackID] ?? 0) + 1

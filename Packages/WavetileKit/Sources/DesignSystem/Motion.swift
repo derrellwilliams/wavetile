@@ -48,16 +48,24 @@ public extension Motion {
 
 /// Press feedback used by tiles and rows: scale from the theme, respects Reduce Motion.
 public struct PressableButtonStyle: ButtonStyle {
-    @Environment(\.theme) private var theme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     public init() {}
 
     public func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed && !reduceMotion ? theme.motion.pressedScale : 1)
-            // Asymmetric: the press lands immediately, the release settles.
-            .animation(configuration.isPressed ? theme.motion.pressIn : theme.motion.snappy, value: configuration.isPressed)
+        Body(configuration: configuration)
+    }
+
+    /// Environment reads live in a View (see `TintedButtonStyle`).
+    private struct Body: View {
+        @Environment(\.theme) private var theme
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+        let configuration: ButtonStyleConfiguration
+
+        var body: some View {
+            configuration.label
+                .scaleEffect(configuration.isPressed && !reduceMotion ? theme.motion.pressedScale : 1)
+                // Asymmetric: the press lands immediately, the release settles.
+                .animation(configuration.isPressed ? theme.motion.pressIn : theme.motion.snappy, value: configuration.isPressed)
+        }
     }
 }
 

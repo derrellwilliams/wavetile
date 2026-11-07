@@ -5,6 +5,10 @@ import Foundation
 /// Security: URLSession keeps every header on a redirect, `Authorization` included, so a reverse
 /// proxy that answers 302 to another host (or to HTTP) would hand that host the token. Redirects
 /// on the same origin keep it; cross-origin reads drop it and writes are refused.
+///
+/// Limit: this only runs for default and ephemeral sessions. A background `URLSession` always
+/// follows redirects without asking its delegate, so background downloads can't be stopped
+/// mid-redirect; they use `leftOrigin` afterwards to halt and contain the exposure.
 public final class RedirectGuard: NSObject, URLSessionTaskDelegate, Sendable {
     public static let shared = RedirectGuard()
 
@@ -26,6 +30,13 @@ public final class RedirectGuard: NSObject, URLSessionTaskDelegate, Sendable {
         var request = request
         request.setValue(nil, forHTTPHeaderField: "Authorization")
         return request
+    }
+
+    /// True when a finished or failed task ended up on a different origin than the one requested,
+    /// which is how a background session (that can't veto redirects) reveals a redirect off the server.
+    public static func leftOrigin(requested original: URL?, ended final: URL?) -> Bool {
+        guard let original, let final else { return false }
+        return !isSameOrigin(original, final)
     }
 
     static func isSameOrigin(_ a: URL, _ b: URL) -> Bool {

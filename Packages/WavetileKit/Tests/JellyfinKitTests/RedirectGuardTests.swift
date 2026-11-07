@@ -55,4 +55,21 @@ struct RedirectGuardTests {
         request.httpBodyStream = InputStream(data: Data("secret".utf8))
         #expect(RedirectGuard.request(request, redirectedFrom: URL(string: "https://music.example/file")) == nil)
     }
+
+    @Test(arguments: [
+        ("https://music.example.com/Audio/1", "https://music.example.com/Audio/1", false),
+        ("https://music.example.com/Audio/1", "https://MUSIC.example.com:443/proxy/1", false),
+        ("https://music.example.com/Audio/1", "https://cdn.example.net/1.flac", true),
+        ("https://music.example.com/Audio/1", "http://music.example.com/Audio/1", true),
+        ("http://192.168.1.5:8096/Audio/1", "http://192.168.1.6:8096/Audio/1", true),
+    ])
+    func detectsBackgroundRedirectOffOrigin(_ requested: String, _ ended: String, _ expected: Bool) {
+        #expect(RedirectGuard.leftOrigin(requested: URL(string: requested), ended: URL(string: ended)) == expected)
+    }
+
+    @Test
+    func unknownURLsAreNotTreatedAsRedirects() {
+        #expect(!RedirectGuard.leftOrigin(requested: nil, ended: URL(string: "https://a.example")))
+        #expect(!RedirectGuard.leftOrigin(requested: URL(string: "https://a.example"), ended: nil))
+    }
 }

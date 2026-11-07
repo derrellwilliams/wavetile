@@ -98,6 +98,11 @@ public final class AudioPlayer {
     @ObservationIgnored private var artworkTask: Task<Void, Never>?
     @ObservationIgnored private var isSeeking = false
     @ObservationIgnored private var sleepTask: Task<Void, Never>?
+    /// Tracks in a row that failed to play; reset once something plays for a moment.
+    @ObservationIgnored private var consecutiveFailures = 0
+    /// After this many failures in a row (an expired sign-in, a server error) playback stops
+    /// instead of skipping on, which under repeat-all would wrap around the queue forever.
+    private static let maxConsecutiveFailures = 10
 
     private struct Entry {
         let track: QueuedTrack
@@ -132,6 +137,7 @@ public final class AudioPlayer {
         }
         queue = PlaybackQueue(tracks: tracks, startAt: index, shuffled: shuffled)
         queue.repeatMode = .off
+        consecutiveFailures = 0
         isPlaying = true
         loadCurrent()
         return true
@@ -212,6 +218,7 @@ public final class AudioPlayer {
             return notifyOffline()
         }
         queue.jump(to: queueID)
+        consecutiveFailures = 0
         isPlaying = true
         loadCurrent()
     }
@@ -461,6 +468,7 @@ public final class AudioPlayer {
             MainActor.assumeIsolated {
                 guard let self, !self.isSeeking else { return }
                 self.currentTime = time.seconds.isFinite ? time.seconds : 0
+                if self.currentTime >= 1 { self.consecutiveFailures = 0 }
                 if let itemDuration = self.player.currentItem?.duration.seconds, itemDuration.isFinite, itemDuration > 0 {
                     self.duration = itemDuration
                 }
@@ -553,6 +561,12 @@ public final class AudioPlayer {
         }
         let fallback = queue.current?.isEpisode == true ? "This episode couldn't be played." : "This track couldn't be played."
         errorMessage = item.error?.localizedDescription ?? fallback
+        consecutiveFailures += 1
+        if consecutiveFailures >= min(queue.items.count, Self.maxConsecutiveFailures) {
+            consecutiveFailures = 0
+            pause()
+            return
+        }
         // Skip unplayable tracks rather than stalling the queue.
         if queue.skipForward() { loadCurrent() } else { pause() }
     }
