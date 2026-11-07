@@ -8,7 +8,7 @@ Consolidated 2026-11-06 from `docs/LAUNCH.md`, project-memory `pre-submission-qa
 
 | Area | State / evidence |
 |---|---|
-| Candidate | Version 1.0.0, build 202611061403, from commit `4e2377f`; archive and TestFlight upload succeeded November 6 (subdued artwork placeholders). Xcode reported uploaded package processing; processing completion and external availability not verified |
+| Candidate | Version 1.0.0, build 202611061835, from commit `2a52299`; archive and TestFlight upload succeeded November 6 (includes shortened download quality label). Xcode reported uploaded package processing; processing completion and external availability not verified |
 | Public beta | Build 202610281900 previously approved for external testing; public link https://testflight.apple.com/join/pk9dyfMq. Approval of that build does not establish approval of the latest one |
 | Signing / CarPlay | Developer team, app record and App Group setup completed sufficiently for uploads. CarPlay Audio granted and enabled on App ID; signed CarPlay build 202610301302 uploaded October 30 (`8af183f`) |
 | Automated QA | November 5: 94/94 package tests under ASan and TSan, no reports; final plain UI run 17/17. See evidence below |
