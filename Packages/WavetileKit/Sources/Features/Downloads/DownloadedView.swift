@@ -5,7 +5,7 @@ import Podcasts
 import SwiftUI
 
 /// Everything on the device: downloaded albums and playlists, with progress, and (with podcasts
-/// on) downloaded episodes behind a Music | Podcasts filter. (Storage used is in Settings.)
+/// on) downloaded episodes behind a Music | Podcasts filter. (Sizes live in `StorageView`.)
 struct DownloadedView: View {
     @ObserveInjection var inject
     @Environment(\.theme) private var theme
@@ -18,6 +18,7 @@ struct DownloadedView: View {
     @State private var statusCollection: DownloadCollectionRecord?
     @State private var collections: [DownloadedCollection] = []
     @State private var confirmRemoveAll = false
+    @State private var showStorage = false
     @State private var filter: MediaKind = .music
     @State private var episodes: [EpisodeItem] = []
     /// Set after each list's first read, so its empty state doesn't flash in before it loads.
@@ -50,13 +51,15 @@ struct DownloadedView: View {
             }
             .tabRootChrome {
                 Menu {
+                    Button("Manage Storage", glyph: .downloads) { showStorage = true }
                     Button("Remove All Downloads", glyph: .trash, role: .destructive) { confirmRemoveAll = true }
+                        .disabled(showsPodcasts ? episodes.isEmpty : collections.isEmpty)
                 } label: {
                     TintedBarIcon(glyph: .more)
                 }
                 .accessibilityLabel("More")
-                .disabled(showsPodcasts ? episodes.isEmpty : collections.isEmpty)
             }
+            .sheet(isPresented: $showStorage) { StorageView() }
             .libraryDestinations(zoom: zoom) { path.append($0) }
             .podcastDestinations(zoom: zoom) { path.append($0) }
             .task {
@@ -161,7 +164,7 @@ struct DownloadedView: View {
         if item.status.paused > 0 { return "Paused · \(item.status.done) of \(item.status.total) songs" }
         if item.status.isInProgress { return "\(item.status.done) of \(item.status.total) songs" }
         if item.status.failed > 0 { return "\(item.status.failed) failed" }
-        return "\(item.collection.subtitle) · \(ByteCountFormatter.string(fromByteCount: item.bytes, countStyle: .file))"
+        return item.collection.subtitle
     }
 }
 

@@ -7,22 +7,33 @@ import SwiftUI
 /// with Phosphor icons; the form handles separators, highlights, headers and large text stacking.
 struct SettingsForm<Content: View>: View {
     @Environment(\.theme) private var theme
+    var selection: Binding<Set<String>>?
     @ViewBuilder let content: Content
 
+    init(selection: Binding<Set<String>>? = nil, @ViewBuilder content: () -> Content) {
+        self.selection = selection
+        self.content = content()
+    }
+
     var body: some View {
-        Form {
-            Group { content }
-                .listRowBackground(theme.palette.surface)
+        if let selection {
+            styled(List(selection: selection) { Group { content }.listRowBackground(theme.palette.surface) }.listStyle(.insetGrouped))
+        } else {
+            styled(Form { Group { content }.listRowBackground(theme.palette.surface) })
         }
-        .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
-        .scrollIndicators(.hidden)
-        .font(theme.typography.body)
-        .labelStyle(.tintedIcon)
-        .toggleStyle(.switch)
-        .tint(theme.palette.toggle)
-        .foregroundStyle(theme.palette.textPrimary)
-        .themedBackground()
+    }
+
+    private func styled(_ form: some View) -> some View {
+        form
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+            .scrollIndicators(.hidden)
+            .font(theme.typography.body)
+            .labelStyle(.tintedIcon)
+            .toggleStyle(.switch)
+            .tint(theme.palette.toggle)
+            .foregroundStyle(theme.palette.textPrimary)
+            .themedBackground()
     }
 }
 

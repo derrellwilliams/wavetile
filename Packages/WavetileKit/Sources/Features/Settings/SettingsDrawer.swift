@@ -16,7 +16,9 @@ struct SettingsDrawer: View {
     @State private var confirmSignOut = false
     @State private var signOutFailed = false
     @State private var confirmRemoveDownloads = false
+    @State private var showStorage = false
     @Environment(DownloadsStore.self) private var downloads
+    @Environment(PodcastsStore.self) private var podcasts
     @Environment(AudioPlayer.self) private var player
 
     var body: some View {
@@ -102,7 +104,10 @@ struct SettingsDrawer: View {
             Toggle(isOn: $downloads.allowCellular) {
                 Label("Use Cellular Data", glyph: .address)
             }
-            SettingsValue("Storage Used", glyph: .downloads, value: ByteCountFormatter.string(fromByteCount: downloads.totalBytes, countStyle: .file))
+            Button { showStorage = true } label: {
+                SettingsValue("Storage Used", glyph: .downloads, value: StorageView.size(downloads.totalBytes + podcasts.totalBytes))
+            }
+            .sheet(isPresented: $showStorage) { StorageView() }
             Button {
                 confirmRemoveDownloads = true
             } label: {
