@@ -163,6 +163,11 @@ public struct PlaybackQueue: Sendable, Equatable {
         for offset in source.reversed() { upcoming.remove(at: offset) }
         upcoming.insert(contentsOf: moving, at: insertAt)
         items.replaceSubrange((index + 1)..., with: upcoming)
+        // Preserve an explicit edit when shuffle is later disabled. While shuffled, only
+        // reorder the affected upcoming entries in their existing original-order slots.
+        let editedIDs = Set(upcoming.map(\.queueID))
+        var reordered = upcoming.map(\.queueID).makeIterator()
+        originalOrder = originalOrder.map { editedIDs.contains($0) ? reordered.next()! : $0 }
     }
 
     public mutating func setShuffle(_ on: Bool) {

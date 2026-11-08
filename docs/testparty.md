@@ -14,6 +14,7 @@ For each check record device, iOS version, build, date, pass/fail and reproducti
 
 ## Security and review access (QA-2 / QA-3 / QA-8)
 
+- [ ] Verify a delayed playback failure followed by a retry of the same track does not skip or pause the new attempt (R2-01); use an engineering-controlled delayed connectivity check.
 - [ ] Verify audio-session changes using rows 23–29 below: interruptions, route changes, AirPlay and CarPlay. Watch for playback that never starts after interruption or starts after being paused.
 - [ ] Verify AVFoundation streaming redirects with an engineering-prepared proxy: redirect an audio request to a second controlled host and confirm no Authorization header reaches it. Use test credentials only; redact credentials from evidence.
 - [ ] Verify Keychain cleanup on device: sign out, relaunch and confirm the session cannot restore; exercise lock/unlock and failed-deletion retry with engineering assistance. Signed-out UI alone does not prove token deletion. Record evidence of cleanup separately from best-effort server revocation.

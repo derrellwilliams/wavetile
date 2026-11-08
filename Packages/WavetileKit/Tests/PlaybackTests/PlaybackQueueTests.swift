@@ -75,6 +75,25 @@ struct PlaybackQueueTests {
         #expect(queue.current?.trackID == "t0")
     }
 
+    @Test func manualOrderSurvivesShuffleRoundTrip() {
+        var queue = PlaybackQueue(tracks: tracks(4))
+        queue.moveUpNext(fromOffsets: [2], toOffset: 0)
+        queue.setShuffle(true)
+        queue.setShuffle(false)
+        #expect(queue.items.map(\.trackID) == ["t0", "t3", "t1", "t2"])
+    }
+
+    @Test func reorderWhileShuffledSurvivesUnshuffle() {
+        var queue = PlaybackQueue(tracks: tracks(5), startAt: 2)
+        queue.setShuffle(true)
+        queue.moveUpNext(fromOffsets: [3], toOffset: 0)
+        let editedOrder = queue.upNext.map(\.queueID)
+        let current = queue.current!.queueID
+        queue.setShuffle(false)
+        #expect(queue.current?.queueID == current)
+        #expect(queue.items.filter { $0.queueID != current }.map(\.queueID) == editedOrder)
+    }
+
     @Test func duplicatesAreDistinctEntries() {
         var queue = PlaybackQueue(tracks: tracks(1))
         queue.append([queue.current!.requeued()])

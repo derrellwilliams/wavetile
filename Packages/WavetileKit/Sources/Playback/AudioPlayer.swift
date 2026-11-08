@@ -100,6 +100,7 @@ public final class AudioPlayer {
     @ObservationIgnored private var sleepTask: Task<Void, Never>?
     /// Tracks in a row that failed to play; reset once something plays for a moment.
     @ObservationIgnored private var consecutiveFailures = 0
+    @ObservationIgnored private var playbackIntentGeneration = 0
     /// After this many failures in a row (an expired sign-in, a server error) playback stops
     /// instead of skipping on, which under repeat-all would wrap around the queue forever.
     private static let maxConsecutiveFailures = 10
@@ -149,6 +150,7 @@ public final class AudioPlayer {
 
     public func resume() {
         guard hasQueue else { return }
+        playbackIntentGeneration += 1
         if player.currentItem == nil || player.currentItem?.status == .failed { loadCurrent() }
         isPlaying = true
         playOnceSessionIsActive()
@@ -157,6 +159,7 @@ public final class AudioPlayer {
     }
 
     public func pause() {
+        playbackIntentGeneration += 1
         isPlaying = false
         player.pause()
         reportProgress(force: true)
@@ -534,10 +537,13 @@ public final class AudioPlayer {
         guard let track = queue.current else { return }
         // Confirm before treating the source as down: one slow or dropped stream isn't an outage.
         if let recheck = onConnectionError {
+            let intentGeneration = playbackIntentGeneration
             Task {
                 await recheck(track)
                 // Unless the listener has moved on in the meantime.
-                guard queue.current?.queueID == track.queueID else { return }
+                guard player.currentItem === item,
+                      playbackIntentGeneration == intentGeneration,
+                      queue.current?.queueID == track.queueID else { return }
                 skipFailed(item, track)
             }
             return

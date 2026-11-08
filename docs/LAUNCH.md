@@ -80,7 +80,7 @@ Review the full app in bounded subsystems, then review interactions across their
 | Order | Scope | Status |
 |---|---|---|
 | 1 | Authentication/networking: credentials, redirects, transport, restore, logout and server switching | Initial source review and R1-01/R1-02 fixes Nov 7; device evidence outstanding |
-| 2 | Playback/queue: concurrency, transitions, interruptions, background operation and restoration | Pending |
+| 2 | Playback/queue: concurrency, transitions, interruptions, background operation and restoration | Initial source review and R2-01/R2-02 fixes Nov 7; device evidence outstanding |
 | 3 | Persistence/library sync: migrations, partial sync, stale records and account isolation | Pending |
 | 4 | Downloads/offline: interruption, missing files, cleanup and fallback | Pending |
 | 5 | Podcasts: malformed feeds, subscription sync, progress and external URLs | Pending |
@@ -92,6 +92,8 @@ Each pass traces user flows through dependencies and records findings with sourc
 
 - [x] **R1-01 (high):** blocked cross-origin redirects when the original or destination URL contains credential query parameters/userinfo; regression coverage added Nov 7. See qa-evidence.md.
 - [x] **R1-02 (medium):** added a persistent reauthentication action on authenticated API 401s, media-failure credential checks, and in-place credential replacement for the same account. Automated recovery/data-preservation coverage added Nov 7; final-device interaction check remains in testparty.
+- [x] **R2-01 (high):** delayed failure recovery now checks the current player item and playback intent generation. Device verification remains open; see qa-evidence.md.
+- [x] **R2-02 (medium):** preserve Up Next reordering across shuffle toggles, including edits while shuffled. See qa-evidence.md.
 - [ ] Complete the existing media-redirect and Keychain device checks in testparty before closing section 1. Review server-switch cancellation/data isolation further in sections 3, 4 and 8.
 
 ### P2 — Deferred (explicit)

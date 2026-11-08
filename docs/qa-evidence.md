@@ -225,3 +225,23 @@ Supersedes the open implementation status above. **R1-01:** the redirect guard n
 **Results (iPhone 18 Pro Max, iOS 27.0):** full package attempt `build/Logs/Test/Test-WavetileKit-Package-2026.11.07_19-45-16--0700.xcresult` passed 154 tests (208 parameterized runs); the single new feature test failed because the unhosted package runner lacked Keychain entitlements (`-34018`). After changing that test to the existing injected credential-store seam, targeted FeaturesTests passed 1/1 with zero runtime warnings: `build/Logs/Test/Test-WavetileKit-Package-2026.11.07_19-46-09--0700.xcresult`. An earlier test-build isolation error in the mock URLProtocol was corrected by making that helper nonisolated. No production changes followed the full package attempt; the final change was test-harness-only. `git diff --check` passed.
 
 **Remaining verification:** final-device sign-in-sheet interactions, real revoked-session playback recovery, OS Keychain behavior, and AVFoundation/background redirect observation remain in testparty. No UI suite, archive, upload, dependency update, commit or push in this fix pass.
+
+## Targeted review 2 — playback and queue — November 7, 2026
+
+**Scope:** source review of `PlaybackQueue.swift`, `AudioPlayer.swift`, queue tests and app failure callback. No runtime changes or device checks. Gapless transitions, interruptions, routing, AirPlay and CarPlay remain device gates in testparty; queue tests do not establish AVFoundation behavior.
+
+### R2-01 — High: an old failure can skip a retried current track
+
+`AudioPlayer.swift`, `itemFailed(_:)` starts an asynchronous connection/authentication check and verifies only the queue ID after it returns. If the listener presses Play during that check, `resume()` replaces the failed AVPlayerItem with a new one for the same queue entry. The old check passes the queue-ID guard and can skip or pause the newly retried item. Reproduce by delaying the check after a music failure, pressing Play, then allowing it to return. This is source-traced, not yet reproduced in AVFoundation. Check the current AVPlayerItem and playback intent/generation after the await; add a delayed-check regression and verify on device.
+
+### R2-02 — Medium: manually reordered Up Next is lost after shuffle toggle
+
+`PlaybackQueue.swift`, `moveUpNext(fromOffsets:toOffset:)` modifies `items` but never updates `originalOrder`. `setShuffle(false)` reconstructs `items` from `originalOrder`, discarding the explicit reorder. With A/B/C, move C before B, toggle shuffle on then off; order returns to A/B/C. Confirm semantics for edits made while shuffled, preserve the explicit reorder, and add deterministic queue tests. Source-traced; no new test run.
+
+**Additional limitations:** shuffle includes tracks already played when it reshuffles; whether that is intended needs a product decision. The queue is not persisted across app relaunch; whether restoration is a release requirement is not established. Device checks remain open.
+
+### R2-01 / R2-02 fixes — November 7, 2026
+
+Failure recovery now checks that the failed AVPlayerItem remains current, that the queue entry is unchanged, and that no pause/resume intent occurred during the asynchronous check. Reordering Up Next now updates the saved unshuffled order; while shuffled, edited entries occupy their existing unshuffled slots in the chosen relative order. Added deterministic tests for reorders before and during shuffle.
+
+**Verification:** targeted PlaybackTests passed on iPhone 18 Pro Max simulator (iOS 27.0), result `build/Logs/Test/Test-WavetileKit-Package-2026.11.07_20-00-05--0700.xcresult`. No automated delayed AVFoundation failure/retry test was added; the specific race still requires controlled device verification. Existing device playback, interruption, gapless and CarPlay gates remain open.
