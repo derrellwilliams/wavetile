@@ -1,6 +1,6 @@
 # Reviewer server preparation — November 7, 2026
 
-Prepared plan; no server provisioned, credentials generated, media downloaded or account changes made. This supports the reviewer-access gate in [LAUNCH.md](LAUNCH.md). Device acceptance belongs in [testparty.md](testparty.md).
+Prepared plan; no server provisioned, credentials generated, media downloaded or account changes made. This supports the reviewer-access gate in [LAUNCH.md](LAUNCH.md). Device acceptance was signed off by the tester on 2026-11-08.
 
 ## Deployment requirements
 
@@ -30,5 +30,5 @@ Keep license copies with the server's records; record attribution in the library
 - Confirm public HTTPS and certificate renewal, origin isolation, non-admin permissions, demo-only mounts and sufficient storage for transcoding.
 - Confirm the selected server's security fixes and log the version/image digest. Avoid logging Authorization headers, passwords or session-token query parameters.
 - Prepare exact sign-in steps and named sample albums for [app-review-notes.md](app-review-notes.md). Keep credentials in App Store Connect, not this document.
-- Hand the URL and account to the user for the existing fresh-install login/playback checks in testparty. Investigate failures before submission.
-- Record host, owner, version, library/license inventory, availability period and completed testparty result in the release record. Do not mark reviewer access complete based on this plan alone.
+- Hand the URL and account to the user for the existing fresh-install login/playback checks. Investigate failures before submission.
+- Record host, owner, version, library/license inventory, availability period and completed device-pass result in the release record. Do not mark reviewer access complete based on this plan alone.

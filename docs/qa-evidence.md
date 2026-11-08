@@ -145,7 +145,7 @@ Still open for QA-4: nothing in scope. Migration tests for `downloadedTrack` boo
 
 **Runtime warnings in the UI run, found and fixed the same day:** the first UI run showed `Accessing Environment<Bool>'s / Environment<Theme>'s value outside of being installed on a View` (about 17 each, so the Nov 7 `ButtonStyle` change had not been the cause) and `AVAudioSession_iOS.mm:978 … UI unresponsiveness if called on the main thread` (once).
 - **Environment warning, cause found with a symbolicated backtrace** (`xcrun simctl spawn booted log stream --backtrace`, then `atos` against `Wavetile.debug.dylib`): `TintedSystemBack.Style.render()` drew the back chevron with `TintedBarIcon(glyph: .back).icon`, reading a computed property off a bare struct that was never installed in a view. Its `@Environment` reads (theme, enabled) therefore returned the defaults. This was a real defect, not only a warning: the chevron was drawn in the default Dark theme's accent whatever theme the app used, and `.environment(\.theme, theme)` applied afterward didn't reach it. Fix: `TintedBarIcon` has a `plain` mode that draws just the icon from its own `body`, the renderer uses that, and `icon` is private (`Features/Main/MainTabView.swift`). The Nov 7 `ButtonStyle` rewrite stays; it's harmless.
-- **AVAudioSession warning, fixed (was "keep for 1.0").** `AudioPlayer` now sets the category and activates the session on one serial background queue and calls `player.play()` once activation completes, only if no newer request overtook it and the listener hasn't paused; `stop()` queues the deactivation on the same queue, so activate and deactivate keep call order. Now Playing and progress reporting follow `isPlaying`, so only the audio start waits for the session (typically milliseconds). **Not verified on a device:** interruptions, route changes, AirPlay and CarPlay still need the device pass (rows 23-29 in [carplay-device-checklist.md](carplay-device-checklist.md)); a start that never fires after an interruption is the failure to look for.
+- **AVAudioSession warning, fixed (was "keep for 1.0").** `AudioPlayer` now sets the category and activates the session on one serial background queue and calls `player.play()` once activation completes, only if no newer request overtook it and the listener hasn't paused; `stop()` queues the deactivation on the same queue, so activate and deactivate keep call order. Now Playing and progress reporting follow `isPlaying`, so only the audio start waits for the session (typically milliseconds). **Not verified on a device:** interruptions, route changes, AirPlay and CarPlay still need the device pass (rows 23-29 of the removed CarPlay device checklist); a start that never fires after an interruption is the failure to look for.
 
 **Verification after the fixes:** package scheme 150/150 (196 runs), 0 failures (`Test-WavetileKit-Package-2026.11.07_18-25-07--0700.xcresult`); `Wavetile` UI scheme 17/17 with an empty `runtimeWarnings` list (`Test-Wavetile-2026.11.07_18-37-38--0700.xcresult`), against about 35 warnings before. One earlier full run after the fixes failed `HomeTests/testWaveAndHomeTabScrollToTop` ("Wave tap didn't scroll to the top", 168.0 vs 1449.3); it passed when run alone and in the next full run, so it is recorded as a one-off with no cause found. Watch for it recurring.
 
@@ -186,7 +186,7 @@ All ten pinned revisions/versions match `build/SourcePackages/workspace-state.js
 
 **Live policy:** direct HTTPS GETs to privacy and support returned 200. The privacy page's `<main>` content exactly matches `site/privacy.html`, including Keychain retry and remote-revocation wording. Earlier “local until deployed” status is superseded; no deployment performed in this pass. The web-fetch tool could not access these URLs, so the comparison used ordinary HTTPS requests from the workspace.
 
-**Validation:** checked listing field limits and reviewer-notes byte limit, local Markdown link targets and `git diff --check`. Documentation and advisory evidence only; no runtime code changed, so no additional app tests run. App Store Connect entry, final archive/privacy report, service-retention confirmation, demo provisioning/media licensing and testparty sign-off remain open.
+**Validation:** checked listing field limits and reviewer-notes byte limit, local Markdown link targets and `git diff --check`. Documentation and advisory evidence only; no runtime code changed, so no additional app tests run. App Store Connect entry, final archive/privacy report, service-retention confirmation, demo provisioning/media licensing and device sign-off remain open.
 
 ## Targeted review 1 — authentication and networking — November 7, 2026
 
@@ -212,7 +212,7 @@ Restoration trusts the locally stored session, and a sync authorization failure 
 
 **Existing protections confirmed in source:** remote HTTP is rejected during address validation and filtered on restore; login bodies are blocked on cross-origin redirects; tokens use device-only Keychain storage; failed deletion identifiers are queued for retry without restoring signed-out sessions; API/media construction uses Authorization headers rather than token query parameters. These observations do not establish safety of every redirect transport.
 
-**Remaining limits:** LAN HTTP identity matching is not authentication against an active attacker; AVFoundation/background redirect behavior and real-device Keychain lock/unlock remain existing testparty gates. Logout revocation is best effort. Full cancellation/account-isolation behavior during in-flight work belongs to the later persistence/download/boundary passes. No dependency versions changed or advisory scan rerun; the earlier November 7 inventory record and final-archive gate remain applicable.
+**Remaining limits:** LAN HTTP identity matching is not authentication against an active attacker; AVFoundation/background redirect behavior and real-device Keychain lock/unlock remain existing device-pass gates. Logout revocation is best effort. Full cancellation/account-isolation behavior during in-flight work belongs to the later persistence/download/boundary passes. No dependency versions changed or advisory scan rerun; the earlier November 7 inventory record and final-archive gate remain applicable.
 
 ### R1-01 / R1-02 fixes and verification — November 7, 2026
 
@@ -224,11 +224,11 @@ Supersedes the open implementation status above. **R1-01:** the redirect guard n
 
 **Results (iPhone 18 Pro Max, iOS 27.0):** full package attempt `build/Logs/Test/Test-WavetileKit-Package-2026.11.07_19-45-16--0700.xcresult` passed 154 tests (208 parameterized runs); the single new feature test failed because the unhosted package runner lacked Keychain entitlements (`-34018`). After changing that test to the existing injected credential-store seam, targeted FeaturesTests passed 1/1 with zero runtime warnings: `build/Logs/Test/Test-WavetileKit-Package-2026.11.07_19-46-09--0700.xcresult`. An earlier test-build isolation error in the mock URLProtocol was corrected by making that helper nonisolated. No production changes followed the full package attempt; the final change was test-harness-only. `git diff --check` passed.
 
-**Remaining verification:** final-device sign-in-sheet interactions, real revoked-session playback recovery, OS Keychain behavior, and AVFoundation/background redirect observation remain in testparty. No UI suite, archive, upload, dependency update, commit or push in this fix pass.
+**Remaining verification:** final-device sign-in-sheet interactions, real revoked-session playback recovery, OS Keychain behavior, and AVFoundation/background redirect observation remain in the device pass. No UI suite, archive, upload, dependency update, commit or push in this fix pass.
 
 ## Targeted review 2 — playback and queue — November 7, 2026
 
-**Scope:** source review of `PlaybackQueue.swift`, `AudioPlayer.swift`, queue tests and app failure callback. No runtime changes or device checks. Gapless transitions, interruptions, routing, AirPlay and CarPlay remain device gates in testparty; queue tests do not establish AVFoundation behavior.
+**Scope:** source review of `PlaybackQueue.swift`, `AudioPlayer.swift`, queue tests and app failure callback. No runtime changes or device checks. Gapless transitions, interruptions, routing, AirPlay and CarPlay remain device gates in the device pass; queue tests do not establish AVFoundation behavior.
 
 ### R2-01 — High: an old failure can skip a retried current track
 
@@ -320,7 +320,7 @@ Account folder and file-name sanitizing, protection class and backup exclusion, 
 - **Duplicate Live Activity:** starting a download again while one is running for the same collection requests a second activity.
 - **Download folder name** uses the same non-injective ID sanitizing noted under R3 (section 8).
 
-**Verification:** package scheme passed on iPhone 18 Pro Max (iOS 27.0): 163 tests, 217 runs, 0 failures, no runtime warnings (`build/Logs/Test/Test-WavetileKit-Package-2026.11.07_21-06-16--0700.xcresult`). New tests: `missingFilesGoBackInTheQueue` and `rejectsEmptyAndNonAudioBodies`. Not automated: R4-01's read-error path (needs a `DownloadManager` with a failing database) and the `DownloadManager` delegate paths. Device checks for interruption, airplane mode and relaunch are tracked in testparty.
+**Verification:** package scheme passed on iPhone 18 Pro Max (iOS 27.0): 163 tests, 217 runs, 0 failures, no runtime warnings (`build/Logs/Test/Test-WavetileKit-Package-2026.11.07_21-06-16--0700.xcresult`). New tests: `missingFilesGoBackInTheQueue` and `rejectsEmptyAndNonAudioBodies`. Not automated: R4-01's read-error path (needs a `DownloadManager` with a failing database) and the `DownloadManager` delegate paths. Device checks for interruption, airplane mode and relaunch are tracked in the device pass.
 
 ## Targeted review 5 — podcasts — 2026-11-07
 
@@ -360,11 +360,11 @@ Feed size cap and 304/hash short-circuit; HTTPS-only fetching with `http`→`htt
 - **Orphan episode files** from a crash between move and row update are not swept (same reasoning as music in section 4).
 - **Podcast folder name** uses the non-injective ID sanitizing noted under R3 (section 8).
 
-**Verification:** package scheme passed on iPhone 18 Pro Max (iOS 27.0): 173 tests, 230 runs, 0 failures, no runtime warnings (`build/Logs/Test/Test-WavetileKit-Package-2026.11.07_21-10-04--0700.xcresult`). New tests: four `FeedParserTests` cases (normal, trailing junk, broken partway, cut off before the title), three `PodcastDatabaseTests` cases (partial feed, removed-download update, missing-file requeue) and `PodcastSyncDamagedCopyTests` (truncated, malformed, wrong-shape and missing lists; a newer readable list and a deliberate empty list still apply). Not automated: the `EpisodeDownloadManager` delegate paths and `PodcastsStore.sync`/`apply` end to end. Device checks for feeds, sync across two devices and background refresh are tracked in testparty.
+**Verification:** package scheme passed on iPhone 18 Pro Max (iOS 27.0): 173 tests, 230 runs, 0 failures, no runtime warnings (`build/Logs/Test/Test-WavetileKit-Package-2026.11.07_21-10-04--0700.xcresult`). New tests: four `FeedParserTests` cases (normal, trailing junk, broken partway, cut off before the title), three `PodcastDatabaseTests` cases (partial feed, removed-download update, missing-file requeue) and `PodcastSyncDamagedCopyTests` (truncated, malformed, wrong-shape and missing lists; a newer readable list and a deliberate empty list still apply). Not automated: the `EpisodeDownloadManager` delegate paths and `PodcastsStore.sync`/`apply` end to end. Device checks for feeds, sync across two devices and background refresh are tracked in the device pass.
 
 ## Targeted review 6 — system integrations — 2026-11-07
 
-Reviewed `Features/CarPlay/CarPlayController.swift` and `App/CarPlaySceneDelegate.swift`; `App/MusicIntents.swift` with `Features/Siri/SiriLibrary.swift`; `Shared/PlaybackIntents.swift`, `PlaybackCommandCenter`, `WidgetSnapshots` (`WidgetStore`, `WidgetLink`) and `Features/Widgets/WidgetBridge.swift`; the widget views and `DownloadLiveActivity`; the Live Activity driver in `DownloadsStore`; the deep-link handler in `MainTabView`; entitlements and Info.plist entries in `project.yml`; and how sign-out reaches each of them. Real CarPlay, Siri, Lock Screen widget and Live Activity behavior can't be exercised here; those checks stay in testparty.
+Reviewed `Features/CarPlay/CarPlayController.swift` and `App/CarPlaySceneDelegate.swift`; `App/MusicIntents.swift` with `Features/Siri/SiriLibrary.swift`; `Shared/PlaybackIntents.swift`, `PlaybackCommandCenter`, `WidgetSnapshots` (`WidgetStore`, `WidgetLink`) and `Features/Widgets/WidgetBridge.swift`; the widget views and `DownloadLiveActivity`; the Live Activity driver in `DownloadsStore`; the deep-link handler in `MainTabView`; entitlements and Info.plist entries in `project.yml`; and how sign-out reaches each of them. Real CarPlay, Siri, Lock Screen widget and Live Activity behavior can't be exercised here; those checks stay in the device pass.
 
 ### R6-01 — High (fixed): sign-out deleted the podcast database while its store was still using it
 
@@ -395,13 +395,13 @@ Deep links: `wavetile://album/<id>` only navigates, after a lookup in the signed
 - **Lock Screen exposure by design:** Siri, the widget buttons and the Now Playing widget work with the phone locked (the same as Apple Music), so a listener can start playback and see the current title and artist without unlocking. Requiring authentication would break Siri in CarPlay with a locked phone. Accepted; mention in privacy answers if reviewers ask what Siri learns (names stay on the device).
 - **CarPlay offline feedback:** with nothing playable offline, picking a row does nothing and the list doesn't dim downloaded music the way the phone does. Needs a CarPlay-specific design.
 - **CarPlay refresh under steady writes:** the one-second debounce restarts on every database write, so lists don't refresh while a download or sync is writing continuously; they refresh when it settles.
-- **Dynamic Island and Lock Screen layouts, widget families and CarPlay templates** need device review (testparty); the Live Activity text shows the album or playlist name by design.
+- **Dynamic Island and Lock Screen layouts, widget families and CarPlay templates** need device review (the device pass); the Live Activity text shows the album or playlist name by design.
 
 **Verification:** package scheme passed on iPhone 18 Pro Max (iOS 27.0): 175 tests, 243 runs, 0 failures, no runtime warnings (`build/Logs/Test/Test-WavetileKit-Package-2026.11.07_21-14-50--0700.xcresult`); the Wavetile app target also builds (it contains the Siri hook change). New tests: `WidgetLinkTests` (valid links and round-trip for odd IDs) and a check in the sign-out test that the podcast pool is closed. Not automated: Live Activity and Siri behavior, `recentsChanged` racing a sign-out, and `PodcastsStore.shutdown()` with a sync mid-flight. UI tests were not rerun.
 
 ## Targeted review 7 — screens and release configuration — 2026-11-07
 
-Reviewed `project.yml` (both targets, entitlements, Info.plist keys, ATS, background modes, launch and scene configuration), the generated entitlements and privacy manifests, `DebugFlags` and every `#if DEBUG` in the package, the sign-in flow and root view (`SignInModel`, `SignInFlow`, `RootView`), the shared error surfaces (`LibraryActions` alerts and banners, sign-out failure alert), the OPML importer, background refresh registration, and launch-argument use. Visual layout, Dynamic Type at the largest sizes, VoiceOver order and navigation on a device stay with the UI audit and testparty.
+Reviewed `project.yml` (both targets, entitlements, Info.plist keys, ATS, background modes, launch and scene configuration), the generated entitlements and privacy manifests, `DebugFlags` and every `#if DEBUG` in the package, the sign-in flow and root view (`SignInModel`, `SignInFlow`, `RootView`), the shared error surfaces (`LibraryActions` alerts and banners, sign-out failure alert), the OPML importer, background refresh registration, and launch-argument use. Visual layout, Dynamic Type at the largest sizes, VoiceOver order and navigation on a device stay with the UI audit and the device pass.
 
 ### Reviewed, no change needed
 
@@ -418,7 +418,7 @@ See R8-01; the code paths are in the app's launch (`makeSignedIn`) and the downl
 
 ### Deferred, with rationale
 
-- **Accessibility at the largest Dynamic Type sizes and VoiceOver order** can't be judged from source; the UI accessibility audit covers the main screens and device checks stay in testparty.
+- **Accessibility at the largest Dynamic Type sizes and VoiceOver order** can't be judged from source; the UI accessibility audit covers the main screens and device checks stay in the device pass.
 
 ## Targeted review 8 — cross-subsystem scenarios — 2026-11-07
 

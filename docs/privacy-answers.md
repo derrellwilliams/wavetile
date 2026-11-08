@@ -61,7 +61,7 @@ Select exact types, purposes, identity linkage and tracking from the verified fl
 - [ ] Confirm service/partner retention and reconcile the authenticated App Store Connect form before entry.
 - [ ] Generate the privacy report on the final archive and confirm it lists no unexpected SDK or data type.
 - [ ] If analytics, crash reporting or any new retaining service is added, reassess disclosure in the same release.
-- [ ] Record the date you entered the answers in [LAUNCH.md](LAUNCH.md).
+- [x] Entered and published in App Store Connect on 2026-11-08 (Data Not Collected); recorded in [LAUNCH.md](LAUNCH.md). Service/partner retention assumed none (tester's confirmation).
 
 ## Related submission answers (for the same sitting)
 

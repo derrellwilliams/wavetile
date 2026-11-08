@@ -1,6 +1,6 @@
 # App Store listing — prepared November 7, 2026
 
-Copy reviewed against source; not entered in App Store Connect. Final build and device sign-off remain in [LAUNCH.md](LAUNCH.md) and [testparty.md](testparty.md). Pricing, territories and category selection still need account confirmation.
+Copy reviewed against source; not entered in App Store Connect. Final build and device sign-off remain in [LAUNCH.md](LAUNCH.md) (device checks signed off 2026-11-08). Pricing, territories and category selection still need account confirmation.
 
 ## Fields
 
@@ -59,6 +59,6 @@ Use only the licensed demo library and fictional account details. No real server
 
 ## Source and submission checks
 
-Feature sources: `JellyfinKit/PlaybackAPI.swift`, `Downloads/DownloadManager.swift`, `Features/Settings/SettingsDrawer.swift`, `Features/Podcasts/PodcastsStore.swift`, `Features/CarPlay/CarPlayController.swift`, `Widgets/`. Device claims remain gated by testparty; remove any claim that fails final RC verification. No price or guaranteed audio fidelity is claimed.
+Feature sources: `JellyfinKit/PlaybackAPI.swift`, `Downloads/DownloadManager.swift`, `Features/Settings/SettingsDrawer.swift`, `Features/Podcasts/PodcastsStore.swift`, `Features/CarPlay/CarPlayController.swift`, `Widgets/`. Device claims remain gated by the device pass; remove any claim that fails final RC verification. No price or guaranteed audio fidelity is claimed.
 
 Field limits checked against [Apple app information](https://developer.apple.com/help/app-store-connect/reference/app-information/app-information/) and [platform version information](https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information/). Keep Jellyfin out of the app name under its [branding guidance](https://jellyfin.org/docs/general/contributing/branding/); subtitle use describes compatibility, not endorsement.
