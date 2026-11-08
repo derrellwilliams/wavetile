@@ -14,6 +14,7 @@ struct SettingsDrawer: View {
     let session: ServerSession
     @Binding var isOpen: Bool
     @State private var confirmSignOut = false
+    @State private var signOutFailed = false
     @State private var confirmRemoveDownloads = false
     @Environment(DownloadsStore.self) private var downloads
     @Environment(AudioPlayer.self) private var player
@@ -70,10 +71,15 @@ struct SettingsDrawer: View {
                 }
                 .confirmationDialog("Sign out of \(session.serverName)?", isPresented: $confirmSignOut, titleVisibility: .visible) {
                     Button("Sign Out", role: .destructive) {
-                        Task { await app.signOut() }
+                        Task { signOutFailed = !(await app.signOut()) }
                     }
                 }
             }
+        }
+        .alert("Couldn’t Sign Out", isPresented: $signOutFailed) {
+            Button("OK") {}
+        } message: {
+            Text("Close and reopen Wavetile, then try signing out again.")
         }
         .enableInjection()
     }

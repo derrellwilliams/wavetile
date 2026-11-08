@@ -18,6 +18,8 @@ final class LibraryStore {
     private let sync: LibrarySync
     @ObservationIgnored private var syncTask: Task<Void, Never>?
 
+    private var shuttingDown = false
+
     private(set) var progress: LibrarySync.Progress?
     private(set) var isSyncing = false
     private(set) var syncError: String?
@@ -47,6 +49,7 @@ final class LibraryStore {
     }
 
     func syncNow() async {
+        guard !shuttingDown else { return }
         // A manual refresh joins an automatic sync already in flight before reloading shelves.
         if let syncTask {
             await syncTask.value
@@ -56,6 +59,19 @@ final class LibraryStore {
         syncTask = task
         await task.value
         syncTask = nil
+    }
+
+    func shutdown() async -> Bool {
+        shuttingDown = true
+        syncTask?.cancel()
+        await syncTask?.value
+        syncTask = nil
+        do {
+            try database.pool.close()
+            return true
+        } catch {
+            return false
+        }
     }
 
     private func performSync() async {
@@ -68,6 +84,7 @@ final class LibraryStore {
         // Send plays from offline listening first, so the sync pulls counts that include them.
         await reportPendingPlays()
         do {
+            try Task.checkCancellation()
             try await sync.run { [weak self] progress in
                 Task { @MainActor in self?.progress = progress }
             }
@@ -85,6 +102,7 @@ final class LibraryStore {
     func reportPendingPlays() async {
         guard let plays = try? await database.pendingPlays() else { return }
         for play in plays {
+            guard !Task.isCancelled else { return }
             guard let id = play.id, await api.markPlayed(trackID: play.trackID, at: play.playedAt) else { return }
             try? await database.removePendingPlay(id: id)
         }

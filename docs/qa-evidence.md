@@ -245,3 +245,47 @@ Supersedes the open implementation status above. **R1-01:** the redirect guard n
 Failure recovery now checks that the failed AVPlayerItem remains current, that the queue entry is unchanged, and that no pause/resume intent occurred during the asynchronous check. Reordering Up Next now updates the saved unshuffled order; while shuffled, edited entries occupy their existing unshuffled slots in the chosen relative order. Added deterministic tests for reorders before and during shuffle.
 
 **Verification:** targeted PlaybackTests passed on iPhone 18 Pro Max simulator (iOS 27.0), result `build/Logs/Test/Test-WavetileKit-Package-2026.11.07_20-00-05--0700.xcresult`. No automated delayed AVFoundation failure/retry test was added; the specific race still requires controlled device verification. Existing device playback, interruption, gapless and CarPlay gates remain open.
+
+## Targeted review 3 — persistence/library sync — 2026-11-07
+
+Source review completed; findings below remain open, so this release gate is not closed. No implementation changes or automated/device runs in this pass. Reviewed LibrarySync, LibraryEditor, LibraryDatabase/migrations, SyncWrites, persistence records and download queries, LibraryStore and AppModel account lifecycle; traced downstream download reconciliation. Existing migration tests cover v1 upgrade, FTS after upgrade and idempotent reopening; this is coverage inspection, not a new passing run.
+
+### R3-01 — High: incomplete membership reads replace complete cached data
+
+`Library/LibrarySync.swift:236–247` returns playlist entries when a page is empty even if the accumulated count is below the reported total. `writePlaylist` (145–164) then replaces all cached entries. Collection children (188–215) use a single response, discard its total and replace membership or delete the collection as non-music. `Downloads/DownloadManager.swift:95–130` reconciles downloaded membership from that cache and removes orphaned files. A partial successful HTTP response can therefore remove offline music.
+
+Verification to add: seed a downloaded playlist with 600 entries; respond with 500/600 then an empty page. Assert the old membership and files survive and sync reports incomplete. Repeat for collection children with a truncated response, including a first page with only non-music children. Require a validated complete read before membership replacement or collection classification.
+
+### R3-02 — High: collection rename can permanently lose server membership
+
+`Library/LibraryEditor.swift:126–143` recreates a collection after a forbidden metadata update. It reads children once, converts absent Items to an empty array, ignores TotalRecordCount and then deletes the original after creating the replacement. A truncated successful response creates an incomplete replacement and destroys the original membership.
+
+Verification to add: force metadata-update 403, return one of two children (total 2), and assert no delete of the original is sent until every child is fetched and validated. An absent Items field must fail closed. This is a release-blocking destructive-operation finding, not the optional rename refactor.
+
+### R3-03 — High: unknown totals are treated as permission to prune
+
+`Library/LibrarySync.swift:281–293` stops after the first page when the total is absent and treats that page as complete (`total ?? 0`). The playlist list and collection list have equivalent fallbacks (133, 183). A response with omitted Items and total can be interpreted as an authoritative empty library; final pruning deletes cached rows and cascaded membership.
+
+Verification to add: seed two pages of tracks and return a first page without TotalRecordCount, then separately return an empty DTO. Neither may authorize deletion of unseen records. Validate completeness explicitly; distinguish an authoritative zero from missing metadata.
+
+### R3-04 — Medium: incomplete sync is recorded as successful
+
+`Library/LibrarySync.swift:47–62` omits pruning for a pass returning nil, but still advances lastCompleted. `Features/LibraryStore.swift:70–77` then sets hasSyncedOnce and invokes download reconciliation. A known incomplete library is shown as successfully refreshed and automatic retry is suppressed for an hour.
+
+Verification to add: return fewer unique IDs than the reported total; assert lastCompleted is unchanged, a retry/error is exposed and destructive downstream reconciliation is skipped. Retain safe page upserts.
+
+### R3-05 — High: logout deletes SQLite files while sync still owns the pool
+
+`Features/LibraryStore.swift:49–58` creates an unstructured sync task that retains the store. `Features/AppModel.swift:159–178` neither cancels nor awaits it and unlinks SQLite/WAL/SHM files without closing the pool. Old requests and writes can continue after logout; quickly reopening the same account creates another pool at the same path while the previous pool is alive. This violates safe SQLite lifecycle and undermines the claimed local-data cleanup. Exact filesystem failure mode requires a controlled runtime test; cross-account data disclosure was not demonstrated.
+
+Verification to add: hold a sync response, sign out, immediately sign back into the same account, then release the response. Assert old tasks cannot write or reconcile downloads, and database removal occurs only after writers are stopped and the pool is closed. Include pending-play reporting and targeted editor operations in the shutdown design. Cross-subsystem completion belongs in sections 4/8 as well.
+
+Account isolation limitation: database filenames sanitize server/user IDs by deleting characters and joining with a hyphen. This is not injective for arbitrary strings, and storage does not include server origin. Normal distinct Jellyfin UUID pairs do not collide; malformed IDs or cloned server identities need explicit validation/namespace coverage in section 8. No migration defect established in this source pass.
+
+**Resolution Nov 7:** R3-01 to R3-05 fixed.
+- **R3-01/R3-02/R3-03:** a shared `completeItems` helper (`LibrarySync.swift`) pages membership reads (playlist entries, collection children, the collection list, and the collection-rename recreate) and throws unless the pages are complete: missing `Items` or `TotalRecordCount`, a changing total, a wrong `StartIndex`, an empty page short of the total, and overshoot all fail closed. The page walker (`paged`), the playlist list and entries without an ID throw on missing metadata instead of treating it as an empty library. A rename recreate also refuses children without IDs, so the original collection is deleted only after a full copy. Collection lists larger than one server page now page instead of failing.
+- **R3-04:** a full sync with any incomplete pass throws before pruning, before `lastCompleted` advances and before download reconciliation; per-page upserts stay, and the user sees "Library sync failed. Pull to retry."
+- **R3-05:** `LibraryStore.shutdown()` stops new syncs, cancels the sync task, waits for it and closes the pool. `AppModel.signOut()` runs it before deleting files, ignores re-entrant calls, and returns false on a close failure, leaving the session in place; Settings shows "Couldn't Sign Out". The server token revocation moved after the local cleanup succeeds. Pending-play reporting stops when cancelled.
+- **Tests added:** `CompleteItemsTests` (all pages collected; truncated, missing and null items, changing total and wrong offset rejected); `ReauthenticationTests.signOutCancelsAnInFlightSyncAndClosesItsPool` (holds a sync request, signs out, checks the old pool is closed and sign-in again opens a fresh empty database); the existing reauthentication test also checks the old pool is closed after sign-out.
+
+**Verification:** package scheme passed on iPhone 18 Pro Max (iOS 27.0): 161 tests, 215 runs, 0 failures, no runtime warnings (`build/Logs/Test/Test-WavetileKit-Package-2026.11.07_20-50-19--0700.xcresult`). UI tests were not rerun after the Settings alert. Not covered by automation: end-to-end sync tests against a stubbed server for the truncated-playlist/collection cases with seeded downloads (the helper is unit-tested; the call sites are not), a pool-close failure, and the filename-collision limitation above (section 8).

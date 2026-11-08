@@ -4,7 +4,7 @@ Moved from [LAUNCH.md](LAUNCH.md) on 2026-11-07. This is the working checklist f
 
 ## Before starting
 
-Use a new signed TestFlight build containing the Nov 7 fixes, including background audio-session activation. Build 202611061835 lacks those changes. Start with the detailed CarPlay and audio pass below, then run every P0 scenario on the final RC.
+Use signed TestFlight build 202611072010 from `351df13` once processing and availability are confirmed. It contains the Nov 7 fixes, including background audio-session activation and authentication/playback review fixes. Build 202611061835 lacks those changes. Start with the detailed CarPlay and audio pass below, then run every P0 scenario on the final RC.
 
 For each check record device, iOS version, build, date, pass/fail and reproduction notes. Include head-unit/speaker details where relevant. Leave untested checks open; record any explicit deferral and rationale. Put engineering defects in LAUNCH.md with the build and a link to the failed check here.
 

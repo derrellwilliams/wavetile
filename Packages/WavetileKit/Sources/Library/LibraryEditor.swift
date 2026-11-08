@@ -115,11 +115,16 @@ public struct LibraryEditor: Sendable {
     /// only if that fails too are there two copies (`DuplicateCollectionError`).
     private func recreateCollection(id: String, name: String, image: String?) async throws -> String {
         guard image == nil else { throw RenameWouldLoseCoverError() }
-        var params = Paths.GetItemsParameters()
-        params.userID = session.userID
-        params.parentID = id
-        let children = try await client.send(Paths.getItems(parameters: params)).value.items ?? []
+        let children = try await completeItems { start, limit in
+            var params = Paths.GetItemsParameters()
+            params.userID = session.userID
+            params.parentID = id
+            params.startIndex = start
+            params.limit = limit
+            return try await client.send(Paths.getItems(parameters: params)).value
+        }
         let itemIDs = children.compactMap(\.id)
+        guard itemIDs.count == children.count else { throw URLError(.badServerResponse) }
         let create = Paths.CreateCollectionParameters(name: name, ids: itemIDs.isEmpty ? nil : itemIDs, isLocked: false)
         guard let newID = try await client.send(Paths.createCollection(parameters: create)).value.id else {
             throw URLError(.badServerResponse)

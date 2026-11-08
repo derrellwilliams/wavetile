@@ -3,6 +3,24 @@ import GRDB
 import JellyfinKit
 import Persistence
 
+/// Fetches every page before a caller replaces or deletes existing membership.
+func completeItems(fetch: (Int, Int) async throws -> BaseItemDtoQueryResult) async throws -> [BaseItemDto] {
+    var result: [BaseItemDto] = []
+    var expected: Int?
+    while true {
+        try Task.checkCancellation()
+        let page = try await fetch(result.count, 500)
+        guard let items = page.items, let total = page.totalRecordCount, total >= 0,
+              expected == nil || expected == total,
+              page.startIndex == nil || page.startIndex == result.count,
+              items.count <= total - result.count else { throw URLError(.badServerResponse) }
+        expected = total
+        result.append(contentsOf: items)
+        if result.count == total { return result }
+        guard !items.isEmpty else { throw URLError(.badServerResponse) }
+    }
+}
+
 /// Mirrors the user's Jellyfin music library into `LibraryDatabase`.
 ///
 /// Full sync, paged, each page written in its own transaction so the UI fills in while it runs.
@@ -53,6 +71,8 @@ public actor LibrarySync {
         complete[PlaylistRecord.databaseTableName] = try await syncPlaylists(generation, progress)
         complete[CollectionRecord.databaseTableName] = try await syncCollections(generation, progress)
 
+        guard complete.count == 5 else { throw URLError(.badServerResponse) }
+        try Task.checkCancellation()
         progress(.init(phase: .finishing, completed: 0, total: nil))
         let tables = complete
         try await database.pool.write { db in
@@ -128,12 +148,13 @@ public actor LibrarySync {
             params.fields = [.childCount, .sortName]
             params.sortBy = [.sortName]
             let page = try await client.send(Paths.getItems(parameters: params)).value
-            let items = page.items ?? []
+            guard let items = page.items, let reported = page.totalRecordCount else { throw URLError(.badServerResponse) }
             playlists.append(contentsOf: items)
-            total = page.totalRecordCount ?? playlists.count
+            total = reported
             if items.isEmpty { break }
         } while playlists.count < total
         let seen = Set(playlists.compactMap(\.id))
+        guard playlists.count == total, seen.count == total else { throw URLError(.badServerResponse) }
 
         for (index, playlist) in playlists.enumerated() {
             progress(.init(phase: .playlists, completed: index, total: playlists.count))
@@ -145,6 +166,7 @@ public actor LibrarySync {
     private func writePlaylist(_ playlist: BaseItemDto, generation: Int) async throws {
         guard let id = playlist.id else { return }
         let entries = try await playlistEntries(id)
+        guard entries.allSatisfy({ $0.id != nil }) else { throw URLError(.badServerResponse) }
         let rows = entries.enumerated().compactMap { position, entry in
             entry.id.map { PlaylistEntryRecord(playlistID: id, position: position, trackID: $0, entryID: entry.playlistItemID) }
         }
@@ -166,33 +188,43 @@ public actor LibrarySync {
 
     /// Collections (BoxSets) that hold albums. Empty ones are kept so new collections show up.
     private func syncCollections(_ generation: Int, _ progress: (Progress) -> Void) async throws -> Set<String>? {
-        var params = Paths.GetItemsParameters()
-        params.userID = session.userID
-        params.isRecursive = true
-        params.includeItemTypes = [.boxSet]
-        params.fields = [.childCount, .sortName]
-        params.sortBy = [.sortName]
-        let page = try await client.send(Paths.getItems(parameters: params)).value
-        let collections = page.items ?? []
+        let collections = try await completeItems { start, limit in
+            var params = Paths.GetItemsParameters()
+            params.userID = session.userID
+            params.isRecursive = true
+            params.includeItemTypes = [.boxSet]
+            params.fields = [.childCount, .sortName]
+            params.sortBy = [.sortName]
+            params.startIndex = start
+            params.limit = limit
+            return try await client.send(Paths.getItems(parameters: params)).value
+        }
+        let total = collections.count
+        guard Set(collections.compactMap(\.id)).count == total else { throw URLError(.badServerResponse) }
         var seen = Set<String>()
         for (index, collection) in collections.enumerated() {
             progress(.init(phase: .collections, completed: index, total: collections.count))
             if try await writeCollection(collection, generation: generation), let id = collection.id { seen.insert(id) }
         }
         // Movie/TV collections were skipped (and deleted), so count every listed collection.
-        return collections.count >= (page.totalRecordCount ?? 0) ? seen : nil
+        return seen
     }
 
     /// Returns false for collections that aren't music (and so aren't kept).
     @discardableResult
     private func writeCollection(_ collection: BaseItemDto, generation: Int) async throws -> Bool {
         guard let id = collection.id else { return false }
-        var params = Paths.GetItemsParameters()
-        params.userID = session.userID
-        params.parentID = id
-        params.fields = [.sortName]
-        let children = try await client.send(Paths.getItems(parameters: params)).value.items ?? []
+        let children = try await completeItems { start, limit in
+            var params = Paths.GetItemsParameters()
+            params.userID = session.userID
+            params.parentID = id
+            params.fields = [.sortName]
+            params.startIndex = start
+            params.limit = limit
+            return try await client.send(Paths.getItems(parameters: params)).value
+        }
         let albums = children.filter { $0.type == .musicAlbum }
+        guard albums.allSatisfy({ $0.id != nil }), Set(albums.compactMap(\.id)).count == albums.count else { throw URLError(.badServerResponse) }
         // Skip movie/TV collections: keep only empty ones or ones that contain albums.
         guard children.isEmpty || !albums.isEmpty else {
             _ = try await database.pool.write { try CollectionRecord.deleteOne($0, key: id) }
@@ -234,17 +266,13 @@ public actor LibrarySync {
     }
 
     private func playlistEntries(_ playlistID: String) async throws -> [BaseItemDto] {
-        var entries: [BaseItemDto] = []
-        while true {
+        try await completeItems { start, limit in
             var params = Paths.GetPlaylistItemsParameters()
             params.userID = session.userID
-            params.startIndex = entries.count
-            params.limit = 500
+            params.startIndex = start
+            params.limit = limit
             params.enableImages = false
-            let page = try await client.send(Paths.getPlaylistItems(playlistID: playlistID, parameters: params)).value
-            let items = page.items ?? []
-            entries.append(contentsOf: items)
-            if items.isEmpty || entries.count >= (page.totalRecordCount ?? 0) { return entries }
+            return try await client.send(Paths.getPlaylistItems(playlistID: playlistID, parameters: params)).value
         }
     }
 
@@ -282,8 +310,8 @@ public actor LibrarySync {
         while true {
             try Task.checkCancellation()
             let page = try await fetch(start, pageSize)
-            let items = page.items ?? []
-            total = page.totalRecordCount ?? total
+            guard let items = page.items, let reported = page.totalRecordCount else { throw URLError(.badServerResponse) }
+            total = reported
             try await database.pool.write { db in try write(db, items) }
             seen.formUnion(items.compactMap(\.id))
             start += items.count

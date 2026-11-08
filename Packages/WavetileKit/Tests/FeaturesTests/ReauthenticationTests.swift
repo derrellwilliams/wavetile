@@ -23,8 +23,43 @@ nonisolated private final class MemoryCredentials: SessionCredentials, Sendable 
     func remove(_ account: String) throws { _ = values.withLock { $0.removeValue(forKey: account) } }
 }
 
+nonisolated private final class HeldSyncProtocol: URLProtocol, @unchecked Sendable {
+    static let started = OSAllocatedUnfairLock(initialState: false)
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() { Self.started.withLock { $0 = true } }
+    override func stopLoading() {}
+}
+
 @Suite(.serialized) @MainActor
 struct ReauthenticationTests {
+    @Test func signOutCancelsAnInFlightSyncAndClosesItsPool() async throws {
+        HeldSyncProtocol.started.withLock { $0 = false }
+        let id = UUID().uuidString
+        let defaults = UserDefaults(suiteName: id)!
+        let store = SessionStore(credentials: MemoryCredentials(), defaults: defaults)
+        defer { store.clear(); defaults.removePersistentDomain(forName: id) }
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [HeldSyncProtocol.self]
+        let auth = AuthService(identity: .init(clientName: "Test", version: "1", deviceName: "Test", deviceID: id), sessionConfiguration: config)
+        let app = AppModel(deviceName: "Test", store: store, auth: auth)
+        let session = ServerSession(serverURL: URL(string: "https://sync.invalid")!, serverID: id, serverName: "Test", userID: id, userName: "Test")
+        try app.didSignIn(session, token: "synthetic")
+        guard case let .signedIn(account) = app.phase else { Issue.record("Not signed in"); return }
+        let sync = Task { await account.library.syncNow() }
+        for _ in 0..<100 where !HeldSyncProtocol.started.withLock({ $0 }) {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(HeldSyncProtocol.started.withLock { $0 })
+        #expect(await app.signOut())
+        await sync.value
+        #expect(throws: (any Error).self) { try account.library.database.pool.read { _ in () } }
+        try app.didSignIn(session, token: "new-synthetic")
+        guard case let .signedIn(reopened) = app.phase else { Issue.record("Could not sign in again"); return }
+        #expect(try reopened.library.database.syncState() == nil)
+        await app.signOut()
+    }
+
     @Test func recoveryPreservesAccountObjectsAndDownloadedFiles() async throws {
         let id = UUID().uuidString
         let defaults = UserDefaults(suiteName: id)!
@@ -63,5 +98,6 @@ struct ReauthenticationTests {
         #expect(!app.needsReauthentication)
         #expect(!app.showsReauthentication)
         await app.signOut()
+        #expect(throws: (any Error).self) { try before.library.database.pool.read { _ in () } }
     }
 }

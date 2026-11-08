@@ -34,6 +34,7 @@ public final class AppModel {
     private var authorization: SessionAuthorization?
     private(set) var authorizationID = UUID()
     public let auth: AuthService
+    private var signingOut = false
     private let store: SessionStore
     // Stored on the model, not in @AppStorage, so non-view code can read it later (widgets, Now Playing).
     public var theme: Theme {
@@ -156,14 +157,14 @@ public final class AppModel {
         return SignedIn(session: session, library: library, player: player, downloads: downloads, podcasts: podcasts, authorization: authorization, authorizationID: authorizationID)
     }
 
-    public func signOut() async {
-        // Revoke the token on the server in the background: offline, waiting for it would hang
-        // sign-out for a request timeout. Local data goes right away either way.
-        if let (session, token) = store.load() {
-            Task.detached { [auth] in await auth.signOut(session, token: token) }
-        }
+    @discardableResult
+    public func signOut() async -> Bool {
+        guard !signingOut else { return false }
+        signingOut = true
+        defer { signingOut = false }
         if case let .signedIn(signedIn) = phase {
             signedIn.player.stop()
+            guard await signedIn.library.shutdown() else { return false }
             WidgetBridge.clear()
             Connectivity.shared.server = nil
             // Downloaded music is tied to this account; remove it from the device.
@@ -176,12 +177,16 @@ public final class AppModel {
             RecentSearches.clearStored()
             ImageCaching.removeAll()
         }
+        if let (session, token) = store.load() {
+            Task.detached { [auth] in await auth.signOut(session, token: token) }
+        }
         authorizationID = UUID()
         authorization = nil
         needsReauthentication = false
         showsReauthentication = false
         store.clear()
         phase = .signedOut
+        return true
     }
 }
 
