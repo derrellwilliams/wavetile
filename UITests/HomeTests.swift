@@ -45,7 +45,11 @@ final class HomeTests: XCTestCase {
         tile.press(forDuration: 1.2)
         let goToArtist = app.buttons["Go to Artist"]
         XCTAssertTrue(goToArtist.waitForExistence(timeout: 3))
-        XCTAssertGreaterThan(goToArtist.frame.minY, app.buttons["Favorite"].frame.minY, "Go to Artist should follow Favorite")
+        let favorite = app.buttons.matching(NSPredicate(
+            format: "label IN %@", ["Add to Favorites", "Remove from Favorites"]
+        )).firstMatch
+        XCTAssertTrue(favorite.waitForExistence(timeout: 3))
+        XCTAssertGreaterThan(goToArtist.frame.minY, favorite.frame.minY, "Go to Artist should follow the favorite toggle")
         goToArtist.tap()
         XCTAssertTrue(app.navigationBars.buttons.firstMatch.waitForExistence(timeout: 5), "Artist page didn't open")
     }

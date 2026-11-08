@@ -42,9 +42,13 @@ final class SongsActionsTests: XCTestCase {
         XCTAssertTrue(more.waitForExistence(timeout: 5))
         // Press the row's title area, left of the ⋯ button.
         more.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).withOffset(CGVector(dx: -200, dy: 0)).press(forDuration: 1.2)
-        for title in ["Play", "Go to Album", "Go to Artist", "Play Next", "Add to Queue", "Add to Playlist", "Favorite"] {
+        for title in ["Play", "Go to Album", "Go to Artist", "Play Next", "Add to Queue", "Add to Playlist"] {
             XCTAssertTrue(app.buttons[title].waitForExistence(timeout: 3), "Long press is missing \(title)")
         }
+        let favorite = app.buttons.matching(NSPredicate(
+            format: "label IN %@", ["Add to Favorites", "Remove from Favorites"]
+        )).firstMatch
+        XCTAssertTrue(favorite.waitForExistence(timeout: 3), "Long press is missing the favorite toggle")
         app.buttons["Go to Album"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["trackRow"].firstMatch.waitForExistence(timeout: 5), "Album page didn't open")
     }
