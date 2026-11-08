@@ -133,9 +133,12 @@ struct SettingsDrawer: View {
             VStack(alignment: .leading, spacing: theme.spacing.xxs) {
                 Text(session.userName)
                     .font(theme.typography.title)
-                Text(session.serverName)
-                    .font(theme.typography.itemSubtitle)
-                    .foregroundStyle(theme.palette.textSecondary)
+                // Only when it adds something: the server's main account is named the same as the server.
+                if session.serverName.caseInsensitiveCompare(session.userName) != .orderedSame {
+                    Text(session.serverName)
+                        .font(theme.typography.itemSubtitle)
+                        .foregroundStyle(theme.palette.textSecondary)
+                }
             }
             .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
         }
