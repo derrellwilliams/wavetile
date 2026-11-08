@@ -127,24 +127,15 @@ struct SettingsDrawer: View {
         }
     }
 
-    private var serverName: String {
-        session.serverName.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
     private var profileHeader: some View {
         VStack(alignment: .leading, spacing: theme.spacing.md) {
             Avatar()
             VStack(alignment: .leading, spacing: theme.spacing.xxs) {
                 Text(session.userName)
                     .font(theme.typography.title)
-                // Only when it adds something: the server's main account is named the same as the server.
-                if !serverName.isEmpty,
-                   serverName.compare(session.userName.trimmingCharacters(in: .whitespacesAndNewlines),
-                                      options: [.caseInsensitive, .diacriticInsensitive]) != .orderedSame {
-                    Text(serverName)
-                        .font(theme.typography.itemSubtitle)
-                        .foregroundStyle(theme.palette.textSecondary)
-                }
+                Text(session.serverName)
+                    .font(theme.typography.itemSubtitle)
+                    .foregroundStyle(theme.palette.textSecondary)
             }
             .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
         }

@@ -14,6 +14,7 @@ Consolidated 2026-11-06 and reorganized 2026-11-07 (tiers below, evidence and se
 
 | Area | State / evidence |
 |---|---|
+| Latest upload | Version 1.0.0, build 202611081630 from `bbbe441` (main), uploaded Nov 8 16:33 MST; App Store Connect reported it processing. Includes the storage sheet and profile drawer changes made after `34c899f`, which the Nov 8 device sign-off did not cover. Not yet confirmed in TestFlight; not attached to the version |
 | Candidate | Version 1.0.0, build 202611072135 from `34c899f` (all review 1–8 fixes), uploaded Nov 7 21:38 PT; App Store Connect reported the upload processing, and TestFlight availability is not yet verified. Builds 202611072010 and 202611061835 predate the review fixes and are not used for device checks. Device sign-off done Nov 8 (tester, bulk). This build is not the final RC; none is attached to the version yet |
 | Public beta | Build 202610281900 approved for external testing; link https://testflight.apple.com/join/pk9dyfMq. That approval doesn't cover newer builds |
 | Signing / CarPlay | Team, app record and App Group done. CarPlay Audio granted and enabled; signed CarPlay build 202610301302 uploaded Oct 30 (`8af183f`) |
