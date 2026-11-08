@@ -3,7 +3,7 @@ import GRDB
 import Testing
 @testable import Library
 @testable import Persistence
-import JellyfinKit
+@testable import JellyfinKit
 
 /// The server's data is untrusted and often incomplete: untagged files, empty arrays, blank
 /// names, nonsense durations, hostile search text. None of it may crash, corrupt the cache or
@@ -104,6 +104,25 @@ struct ServerDataTests {
         let stored = try db.pool.read { try TrackRecord.fetchOne($0, key: "t2") }
         #expect(stored?.title == long, "long titles are stored whole")
         #expect(try db.search("日本").tracks.map(\.id) == ["t3"])
+    }
+
+    @Test func apiTrackSummariesGetTheSameFallbacksAndLimits() throws {
+        let bare = try #require(TrackSummary(item: item()))
+        #expect(bare.title == "Unknown Track")
+        #expect(bare.artist == "Unknown Artist")
+        #expect(bare.duration == nil)
+
+        let blank = try #require(TrackSummary(item: item { $0.name = "  "; $0.artists = []; $0.albumArtist = "Band" }))
+        #expect(blank.title == "Unknown Track")
+        #expect(blank.artist == "Band", "an empty artist list falls back, not to an empty name")
+
+        let several = try #require(TrackSummary(item: item { $0.artists = ["A", "", "B"] }))
+        #expect(several.artist == "A, B")
+
+        #expect(try #require(TrackSummary(item: item { $0.runTimeTicks = 1_800_000_000 })).duration == .milliseconds(180_000))
+        #expect(try #require(TrackSummary(item: item { $0.runTimeTicks = -1 })).duration == .milliseconds(0))
+        #expect(try #require(TrackSummary(item: item { $0.runTimeTicks = Int.max })).duration == .milliseconds(ServerDuration.maxMs))
+        #expect(TrackSummary(item: item(nil)) == nil)
     }
 
     // MARK: Albums and artists

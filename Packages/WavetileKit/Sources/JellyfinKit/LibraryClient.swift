@@ -231,12 +231,11 @@ extension TrackSummary {
         guard let id = item.id else { return nil }
         self.init(
             id: id,
-            title: item.name ?? "Unknown Track",
-            artist: item.artists?.joined(separator: ", ") ?? item.albumArtist ?? "Unknown Artist",
+            title: ServerText.nonBlank(item.name) ?? "Unknown Track",
+            artist: ServerText.names(item.artists) ?? ServerText.nonBlank(item.albumArtist) ?? "Unknown Artist",
             trackNumber: item.indexNumber,
             discNumber: item.parentIndexNumber,
-            // Jellyfin ticks are 100ns.
-            duration: item.runTimeTicks.map { .milliseconds($0 / 10_000) },
+            duration: ServerDuration.milliseconds(ticks: item.runTimeTicks).map { .milliseconds($0) },
             normalizationGain: item.normalizationGain.map(Double.init)
         )
     }

@@ -666,7 +666,9 @@ public final class AudioPlayer {
                 guard let self else { return }
                 switch type {
                 case .began:
-                    // Keep intent so we can resume; just stop the clock.
+                    // Keep intent so we can resume; just stop the clock. A start still waiting on
+                    // the session must not begin in the middle of the interruption.
+                    self.sessionRequest += 1
                     self.player.pause()
                     self.updateNowPlayingPlayback()
                 case .ended where options.contains(.shouldResume) && self.isPlaying:
