@@ -103,10 +103,7 @@ struct PlayableRow<Label: View>: View {
         Divider()
         Button("Add to Playlist", glyph: .addToQueue) { actions.addToPlaylist([trackID]) }
             .requiresServer()
-        Button("Favorite", glyph: .favorite) {
-            actions.favorite(trackID, store: store)
-        }
-        .requiresServer()
+        FavoriteButton(itemID: trackID, showsConfirmation: true)
     }
 
     private var tapAction: some View {

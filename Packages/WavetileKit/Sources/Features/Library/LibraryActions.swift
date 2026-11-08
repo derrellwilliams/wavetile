@@ -63,18 +63,6 @@ final class LibraryActions {
         }
     }
 
-    /// Favorite from a menu, where (unlike the heart button) nothing on screen changes.
-    func favorite(_ itemID: String, store: LibraryStore) {
-        Task {
-            do {
-                try await store.editor.setFavorite(itemID: itemID, true)
-                confirm("Added to Favorites")
-            } catch {
-                errorMessage = "Couldn't update favorites. Check your connection."
-            }
-        }
-    }
-
     /// Radio from a song, album or artist: plays Jellyfin's Instant Mix for it.
     func startRadio(from itemID: String, store: LibraryStore, player: AudioPlayer) {
         Task {
@@ -174,6 +162,8 @@ struct FavoriteButton: View {
     let itemID: String
     /// Nil in a navigation bar: a plain bar item, sized and tinted like its neighbours.
     var size: CGFloat?
+    /// Menus show a banner after the action completes.
+    var showsConfirmation = false
     @State private var isFavorite = false
 
     var body: some View {
@@ -191,7 +181,7 @@ struct FavoriteButton: View {
     }
 
     @ViewBuilder private var button: some View {
-        let title = isFavorite ? "Unfavorite" : "Favorite"
+        let title = isFavorite ? "Remove from Favorites" : "Add to Favorites"
         let glyph: Glyph = isFavorite ? .favoriteFilled : .favorite
         if let size {
             GlyphButton(title, glyph: glyph, size: size, action: toggle)
@@ -204,7 +194,12 @@ struct FavoriteButton: View {
     private func toggle() {
         let target = !isFavorite
         Task {
-            do { try await store.editor.setFavorite(itemID: itemID, target) } catch {
+            do {
+                try await store.editor.setFavorite(itemID: itemID, target)
+                if showsConfirmation {
+                    actions.confirm(target ? "Added to Favorites" : "Removed from Favorites")
+                }
+            } catch {
                 actions.errorMessage = "Couldn't update favorites. Check your connection."
             }
         }
