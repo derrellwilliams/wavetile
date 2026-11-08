@@ -4,7 +4,7 @@ Moved from [LAUNCH.md](LAUNCH.md) on 2026-11-07. This is the working checklist f
 
 ## Before starting
 
-Decided Nov 7: no TestFlight upload until all eight targeted source reviews were done, so everything runs on one build. They are done; the build to test is **RC_BUILD_PLACEHOLDER** (Version 1.0.0, from commit RC_COMMIT_PLACEHOLDER, uploaded RC_DATE_PLACEHOLDER; confirm in TestFlight that processing finished). Builds 202611072010 and 202611061835 predate the review fixes and are not used. Start with the detailed CarPlay and audio pass below and the review-fix checks, then run every P0 scenario on this build.
+Decided Nov 7: no TestFlight upload until all eight targeted source reviews were done, so everything runs on one build. They are done; the build to test is **202611072135** (Version 1.0.0, from commit `34c899f`, uploaded Nov 7, 2026 at 21:38 PT; confirm in TestFlight that processing finished). Builds 202611072010 and 202611061835 predate the review fixes and are not used. Start with the detailed CarPlay and audio pass below and the review-fix checks, then run every P0 scenario on this build.
 
 For each check record device, iOS version, build, date, pass/fail and reproduction notes. Include head-unit/speaker details where relevant. Leave untested checks open; record any explicit deferral and rationale. Put engineering defects in LAUNCH.md with the build and a link to the failed check here.
 

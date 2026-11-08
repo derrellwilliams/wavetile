@@ -14,10 +14,10 @@ Consolidated 2026-11-06 and reorganized 2026-11-07 (tiers below, evidence and se
 
 | Area | State / evidence |
 |---|---|
-| Candidate | Version 1.0.0, build 202611072010 from `351df13`, uploaded Nov 7; App Store Connect reported processing, and TestFlight availability is not yet verified. This includes the authentication and playback review fixes. **The section 3 persistence/sync fixes (`53fa4a2`, on `main`) are in no build**, so the RC must be a new build. Device sign-off and RC requirements remain open |
+| Candidate | Version 1.0.0, build 202611072135 from `34c899f` (all review 1–8 fixes), uploaded Nov 7 21:38 PT; App Store Connect reported the upload processing, and TestFlight availability is not yet verified. Builds 202611072010 and 202611061835 predate the review fixes and are not used for testparty. Device sign-off and the other RC requirements remain open |
 | Public beta | Build 202610281900 approved for external testing; link https://testflight.apple.com/join/pk9dyfMq. That approval doesn't cover newer builds |
 | Signing / CarPlay | Team, app record and App Group done. CarPlay Audio granted and enabled; signed CarPlay build 202610301302 uploaded Oct 30 (`8af183f`) |
-| Automated QA | Nov 7 (Debug, iPhone 18 Pro Max, iOS 27.0): package scheme 177/177 (245 runs) and UI 17/17, both with zero runtime warnings, with the review 1–8 fixes (1–3 committed in `53fa4a2`, 4–8 uncommitted) and the Settings sign-out alert, so it needs a rerun. Nov 5: 94/94 under ASan and TSan, none rerun on the Nov 7 edits. One earlier Nov 7 UI run failed `testWaveAndHomeTabScrollToTop` once, then passed (cause not found). Details in qa-evidence.md |
+| Automated QA | Nov 7 (Debug, iPhone 18 Pro Max, iOS 27.0): package scheme 177/177 (245 runs) and UI 17/17, both with zero runtime warnings, with the review 1–8 fixes, all committed (`53fa4a2`, `34c899f`) and the Settings sign-out alert, so it needs a rerun. Nov 5: 94/94 under ASan and TSan, none rerun on the Nov 7 edits. One earlier Nov 7 UI run failed `testWaveAndHomeTabScrollToTop` once, then passed (cause not found). Details in qa-evidence.md |
 | Website / repo | Site, support/privacy pages, guides, llms.txt, JSON-LD, sitemap live; MPL-2.0 and README in place. Service/account configuration not reverified Nov 6 |
 | Review access | Earlier plan: `https://demo.jellyfin.org/stable`, user `demo`, blank password. **Decision needed:** see P0 |
 | Contact | realslimscrawny@gmail.com (site, support, privacy) |
@@ -27,7 +27,7 @@ Consolidated 2026-11-06 and reorganized 2026-11-07 (tiers below, evidence and se
 1. Quick wins (minutes each): confirm agreements, pricing and territories in App Store Connect; verify domain transfer lock, DNSSEC and Cloudflare 2FA.
 2. Choose the host and licensed demo library using [reviewer-server.md](reviewer-server.md), then provision reviewer access.
 3. Current pins rechecked Nov 7 with no matching OSV advisories; repeat against the final archive to finish the remaining QA-2/QA-3 engineering check. Nov 7 package and UI regressions are passing.
-4. Source reviews are done, so the RC build can be cut once the fixes are committed (decided Nov 7: no TestFlight upload before then, so testparty runs once on a single build). Build 202611072010 is not being used for it.
+4. Confirm build 202611072135 finishes processing and becomes available in TestFlight, then run [testparty.md](testparty.md) on it, once, on that single build; investigate any reported failures. If a fix lands, it needs a new build and a rerun of the affected checks. Build 202611072010 is not being used for it.
 5. Targeted source reviews 1–8 are done (findings fixed or deferred in qa-evidence.md); what remains is device verification in [testparty.md](testparty.md), plus the optional items listed under each section.
 6. Freeze, cut one RC build (rerun package and UI tests first), complete P0 listing work and collect the required results from [testparty.md](testparty.md) before submission.
 
