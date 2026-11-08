@@ -35,6 +35,9 @@ public final class DownloadManager: NSObject, Sendable {
     private struct MutableState {
         var session: URLSession?
         var reconciling = false
+        var generation = 0
+        var mutations = 0
+        var securityStopped = false
         var lastProgressWrite: [String: Double] = [:]
         var lastByteWrite: [String: Int64] = [:]
         /// Automatic retries so far per track, this launch.
@@ -58,6 +61,7 @@ public final class DownloadManager: NSObject, Sendable {
         self.identifier = Self.sessionIdentifier(serverID: serverID, userID: userID)
         self.directory = try Self.makeDirectory(serverID: serverID, userID: userID)
         super.init()
+        state.withLock { $0.securityStopped = UserDefaults.standard.bool(forKey: identifier + ".redirectStopped") }
         _ = session  // Reconnect to transfers started in a previous launch.
     }
 
@@ -82,6 +86,8 @@ public final class DownloadManager: NSObject, Sendable {
     }
 
     public func pause(collectionID: String) async throws {
+        state.withLock { $0.generation += 1; $0.mutations += 1 }
+        defer { state.withLock { $0.mutations -= 1 } }
         try await database.setDownloadPaused(collectionID: collectionID, paused: true)
         await cancelTasks(notIn: try database.pendingDownloads().map(\.trackID))
     }
@@ -151,7 +157,7 @@ public final class DownloadManager: NSObject, Sendable {
     /// gives failed ones another go.
     public func resumePending(quality: Quality, allowCellular: Bool, retryFailed: Bool = true) async {
         guard state.withLock({ state in
-            guard !state.reconciling else { return false }
+            guard !state.reconciling, !state.securityStopped else { return false }
             state.reconciling = true
             return true
         }) else { return }
@@ -195,29 +201,38 @@ public final class DownloadManager: NSObject, Sendable {
 
     /// Deletes this account's download folder (sign out).
     public func deleteEverything() {
+        state.withLock { $0.securityStopped = true; $0.generation += 1 }
         session.invalidateAndCancel()
+        UserDefaults.standard.removeObject(forKey: identifier + ".redirectStopped")
         try? FileManager.default.removeItem(at: directory)
     }
 
     // MARK: - Internals
 
     private func enqueue(_ trackIDs: [String], quality: Quality, allowCellular: Bool) async {
-        guard !trackIDs.isEmpty, await ServerIdentity.shared.confirmToken(to: library.session.serverURL) else { return }
+        guard !trackIDs.isEmpty else { return }
+        let generation = state.withLock { $0.generation }
+        guard await ServerIdentity.shared.confirmToken(to: library.session.serverURL) else { return }
         state.withLock {
             $0.quality = quality
             $0.allowCellular = allowCellular
         }
         let running = Set(await session.allTasks.filter { $0.state == .running || $0.state == .suspended }.compactMap(\.taskDescription))
         let pending = Set((try? database.pendingDownloads().map(\.trackID)) ?? [])
+        let transferSession = session
         for trackID in trackIDs where pending.contains(trackID) && !running.contains(trackID) {
             guard let stream = library.streamRequest(trackID: trackID, maxBitrate: quality.maxBitrate) else { continue }
             var request = URLRequest(url: stream.url)
             // Header auth: the token isn't written into the URL (or the system's transfer logs).
             for (field, value) in stream.headers { request.setValue(value, forHTTPHeaderField: field) }
             request.allowsCellularAccess = allowCellular
-            let task = session.downloadTask(with: request)
-            task.taskDescription = trackID
-            task.resume()
+            let preparedRequest = request
+            state.withLock { state in
+                guard !state.securityStopped, state.mutations == 0, state.generation == generation else { return }
+                let task = transferSession.downloadTask(with: preparedRequest)
+                task.taskDescription = trackID
+                task.resume()
+            }
         }
     }
 
@@ -358,6 +373,11 @@ extension DownloadManager: URLSessionDownloadDelegate {
     }
 
     private func stopAfterOffOriginRedirect(_ trackID: String) {
+        state.withLock { state in
+            state.securityStopped = true
+            state.generation += 1
+            UserDefaults.standard.set(true, forKey: identifier + ".redirectStopped")
+        }
         log.error("Download of \(trackID, privacy: .public) was redirected to another host; stopping all downloads")
         let message = "The server redirected this download to another host, so downloads were stopped to protect your sign-in."
         Task {
@@ -388,13 +408,18 @@ extension DownloadManager: URLSessionDownloadDelegate {
         let resumeData = (error as NSError).userInfo[NSURLSessionDownloadTaskResumeData] as? Data
         Task {
             try? await Task.sleep(for: .seconds(pow(2, Double(attempt))))
+            let generation = state.withLock { $0.generation }
             guard (try? database.pendingDownloads().contains { $0.trackID == trackID }) == true else { return }
             // Resume data carries the original request, Authorization header included.
             guard await ServerIdentity.shared.confirmToken(to: library.session.serverURL) else { return }
             if let resumeData {
-                let retry = self.session.downloadTask(withResumeData: resumeData)
-                retry.taskDescription = trackID
-                retry.resume()
+                let transferSession = self.session
+                state.withLock { state in
+                    guard !state.securityStopped, state.mutations == 0, state.generation == generation else { return }
+                    let retry = transferSession.downloadTask(withResumeData: resumeData)
+                    retry.taskDescription = trackID
+                    retry.resume()
+                }
             } else {
                 let (quality, cellular) = state.withLock { ($0.quality, $0.allowCellular) }
                 await enqueue([trackID], quality: quality, allowCellular: cellular)
