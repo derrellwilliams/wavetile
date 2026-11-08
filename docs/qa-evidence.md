@@ -457,3 +457,16 @@ Rerun after the Nov 7 review fixes, the Settings sign-out alert and the favorite
 - **Rerun of that test alone:** passed (`Test-Wavetile-2026.11.08_07-51-57--0700.xcresult`). `textSecondary` (`#989388`) on the Dark background (`#1A1A1A`) computes to about 5.7:1, above the 4.5:1 AA threshold.
 - **Assessment:** intermittent, not reproduced; the likely cause is the audit sampling the label while the sheet or its backdrop is still settling. This is the second unexplained one-off UI failure (Nov 7: `testWaveAndHomeTabScrollToTop`), so UI results are "passes on rerun", not clean. Not yet investigated further; if it recurs, try a longer settle before the audit or a check that the sheet has stopped moving.
 - **Not rerun:** sanitizer (ASan/TSan) runs from Nov 5.
+
+### Stubbed-server sync tests with seeded downloads — November 8, 2026
+
+`Tests/LibraryTests/LibrarySyncStubbedServerTests.swift` runs the real `LibrarySync` against a `URLProtocol` stub that serves Jellyfin JSON (artists, albums, tracks, playlists, no collections), with an album download seeded first (`t1` finished with a file, `t2` queued). Six tests, all passing on the first run (`Test-WavetileKit-Package-2026.11.08_08-01-01--0700.xcresult`, no runtime warnings):
+
+- A full sync mirrors the server and leaves the download rows and file name alone.
+- A cut-off track page (server reports 3 tracks, sends 2) fails the sync: no tracks pruned, `lastCompleted` and generation unchanged, downloads intact.
+- A 500 on the playlist pass after tracks changed on the server fails the sync: library, playlist membership and downloads unchanged.
+- A 401 on every request changes nothing.
+- A complete sync that no longer lists `t1` prunes the library row and the playlist entry but keeps the download (the file stays until the user removes it).
+- A valid but empty server prunes the library only; downloads stay.
+
+Not covered: collections (the stub returns none), multi-page tracks (page size 1000), cancellation mid-sync (covered by `ReauthenticationTests`), and the download managers' own sync of downloaded playlists (`syncDownloadedPlaylist` has unit tests in `DownloadBookkeepingTests`).

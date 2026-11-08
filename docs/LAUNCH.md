@@ -10,7 +10,7 @@ The working checklist for engineering, App Store preparation, launch and follow-
 
 Consolidated 2026-11-06 and reorganized 2026-11-07 (tiers below, evidence and search notes split out). Historical test results are preserved, not rerun or certification of the latest build. This plan doesn't itself authorize uploads, CI setup, delegation, commits or public posts.
 
-## Current status — 2026-11-07
+## Current status — 2026-11-07 (automated QA row updated 2026-11-08)
 
 | Area | State / evidence |
 |---|---|
@@ -26,7 +26,7 @@ Consolidated 2026-11-06 and reorganized 2026-11-07 (tiers below, evidence and se
 **Next steps, in order**
 1. Quick wins (minutes each): confirm agreements, pricing and territories in App Store Connect; verify domain transfer lock, DNSSEC and Cloudflare 2FA.
 2. Choose the host and licensed demo library using [reviewer-server.md](reviewer-server.md), then provision reviewer access.
-3. Current pins rechecked Nov 7 with no matching OSV advisories; repeat against the final archive to finish the remaining QA-2/QA-3 engineering check. Nov 7 package and UI regressions are passing.
+3. Current pins rechecked Nov 7 with no matching OSV advisories; repeat against the final archive to finish the remaining QA-2/QA-3 engineering check. Nov 8 package regressions pass (178/178) and UI passes on rerun (one intermittent audit failure; see Automated QA).
 4. Confirm build 202611072135 finishes processing and becomes available in TestFlight, then run [testparty.md](testparty.md) on it, once, on that single build; investigate any reported failures. If a fix lands, it needs a new build and a rerun of the affected checks. Build 202611072010 is not being used for it.
 5. Targeted source reviews 1–8 are done (findings fixed or deferred in qa-evidence.md); what remains is device verification in [testparty.md](testparty.md), plus the optional items listed under each section.
 6. Freeze, cut one RC build (rerun package and UI tests first), complete P0 listing work and collect the required results from [testparty.md](testparty.md) before submission.
@@ -76,13 +76,13 @@ Project goals, not Apple requirements. Each has a "done when" so it can't run fo
 
 ### Targeted pre-release reviews — added November 7, 2026
 
-As of Nov 7, the initial source reviews and fixes for all eight source reviews and their fixes are complete. Sections 1–8 still require device verification before they can close (UI tests were rerun Nov 7 and pass); section 3 also needs stubbed-server sync tests with seeded downloads. This extends QA-2/QA-3; earlier reviews remain historical evidence, not completion of this pass. Track findings and verification in [qa-evidence.md](qa-evidence.md); real-device execution stays in [testparty.md](testparty.md).
+As of Nov 7, the initial source reviews and fixes for all eight source reviews and their fixes are complete. Sections 1–8 still require device verification before they can close (UI tests were rerun Nov 7 and pass); section 3's stubbed-server sync tests with seeded downloads were added Nov 8 (6 tests, passing). This extends QA-2/QA-3; earlier reviews remain historical evidence, not completion of this pass. Track findings and verification in [qa-evidence.md](qa-evidence.md); real-device execution stays in [testparty.md](testparty.md).
 
 | Order | Scope | Status |
 |---|---|---|
 | 1 | Authentication/networking: credentials, redirects, transport, restore, logout and server switching | Initial source review and R1-01/R1-02 fixes Nov 7; device evidence outstanding |
 | 2 | Playback/queue: concurrency, transitions, interruptions, background operation and restoration | Initial source review and R2-01/R2-02 fixes Nov 7; device evidence outstanding |
-| 3 | Persistence/library sync: migrations, partial sync, stale records and account isolation | Source review and R3-01–R3-05 fixes Nov 7 (package 161/161); stubbed-server sync tests and UI rerun outstanding; account-ID filename limitation goes to section 8 |
+| 3 | Persistence/library sync: migrations, partial sync, stale records and account isolation | Source review and R3-01–R3-05 fixes Nov 7 (package 161/161); stubbed-server sync tests with seeded downloads added Nov 8 (6 tests, passing), UI rerun done Nov 8; account-ID filename limitation goes to section 8 |
 | 4 | Downloads/offline: interruption, missing files, cleanup and fallback | Source review and R4-01–R4-03 fixes Nov 7 (package 163/163); deferrals recorded in qa-evidence.md; device checks outstanding |
 | 5 | Podcasts: malformed feeds, subscription sync, progress and external URLs | Source review and R5-01–R5-05 fixes Nov 7 (package 173/173); deferrals recorded in qa-evidence.md; device checks outstanding |
 | 6 | System integrations: CarPlay, Siri, widgets, Live Activities and shared state | Source review and R6-01–R6-05 fixes Nov 7 (package 175/175, app target builds); deferrals recorded in qa-evidence.md; device checks outstanding |
@@ -95,7 +95,7 @@ Each pass traces user flows through dependencies and records findings with sourc
 - [x] **R1-02 (medium):** added a persistent reauthentication action on authenticated API 401s, media-failure credential checks, and in-place credential replacement for the same account. Automated recovery/data-preservation coverage added Nov 7; final-device interaction check remains in testparty.
 - [x] **R2-01 (high):** delayed failure recovery now checks the current player item and playback intent generation. Device verification remains open; see qa-evidence.md.
 - [x] **R2-02 (medium):** preserve Up Next reordering across shuffle toggles, including edits while shuffled. See qa-evidence.md.
-- [x] **R3-01–R3-05 (high/medium):** incomplete or unvalidated library reads no longer replace, prune or delete cached data or server collections; incomplete sync fails before `lastCompleted`; sign-out cancels sync and closes the database before deleting it (a close failure keeps the session and shows an alert). Details in qa-evidence.md. Still open: UI test rerun after the Settings alert, and stubbed-server sync tests with seeded downloads.
+- [x] **R3-01–R3-05 (high/medium):** incomplete or unvalidated library reads no longer replace, prune or delete cached data or server collections; incomplete sync fails before `lastCompleted`; sign-out cancels sync and closes the database before deleting it (a close failure keeps the session and shows an alert). Details in qa-evidence.md. UI rerun after the Settings alert and stubbed-server sync tests with seeded downloads done Nov 8.
 - [x] **R4-01–R4-03 (high/medium/low):** a failed database read no longer removes a download; empty or non-audio responses are failed instead of saved as done; finished downloads whose file is gone are queued again. Deferrals (orphan-file sweep, disk-full check, duplicate Live Activity and others) are listed in qa-evidence.md.
 - [x] **R5-01–R5-05 (high/medium/low):** a damaged Jellyfin copy of the subscription list no longer unfollows every show; a feed that breaks partway no longer prunes episodes or renames the show; non-audio episode downloads fail instead of saving; removed or missing episode download files are cleaned up or queued again. Deferrals (sync clock skew, GUID-less episodes, sub-30-second episodes and others) are listed in qa-evidence.md.
 - [x] **R6-01–R6-05 (high/medium/low):** sign-out now stops and closes the podcast database before deleting it; Siri's vocabulary updates after syncs and sign-in/out; download Live Activities are ended at sign-out and orphaned ones cleaned up at launch (one per collection); widgets can't be repopulated after sign-out; an odd album ID can't crash the widget. Deferrals (Lock Screen access by design, CarPlay offline feedback and refresh under steady writes) are in qa-evidence.md.
