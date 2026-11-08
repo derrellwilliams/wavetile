@@ -133,6 +133,7 @@ struct DownloadStatusSheet: View {
     @State private var confirmCancel = false
 
     private var paused: Bool { tracks.contains { $0.state == .paused } }
+    private var finished: Bool { !tracks.isEmpty && done == tracks.count }
     private var done: Int { tracks.filter { $0.state == .done }.count }
     private var received: Int64 { tracks.filter { $0.state == .downloading }.reduce(0) { $0 + $1.bytes } }
 
@@ -178,11 +179,12 @@ struct DownloadStatusSheet: View {
                     .disabled(busy)
                 }
                 Section {
-                    Button("Cancel and Remove Download", role: .destructive) { confirmCancel = true }
+                    Button(finished ? "Remove Download" : "Cancel and Remove Download", role: .destructive) { confirmCancel = true }
                 }
             }
             .font(theme.typography.itemTitle)
             .navigationTitle("Download Status")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .confirmationDialog("Remove this download?", isPresented: $confirmCancel, titleVisibility: .visible) {
                 Button("Remove Download", role: .destructive) {
