@@ -84,6 +84,14 @@ final class AccessibilityAuditTests: XCTestCase {
         try audit(launch(["-openSettings"]), screen: "Settings", visibleWidth: 340)
     }
 
+    @MainActor func testStorageSheetAudit() throws {
+        let app = launch(["-tab", "downloaded"])
+        app.buttons["More"].tap()
+        app.buttons["Manage Storage"].tap()
+        XCTAssertTrue(app.navigationBars["Storage"].waitForExistence(timeout: 5))
+        try audit(app, screen: "Storage")
+    }
+
     @MainActor func testLaunchPerformance() throws {
         measure(metrics: [XCTApplicationLaunchMetric()]) {
             XCUIApplication().launch()

@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		197535260D47403824DD5ACF /* HomeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EB333D4B5F2B7A38F00ECED /* HomeTests.swift */; };
 		1E19719FB13A52E83D169D59 /* BackNavigationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1431B850CBF58DA7C98C473F /* BackNavigationTests.swift */; };
+		262346DC288B79CB81D7A815 /* StorageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C706364BB9CFD83B06858EF /* StorageTests.swift */; };
 		293B76453F4541068AF94637 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 600A6831CAFBA608604EC65C /* SwiftUI.framework */; };
 		29FA4F497E1E129557617FC8 /* NowPlayingWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51107A7FCB5C0404CF98041F /* NowPlayingWidget.swift */; };
 		7177EF3BFB2405CBE4A0D6A8 /* WavetileWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = BE64D9F3EAE7A406F7322312 /* WavetileWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -73,6 +74,7 @@
 		353AC9D25C695D5691A49C82 /* Wavetile.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Wavetile.entitlements; sourceTree = "<group>"; };
 		3808158EAA3BE89F777F6196 /* WavetileWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WavetileWidgets.swift; sourceTree = "<group>"; };
 		3D755AFA0A1F31315F004D72 /* WavetileUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = WavetileUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		4C706364BB9CFD83B06858EF /* StorageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageTests.swift; sourceTree = "<group>"; };
 		51107A7FCB5C0404CF98041F /* NowPlayingWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingWidget.swift; sourceTree = "<group>"; };
 		5EB333D4B5F2B7A38F00ECED /* HomeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeTests.swift; sourceTree = "<group>"; };
 		600A6831CAFBA608604EC65C /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
@@ -139,6 +141,7 @@
 				5EB333D4B5F2B7A38F00ECED /* HomeTests.swift */,
 				9B3DBC04AB9BCCD7E614F3F9 /* SearchTypingTests.swift */,
 				174498F652785AFB46720C5B /* SongsActionsTests.swift */,
+				4C706364BB9CFD83B06858EF /* StorageTests.swift */,
 			);
 			path = UITests;
 			sourceTree = "<group>";
@@ -379,6 +382,7 @@
 				197535260D47403824DD5ACF /* HomeTests.swift in Sources */,
 				BFE7CD2369681FAAE8091B79 /* SearchTypingTests.swift in Sources */,
 				EF1E33EDFAA08C60822CD5FB /* SongsActionsTests.swift in Sources */,
+				262346DC288B79CB81D7A815 /* StorageTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -186,7 +186,6 @@ struct StorageView: View {
                 Text(title).font(theme.typography.itemTitle).foregroundStyle(theme.palette.textPrimary)
                 Text(subtitle).font(theme.typography.itemSubtitle).foregroundStyle(theme.palette.textSecondary)
             }
-            .lineLimit(1)
             Spacer(minLength: theme.spacing.sm)
             Text(detail)
                 .font(theme.typography.itemMetadata)
