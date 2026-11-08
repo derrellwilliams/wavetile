@@ -149,10 +149,9 @@ public final class AudioPlayer {
 
     public func resume() {
         guard hasQueue else { return }
-        activateSession()
         if player.currentItem == nil || player.currentItem?.status == .failed { loadCurrent() }
         isPlaying = true
-        player.play()
+        playOnceSessionIsActive()
         reportProgress(force: true)
         updateNowPlayingPlayback()
     }
@@ -282,7 +281,7 @@ public final class AudioPlayer {
         currentTime = 0
         duration = 0
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        deactivateSession()
     }
 
     // MARK: - Queue → AVQueuePlayer
@@ -299,10 +298,7 @@ public final class AudioPlayer {
         enqueueNext()
         applyRate()
         seekToResumePosition(track)
-        if isPlaying {
-            activateSession()
-            player.play()
-        }
+        if isPlaying { playOnceSessionIsActive() }
         didStart(track)
     }
 
@@ -621,11 +617,43 @@ public final class AudioPlayer {
 
     // MARK: - Audio session
 
-    private func activateSession() {
+    /// Session changes run in call order on one background queue: `setActive` can block for a
+    /// good while (a route change, another app's audio), and on the main thread that freezes the UI.
+    private static let sessionQueue = DispatchQueue(label: "com.derrellwilliams.wavetile.audio-session", qos: .userInitiated)
+
+    /// Bumped by every session request; a pending start that was overtaken (a newer play, a pause,
+    /// a stop) sees a different value and does nothing.
+    @ObservationIgnored private var sessionRequest = 0
+
+    /// Sets the category and activates the session off the main thread, then plays, so playback
+    /// still starts only after the category is set and the session is active, as before. Does
+    /// nothing if the listener paused or stopped in the meantime.
+    private func playOnceSessionIsActive() {
+        sessionRequest += 1
+        let request = sessionRequest
+        Self.sessionQueue.async { [weak self] in
+            Self.activate()
+            Task { @MainActor in
+                guard let self, request == self.sessionRequest, self.isPlaying else { return }
+                self.player.play()
+            }
+        }
+    }
+
+    private func deactivateSession() {
+        sessionRequest += 1
+        Self.sessionQueue.async { Self.deactivate() }
+    }
+
+    private nonisolated static func activate() {
         let session = AVAudioSession.sharedInstance()
         // Long-form audio routes AirPlay 2 like Music/Podcasts.
         try? session.setCategory(.playback, mode: .default, policy: .longFormAudio)
         try? session.setActive(true)
+    }
+
+    private nonisolated static func deactivate() {
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
     private func observeAudioSession() {

@@ -270,15 +270,22 @@ struct TintedBarIcon: View {
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.barIconInGroup) private var inGroup
     let glyph: Glyph
+    /// Just the icon on a plain 44pt square, for drawing it outside the bar (the system Back).
+    /// It's drawn as this view, not by reading `icon` off a bare instance: the environment
+    /// (theme, enabled) is only read once the view is installed, and a bare instance reads the defaults.
+    var plain = false
 
     var body: some View {
-        icon
-            // In a group, the group's capsule is the button.
-            .modifier(BarButtonShape(shape: .circle, width: TintedBar.size, isOn: !inGroup))
+        if plain {
+            icon
+        } else {
+            icon
+                // In a group, the group's capsule is the button.
+                .modifier(BarButtonShape(shape: .circle, width: TintedBar.size, isOn: !inGroup))
+        }
     }
 
-    /// The icon on a plain 44pt square, for drawing it outside the bar (the system Back).
-    var icon: some View {
+    private var icon: some View {
         glyph.image
             .foregroundStyle(theme.palette.accent)
             // In a capsule, the plain button style and `DimmingMenuStyle` dim each item.
@@ -574,7 +581,7 @@ private struct TintedSystemBack: UIViewControllerRepresentable {
         let scale: CGFloat
 
         @MainActor func render() -> UIImage? {
-            let renderer = ImageRenderer(content: TintedBarIcon(glyph: .back).icon
+            let renderer = ImageRenderer(content: TintedBarIcon(glyph: .back, plain: true)
                 .background {
                     if !TintedBar.drawsGlass { TintedBarFill(shape: .circle) }
                 }
