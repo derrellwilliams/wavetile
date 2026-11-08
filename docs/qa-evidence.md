@@ -116,6 +116,35 @@ Fixes committed in `92cc0cb`: splash is a modal accessibility element and stops 
 
 The original November 4 inventory was 111 tests (94 package + 17 UI), five UI suites, no CI or lint, and gaps around Downloads/Persistence/Features. This is historical, not a current coverage measurement. Useful test logging: use `XCTContext.runActivity(named:)` when print output is absent from result bundles; inspect bundles using `xcrun xcresulttool get test-results`.
 
+## QA-4 database migration and unusual-server-data tests — November 7, 2026
+
+Scope: tests and small hardening edits only.
+
+**Verification (run by Claude, iPhone 18 Pro Max, iOS 27.0, Debug):** the first build failed to compile (`appliedIdentifiers` returns a `Set`, not an array; fixed in both migration tests). After the fix: the 28 new tests pass (21 + 3 + 4); the full `WavetileKit-Package` scheme passes, 150 tests (196 runs with parameters), 0 failures (`build/Logs/Test/Test-WavetileKit-Package-2026.11.07_18-05-27--0700.xcresult`); the `Wavetile` scheme UI tests pass 17/17 (`Test-Wavetile-2026.11.07_18-05-47--0700.xcresult`). No sanitizer run on these edits. `xcodebuild` runs from Claude's session as a plain command; a command with a pipe falls back into the sandbox and fails.
+
+| Area | Added | What it covers |
+|---|---|---|
+| Podcast database migrations | `PodcastMigrationTests` (4) | A v1 database with a followed show, played episodes, Up Next and a download upgrades to current: positions, played dates, Up Next and downloads kept; v3 defaults (`people` = `[]`) and validator reset; v2-v6 indexes and tables exist; cascades intact; `foreign_key_check` and `integrity_check` clean; every migration applied once and a reopen is a no-op |
+| Library database migrations | `LibraryMigrationTests` (3) | A v1 database upgrades with content kept, new columns empty or defaulted, v2-v8 tables and indexes present, FTS search and its triggers still working after the ALTER migrations |
+| Unusual server data | `ServerDataTests` (21) | Items without IDs, bare items, blank and empty-array names, artist fallbacks, negative/huge durations, negative play counts, odd Unicode and 10k-character titles, genre-tag splitting, sort keys and sections, duplicate IDs in a page, unchanged pages, pruning with hostile IDs, hostile full-text search input |
+
+Source changes made to enable the tests (behavior otherwise unchanged): `migrator` is internal in `LibraryDatabase` and `PodcastDatabase`; artist, album and track mapping moved from inline closures into `ArtistRecord`/`AlbumRecord`/`TrackRecord` `init?(item:generation:)` in `Library/LibrarySync.swift`, with helpers in `Library/Mapping.swift`; `LibraryTests` now depends on `JellyfinKit`.
+
+Defects found by reading the mapping code and fixed along the way:
+- An empty `artists` array from the server gave a blank artist name instead of falling back to the album artist or "Unknown Artist". Blank or whitespace-only names (track, album, artist, playlist, collection) now fall back to the "Unknown …" placeholder; names are stored trimmed, so the next sync rewrites any row that had padding.
+- Durations weren't bounded. Negative values are now 0 and anything over a year is capped, so summing a hostile playlist's entry durations can no longer overflow `Int` and trap. Negative play counts are 0.
+- `SortKey.make("The  Beatles")` (two spaces) left a leading space, which sorted the item before everything else. The remainder is now trimmed.
+
+Noted, not changed: a sync pass that sees a total of 0 returns an empty "seen" set, and the prune then deletes every row of that type. That is right for a truly empty library and costs only a resync otherwise (downloads live in their own tables), but a server that answers 200 with zero items would clear the cache. Not covered by a test because the behavior may be intended.
+
+Still open for QA-4: nothing in scope. Migration tests for `downloadedTrack` bookkeeping beyond the v2 tables checked here are P2 with the download engine tests.
+
+**Runtime warnings in the UI run, found and fixed the same day:** the first UI run showed `Accessing Environment<Bool>'s / Environment<Theme>'s value outside of being installed on a View` (about 17 each, so the Nov 7 `ButtonStyle` change had not been the cause) and `AVAudioSession_iOS.mm:978 … UI unresponsiveness if called on the main thread` (once).
+- **Environment warning, cause found with a symbolicated backtrace** (`xcrun simctl spawn booted log stream --backtrace`, then `atos` against `Wavetile.debug.dylib`): `TintedSystemBack.Style.render()` drew the back chevron with `TintedBarIcon(glyph: .back).icon`, reading a computed property off a bare struct that was never installed in a view. Its `@Environment` reads (theme, enabled) therefore returned the defaults. This was a real defect, not only a warning: the chevron was drawn in the default Dark theme's accent whatever theme the app used, and `.environment(\.theme, theme)` applied afterward didn't reach it. Fix: `TintedBarIcon` has a `plain` mode that draws just the icon from its own `body`, the renderer uses that, and `icon` is private (`Features/Main/MainTabView.swift`). The Nov 7 `ButtonStyle` rewrite stays; it's harmless.
+- **AVAudioSession warning, fixed (was "keep for 1.0").** `AudioPlayer` now sets the category and activates the session on one serial background queue and calls `player.play()` once activation completes, only if no newer request overtook it and the listener hasn't paused; `stop()` queues the deactivation on the same queue, so activate and deactivate keep call order. Now Playing and progress reporting follow `isPlaying`, so only the audio start waits for the session (typically milliseconds). **Not verified on a device:** interruptions, route changes, AirPlay and CarPlay still need the device pass (rows 23-29 in [carplay-device-checklist.md](carplay-device-checklist.md)); a start that never fires after an interruption is the failure to look for.
+
+**Verification after the fixes:** package scheme 150/150 (196 runs), 0 failures (`Test-WavetileKit-Package-2026.11.07_18-25-07--0700.xcresult`); `Wavetile` UI scheme 17/17 with an empty `runtimeWarnings` list (`Test-Wavetile-2026.11.07_18-37-38--0700.xcresult`), against about 35 warnings before. One earlier full run after the fixes failed `HomeTests/testWaveAndHomeTabScrollToTop` ("Wave tap didn't scroll to the top", 168.0 vs 1449.3); it passed when run alone and in the next full run, so it is recorded as a one-off with no cause found. Watch for it recurring.
+
 ## Deferred scope
 
 **October 24 nonblocking backlog — revalidate before scheduling:** offline-play reporting to Jellyfin, incremental library sync, multi-account support, collection rename and AudioPlayer engine tests. Do not infer these are still missing from an old note; engine coverage is explicitly assessed in QA-4. iPhone/portrait-only support is intentional.

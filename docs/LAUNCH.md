@@ -4,6 +4,8 @@ The single working checklist for App Store preparation, launch and follow-up. Up
 
 - Evidence behind the gates: [qa-evidence.md](qa-evidence.md) (security, privacy, Release/config, sanitizer records).
 - App Store, web search and LLM discoverability notes (ASO, SEO, GEO): [search-optimization.md](search-optimization.md).
+- Submission drafts (Nov 7, unreviewed): [app-review-notes.md](app-review-notes.md), [privacy-answers.md](privacy-answers.md).
+- CarPlay and background-audio device pass: [carplay-device-checklist.md](carplay-device-checklist.md).
 
 Consolidated 2026-11-06 and reorganized 2026-11-07 (tiers below, evidence and search notes split out). Historical test results are preserved, not rerun or certification of the latest build. This plan doesn't itself authorize uploads, CI setup, delegation, commits or public posts.
 
@@ -23,7 +25,7 @@ Consolidated 2026-11-06 and reorganized 2026-11-07 (tiers below, evidence and se
 **Next steps, in order**
 1. Quick wins (minutes each): deploy the corrected privacy policy with the site; confirm agreements, pricing and territories in App Store Connect; verify domain transfer lock, DNSSEC and Cloudflare 2FA.
 2. Decide the reviewer demo server (P0, first row).
-3. Run the tests on the Nov 7 QA-3/QA-2 edits (the Claude session's sandbox can't run `xcodebuild`), then finish QA-3 and QA-2 against the table below. Both are otherwise down to the device checks and the two warnings.
+3. ~~Run the tests on the Nov 7 QA-3/QA-2 edits~~ (done Nov 7, all passing; both warnings fixed, zero runtime warnings), then finish QA-3 and QA-2 against the table below. Both are otherwise down to the device checks.
 4. Early device pass on CarPlay and background audio on the current TestFlight build, since those can force large fixes.
 5. Freeze, cut one RC build, run the full QA-6 device checklist and the P0 listing work on it.
 
@@ -57,17 +59,17 @@ Project goals, not Apple requirements. Each has a "done when" so it can't run fo
 | QA-2 | Partial, Nov 7 | Engineering | Code review of Playback, Downloads, Persistence/Sync, Podcasts, JellyfinKit and CarPlay. Fixed: an endless skip loop, unbounded server-sync decoding, an empty-feed prune (details in qa-evidence.md). Open items under "QA-2 / QA-3 remaining" below. A second-opinion review (was QA-10) is optional |
 | QA-8 | Partial | Engineering + User | Remaining items are P0 (policy deploy, privacy answers, reviewer access) plus runtime background audio and CarPlay checks from QA-6. Privacy slice Nov 6 and Release/config slice Nov 7 are done |
 | QA-6 | Open | User + Engineering | P0 device scenarios below pass on the RC; failures investigated |
-| QA-4 | Open | Engineering | Database migration tests and unusual-server-data tests added (the first update will exercise migrations). Download manager/engine and AudioPlayer engine tests are P2 |
+| QA-4 | Done Nov 7 | Engineering | Database migration tests and unusual-server-data tests added and passing: 28 new tests, full package scheme 150/150 (196 runs), UI 17/17 (qa-evidence.md). They also led to fixes for blank names, bad durations and a sort-key edge case. Download manager/engine and AudioPlayer engine tests are P2 |
 | QA-5 | Open | Engineering | Xcode Analyze triaged and results recorded (the compiler warnings from the Release build included) |
 | QA-7 | Ongoing | User | Organizer/TestFlight crash reports inspected during beta and before submission; record build, period and unresolved crashes |
 | QA-1 | Done Nov 5 | Engineering | Sanitizer runs complete. Retest affected paths after later fixes |
 
 ### QA-2 / QA-3 remaining
 
-- [ ] **Engineering:** run the package and UI tests on the Nov 7 edits. They are uncompiled, and the Claude session's sandbox can't run `xcodebuild`.
-- [ ] **Engineering:** in a debug run, confirm the `Environment<Theme/Bool>` warning is gone (ButtonStyle bodies now wrap a View).
-- [ ] **Engineering:** decide the `AVAudioSession`-on-main-thread warning (proposed: keep for 1.0 and cover on device).
-- [ ] **Engineering:** note the CarPlay review items for the device pass (QA-6).
+- [x] **Engineering:** run the package and UI tests on the Nov 7 edits. Done Nov 7: package 150/150, UI 17/17 (Claude can run `xcodebuild` as a plain command; see qa-evidence.md).
+- [x] **Engineering:** `Environment<Theme/Bool>` warning fixed Nov 7. The cause was the back-chevron renderer reading a bare `TintedBarIcon`'s environment (it also used the default theme); UI run now shows zero runtime warnings.
+- [ ] **User:** the `AVAudioSession` main-thread warning is fixed in code (activation moved to a serial background queue, play waits for it); verify interruptions, route changes, AirPlay and CarPlay on device (QA-6, rows 23-29 of the CarPlay checklist).
+- [x] **Engineering:** note the CarPlay review items for the device pass (QA-6). Done Nov 7 in [carplay-device-checklist.md](carplay-device-checklist.md); the pass itself is a User task.
 - [ ] **User:** verify AVFoundation streaming redirects with a redirecting proxy.
 - [ ] **User:** verify Keychain cleanup on device.
 - [ ] **Engineering:** recheck dependency advisories on the final archive.
