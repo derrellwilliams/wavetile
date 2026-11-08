@@ -105,8 +105,9 @@ struct SettingsDrawer: View {
                 Label("Use Cellular Data", glyph: .address)
             }
             Button { showStorage = true } label: {
-                SettingsValue("Storage Used", glyph: .downloads, value: StorageView.size(downloads.totalBytes + podcasts.totalBytes))
+                SettingsValue("Storage Used", glyph: .downloads, value: StorageView.size(downloads.totalBytes + (podcasts.isEnabled ? podcasts.totalBytes : 0)))
             }
+            .accessibilityHint("Shows what is using space and lets you remove downloads")
             .sheet(isPresented: $showStorage) { StorageView() }
             Button {
                 confirmRemoveDownloads = true
