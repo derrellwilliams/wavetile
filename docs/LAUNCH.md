@@ -13,10 +13,10 @@ Consolidated 2026-11-06 and reorganized 2026-11-07 (tiers below, evidence and se
 
 | Area | State / evidence |
 |---|---|
-| Candidate | Version 1.0.0, build 202611061835, from `2a52299`; uploaded Nov 6, processing and external availability not verified. **Fixes since then are in no build** (RedirectGuard, OPML bound, Keychain retry, privacy links), so the RC must be a new build |
+| Candidate | Version 1.0.0, build 202611061835, from `2a52299`; uploaded Nov 6, processing and external availability not verified. **Fixes since then are on `main` but in no build** (RedirectGuard, OPML bound, Keychain retry, privacy links, server-data hardening, back-chevron theme fix, audio session off the main thread), so the RC must be a new build |
 | Public beta | Build 202610281900 approved for external testing; link https://testflight.apple.com/join/pk9dyfMq. That approval doesn't cover newer builds |
 | Signing / CarPlay | Team, app record and App Group done. CarPlay Audio granted and enabled; signed CarPlay build 202610301302 uploaded Oct 30 (`8af183f`) |
-| Automated QA | Nov 5: 94/94 package tests under ASan and TSan, no reports; plain UI run 17/17. Later targeted runs in qa-evidence.md |
+| Automated QA | Nov 7 (Debug, iPhone 18 Pro Max, iOS 27.0): package scheme 151/151 (197 runs) and UI 17/17 with zero runtime warnings, after the QA-2/3/4 edits and a medium code review of them. Nov 5: 94/94 under ASan and TSan, none rerun on the Nov 7 edits. One earlier Nov 7 UI run failed `testWaveAndHomeTabScrollToTop` once, then passed (cause not found). Details in qa-evidence.md |
 | Website / repo | Site, support/privacy pages, guides, llms.txt, JSON-LD, sitemap live; MPL-2.0 and README in place. Service/account configuration not reverified Nov 6 |
 | Review access | Earlier plan: `https://demo.jellyfin.org/stable`, user `demo`, blank password. **Decision needed:** see P0 |
 | Contact | realslimscrawny@gmail.com (site, support, privacy) |
@@ -26,7 +26,7 @@ Consolidated 2026-11-06 and reorganized 2026-11-07 (tiers below, evidence and se
 1. Quick wins (minutes each): deploy the corrected privacy policy with the site; confirm agreements, pricing and territories in App Store Connect; verify domain transfer lock, DNSSEC and Cloudflare 2FA.
 2. Decide the reviewer demo server (P0, first row).
 3. ~~Run the tests on the Nov 7 QA-3/QA-2 edits~~ (done Nov 7, all passing; both warnings fixed, zero runtime warnings), then finish QA-3 and QA-2 against the table below. Both are otherwise down to the device checks.
-4. Early device pass on CarPlay and background audio on the current TestFlight build, since those can force large fixes.
+4. Early device pass on CarPlay and background audio, since those can force large fixes. Do it on a new TestFlight build, not 202611061835: the audio-session change (activation now off the main thread) is only in `main` and is the main thing to verify (rows 23-29 of [carplay-device-checklist.md](carplay-device-checklist.md)).
 5. Freeze, cut one RC build, run the full QA-6 device checklist and the P0 listing work on it.
 
 ## Before submission
