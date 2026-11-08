@@ -17,10 +17,15 @@ final class SignInModel {
     var errorMessage: String?
 
     private let app: AppModel
+    private let authorizationID: UUID
     private var quickConnectTask: Task<Void, Never>?
 
     init(app: AppModel) {
         self.app = app
+        self.authorizationID = app.authorizationID
+        if case let .signedIn(current) = app.phase {
+            addressText = current.session.serverURL.absoluteString
+        }
     }
 
     var transportWarning: ServerAddress.TransportWarning? {
@@ -63,7 +68,8 @@ final class SignInModel {
                     case let .code(code):
                         quickConnectCode = code
                     case let .signedIn(session, token):
-                        try app.didSignIn(session, token: token)
+                        try Task.checkCancellation()
+                        try completeSignIn(session, token: token)
                     }
                 }
             } catch is CancellationError {
@@ -85,14 +91,23 @@ final class SignInModel {
         defer { isWorking = false }
         do {
             let (session, token) = try await app.auth.signIn(server, username: username, password: password)
-            try app.didSignIn(session, token: token)
+            try Task.checkCancellation()
+            try completeSignIn(session, token: token)
         } catch {
             errorMessage = Self.message(for: error)
         }
     }
 
+    private func completeSignIn(_ session: ServerSession, token: String) throws {
+        // Ignore a sign-in response after sign-out or another account became active.
+        guard authorizationID == app.authorizationID else { throw CancellationError() }
+        try app.didSignIn(session, token: token)
+    }
+
     static func message(for error: any Error) -> String {
         switch error {
+        case AppModel.ReauthenticationError.wrongAccount:
+            "Sign in to the same server and account to keep your downloads. To switch accounts, close this sheet and sign out in Settings."
         case ServerAddress.InputError.empty: "Enter your server address."
         case ServerAddress.InputError.invalid: "That doesn't look like a valid address."
         case AuthService.AuthError.notAJellyfinServer: "No Jellyfin server found at that address."

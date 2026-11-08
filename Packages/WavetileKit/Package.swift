@@ -93,6 +93,11 @@ let package = Package(
             swiftSettings: uiSettings
         ),
         .testTarget(
+            name: "FeaturesTests",
+            dependencies: ["Features", "JellyfinKit"],
+            swiftSettings: uiSettings
+        ),
+        .testTarget(
             name: "PlaybackTests",
             dependencies: ["Playback"],
             swiftSettings: serviceSettings

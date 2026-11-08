@@ -100,7 +100,7 @@ Activation now runs on a serial background queue and playback waits for it. Veri
 | 31 | Background for 30+ minutes with downloads running | No stall at track boundaries; no kill by the system |
 | 32 | Low Power Mode on during playback | Playback continues; the podcast refresh BGTask may be deferred |
 | 33 | Streaming a transcoded track (non-direct-play format) vs a FLAC | Both play; note any difference in start latency |
-| 34 | Token expiry during playback | Skips stop after at most 10 failures in a row rather than looping the queue and hitting the server (the QA-2 fix); sign-in prompt follows |
+| 34 | Token expiry during playback | Skips stop after at most 10 failures in a row rather than looping the queue and hitting the server (the QA-2 fix). On confirmed 401, “Session expired. Sign in again” appears. Close the sign-in sheet and verify downloaded playback still works; reauthenticate as the same account and verify streaming resumes with downloads/progress intact (R1-02 fix; new build required) |
 
 ## Notes to capture
 

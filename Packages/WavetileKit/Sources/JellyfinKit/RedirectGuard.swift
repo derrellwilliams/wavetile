@@ -25,11 +25,20 @@ public final class RedirectGuard: NSObject, URLSessionTaskDelegate, Sendable {
         guard !isSameOrigin(original, target) else { return request }
         // 307/308 can preserve a login password or Quick Connect secret in the body.
         // Stripping Authorization alone does not protect those credentials.
-        guard ["GET", "HEAD"].contains(request.httpMethod ?? "GET"),
+        guard !hasCredentials(original), !hasCredentials(target),
+              ["GET", "HEAD"].contains(request.httpMethod ?? "GET"),
               request.httpBody == nil, request.httpBodyStream == nil else { return nil }
         var request = request
         request.setValue(nil, forHTTPHeaderField: "Authorization")
         return request
+    }
+
+    private static func hasCredentials(_ url: URL) -> Bool {
+        if url.user != nil || url.password != nil { return true }
+        let sensitive = ["secret", "api_key", "apikey", "access_token", "token"]
+        return URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.contains {
+            sensitive.contains($0.name.lowercased())
+        } == true
     }
 
     /// True when a finished or failed task ended up on a different origin than the one requested,

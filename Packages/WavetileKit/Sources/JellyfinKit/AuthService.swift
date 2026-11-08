@@ -4,11 +4,17 @@ import Foundation
 /// Server validation and sign-in (Quick Connect or username/password).
 public struct AuthService: Sendable {
     public let identity: ClientIdentity
+    public let authorization: SessionAuthorization?
     private let sessionConfiguration: URLSessionConfiguration
 
-    public init(identity: ClientIdentity, sessionConfiguration: URLSessionConfiguration = .default) {
+    public init(identity: ClientIdentity, sessionConfiguration: URLSessionConfiguration = .default, authorization: SessionAuthorization? = nil) {
+        self.authorization = authorization
         self.identity = identity
         self.sessionConfiguration = sessionConfiguration
+    }
+
+    public func withAuthorization(_ authorization: SessionAuthorization) -> AuthService {
+        AuthService(identity: identity, sessionConfiguration: sessionConfiguration, authorization: authorization)
     }
 
     public struct ServerInfo: Sendable, Equatable {
@@ -43,7 +49,7 @@ public struct AuthService: Sendable {
                 deviceID: identity.deviceID,
                 version: identity.version
             ),
-            delegate: ServerIdentityCheck(),
+            delegate: ServerIdentityCheck(authorization: token == nil ? nil : authorization),
             sessionConfiguration: sessionConfiguration,
             sessionDelegate: RedirectGuard.shared
         )

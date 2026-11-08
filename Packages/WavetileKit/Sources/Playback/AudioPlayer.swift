@@ -533,7 +533,7 @@ public final class AudioPlayer {
     private func itemFailed(_ item: AVPlayerItem) {
         guard let track = queue.current else { return }
         // Confirm before treating the source as down: one slow or dropped stream isn't an outage.
-        if Self.isConnectionError(item.error), let recheck = onConnectionError {
+        if let recheck = onConnectionError {
             Task {
                 await recheck(track)
                 // Unless the listener has moved on in the meantime.

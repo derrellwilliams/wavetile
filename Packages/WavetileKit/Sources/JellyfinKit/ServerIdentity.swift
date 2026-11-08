@@ -116,7 +116,31 @@ public final class ServerIdentity: Sendable {
 
 /// Holds API requests that carry the token until `ServerIdentity` vouches for the server.
 struct ServerIdentityCheck: APIClientDelegate {
+    var authorization: SessionAuthorization? = nil
+
+    func client(_ client: APIClient, validateResponse response: HTTPURLResponse, data: Data, task: URLSessionTask) throws {
+        if response.statusCode == 401, let authorization,
+           let original = task.originalRequest?.url, let final = response.url,
+           RedirectGuard.isSameOrigin(original, final),
+           let header = task.originalRequest?.value(forHTTPHeaderField: "Authorization"),
+           let token = Self.token(in: header) {
+            authorization.reject(token: token)
+        }
+        guard (200..<300).contains(response.statusCode) else {
+            throw APIError.unacceptableStatusCode(response.statusCode)
+        }
+    }
+
+    private static func token(in header: String) -> String? {
+        header.replacingOccurrences(of: "MediaBrowser ", with: "").components(separatedBy: ", ").first(where: { $0.hasPrefix("Token=") })
+            .map { String($0.dropFirst(6)) }
+    }
+
     func client(_ client: APIClient, willSendRequest request: inout URLRequest) async throws {
+        if let authorization, let header = request.value(forHTTPHeaderField: "Authorization") {
+            let fields = header.replacingOccurrences(of: "MediaBrowser ", with: "").components(separatedBy: ", ").filter { !$0.hasPrefix("Token=") }
+            request.setValue("MediaBrowser " + (fields + ["Token=\(authorization.token)"]).joined(separator: ", "), forHTTPHeaderField: "Authorization")
+        }
         guard let url = request.url,
               request.value(forHTTPHeaderField: "Authorization")?.contains("Token=") == true
         else { return }

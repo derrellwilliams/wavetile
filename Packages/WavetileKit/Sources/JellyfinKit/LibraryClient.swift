@@ -81,13 +81,24 @@ public struct LibraryClient: Sendable {
     public let session: ServerSession
     let client: JellyfinAPI.JellyfinClient
     let identity: ClientIdentity
-    let token: String
+    private let initialToken: String
+    let authorization: SessionAuthorization?
+    var token: String { authorization?.token ?? initialToken }
 
     public init(session: ServerSession, token: String, auth: AuthService) {
         self.session = session
         self.client = auth.makeClient(for: session.serverURL, token: token)
         self.identity = auth.identity
-        self.token = token
+        self.initialToken = token
+        self.authorization = auth.authorization
+    }
+
+    /// Checks credentials after a media failure; only a server 401 triggers recovery.
+    public func checkAuthentication() async {
+        _ = try? await client.send(Paths.getCurrentUser) {
+            $0.timeoutInterval = 6
+            $0.cachePolicy = .reloadIgnoringLocalCacheData
+        }
     }
 
     /// Newest albums added to the library.

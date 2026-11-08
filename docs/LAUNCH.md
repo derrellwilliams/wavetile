@@ -73,6 +73,27 @@ Project goals, not Apple requirements. Each has a "done when" so it can't run fo
 - [x] **Engineering:** Nov 7 current-pin advisory recheck: 20 OSV queries returned no matches; recent upstream NIO fix thresholds checked. Details and coverage limits in qa-evidence.md.
 - [ ] **Engineering:** recheck dependency advisories and the actual dependency inventory on the final archive.
 
+### Targeted pre-release reviews — added November 7, 2026
+
+Review the full app in bounded subsystems, then review interactions across their boundaries. This extends QA-2/QA-3; earlier reviews remain historical evidence, not completion of this pass. Track findings and verification in [qa-evidence.md](qa-evidence.md); real-device execution stays in [testparty.md](testparty.md).
+
+| Order | Scope | Status |
+|---|---|---|
+| 1 | Authentication/networking: credentials, redirects, transport, restore, logout and server switching | Initial source review and R1-01/R1-02 fixes Nov 7; device evidence outstanding |
+| 2 | Playback/queue: concurrency, transitions, interruptions, background operation and restoration | Pending |
+| 3 | Persistence/library sync: migrations, partial sync, stale records and account isolation | Pending |
+| 4 | Downloads/offline: interruption, missing files, cleanup and fallback | Pending |
+| 5 | Podcasts: malformed feeds, subscription sync, progress and external URLs | Pending |
+| 6 | System integrations: CarPlay, Siri, widgets, Live Activities and shared state | Pending |
+| 7 | Screens/release configuration: errors, accessibility, navigation, debug behavior and entitlements | Pending |
+| 8 | Cross-subsystem scenarios: server switch during download, network loss during playback, termination during sync and upgrade with existing data | Pending |
+
+Each pass traces user flows through dependencies and records findings with source locations, severity, impact and reproduction/verification steps. Fix release blockers and add meaningful regression coverage; record optional refactors separately. A pass closes only when findings are fixed and verified or explicitly deferred with rationale. Source review does not replace device sign-off.
+
+- [x] **R1-01 (high):** blocked cross-origin redirects when the original or destination URL contains credential query parameters/userinfo; regression coverage added Nov 7. See qa-evidence.md.
+- [x] **R1-02 (medium):** added a persistent reauthentication action on authenticated API 401s, media-failure credential checks, and in-place credential replacement for the same account. Automated recovery/data-preservation coverage added Nov 7; final-device interaction check remains in testparty.
+- [ ] Complete the existing media-redirect and Keychain device checks in testparty before closing section 1. Review server-switch cancellation/data isolation further in sections 3, 4 and 8.
+
 ### P2 — Deferred (explicit)
 
 - QA-9: GitHub Actions package-test CI. Revisit after first submission.

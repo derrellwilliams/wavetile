@@ -24,9 +24,15 @@ public final class AppModel {
         let player: AudioPlayer
         let downloads: DownloadsStore
         let podcasts: PodcastsStore
+        let authorization: SessionAuthorization?
+        let authorizationID: UUID
     }
 
     public private(set) var phase: Phase = .launching
+    var needsReauthentication = false
+    var showsReauthentication = false
+    private var authorization: SessionAuthorization?
+    private(set) var authorizationID = UUID()
     public let auth: AuthService
     private let store: SessionStore
     // Stored on the model, not in @AppStorage, so non-view code can read it later (widgets, Now Playing).
@@ -37,8 +43,8 @@ public final class AppModel {
     /// The app's model, for entry points that don't go through SwiftUI (CarPlay, Siri).
     public private(set) static weak var current: AppModel?
 
-    public init(deviceName: String, store: SessionStore = SessionStore()) {
-        self.auth = AuthService(identity: .load(deviceName: deviceName))
+    public init(deviceName: String, store: SessionStore = SessionStore(), auth: AuthService? = nil) {
+        self.auth = auth ?? AuthService(identity: .load(deviceName: deviceName))
         self.store = store
         let savedTheme = UserDefaults.standard.string(forKey: "themeID")
         self.theme = Theme.all.first { $0.id == savedTheme } ?? .dark
@@ -56,7 +62,7 @@ public final class AppModel {
         guard case .launching = phase else { return }
         if let (session, token) = store.load(), Self.isTransportAllowed(session.serverURL),
            let signedIn = try? makeSignedIn(session, token: token) {
-            phase = .signedIn(signedIn)
+            activate(signedIn)
         } else {
             // No saved session, or no usable library storage (signing in again reports why).
             phase = .signedOut
@@ -68,9 +74,29 @@ public final class AppModel {
         (try? ServerAddress(url.absoluteString))?.transportWarning != .insecureRemote
     }
 
+    enum ReauthenticationError: Error { case wrongAccount }
+
     public func didSignIn(_ session: ServerSession, token: String) throws {
+        if case let .signedIn(current) = phase {
+            guard current.session.serverID == session.serverID,
+                  current.session.userID == session.userID,
+                  current.session.serverURL == session.serverURL else {
+                throw ReauthenticationError.wrongAccount
+            }
+            try store.save(session, token: token)
+            authorization?.replaceToken(token)
+            needsReauthentication = false
+            showsReauthentication = false
+            return
+        }
         let signedIn = try makeSignedIn(session, token: token)
         try store.save(session, token: token)
+        activate(signedIn)
+    }
+
+    private func activate(_ signedIn: SignedIn) {
+        authorization = signedIn.authorization
+        authorizationID = signedIn.authorizationID
         phase = .signedIn(signedIn)
     }
 
@@ -83,7 +109,17 @@ public final class AppModel {
         } catch {
             do { database = try LibraryDatabase.temporary() } catch { throw StorageUnavailable() }
         }
-        let library = LibraryStore(session: session, token: token, auth: auth, database: database)
+        let authorizationID = UUID()
+        let authorization = SessionAuthorization(token: token) { [weak self] in
+            Task { @MainActor in
+                guard let self, self.authorizationID == authorizationID,
+                      self.authorization?.isRejected == true,
+                      case .signedIn = self.phase else { return }
+                self.needsReauthentication = true
+            }
+        }
+        let accountAuth = auth.withAuthorization(authorization)
+        let library = LibraryStore(session: session, token: token, auth: accountAuth, database: database)
         let downloads = DownloadsStore(session: session, library: library)
         let player = AudioPlayer(library: library.api)
         let podcastDatabase = (try? PodcastDatabase.open(serverID: session.serverID, userID: session.userID)) ?? (try? PodcastDatabase.temporary())
@@ -102,7 +138,10 @@ public final class AppModel {
                 : downloads?.isDownloaded(track.trackID) == true
         }
         player.onConnectionError = { track in
-            if !track.isEpisode { await Connectivity.shared.recheck() }
+            if !track.isEpisode {
+                await Connectivity.shared.recheck()
+                if Connectivity.shared.isOnline { await library.api.checkAuthentication() }
+            }
         }
         Connectivity.shared.server = .init(url: session.serverURL, id: session.serverID)
         Connectivity.shared.onNetworkChange = { [weak downloads] in await downloads?.networkChanged() }
@@ -114,7 +153,7 @@ public final class AppModel {
         player.onUnreportedPlay = { [weak library] trackID, date in
             Task { try? await library?.database.queuePlay(trackID: trackID, at: date) }
         }
-        return SignedIn(session: session, library: library, player: player, downloads: downloads, podcasts: podcasts)
+        return SignedIn(session: session, library: library, player: player, downloads: downloads, podcasts: podcasts, authorization: authorization, authorizationID: authorizationID)
     }
 
     public func signOut() async {
@@ -137,6 +176,10 @@ public final class AppModel {
             RecentSearches.clearStored()
             ImageCaching.removeAll()
         }
+        authorizationID = UUID()
+        authorization = nil
+        needsReauthentication = false
+        showsReauthentication = false
         store.clear()
         phase = .signedOut
     }
@@ -199,7 +242,7 @@ extension AppModel {
             let store = LibraryStore(session: session, token: "", auth: model.auth, database: try! LibraryDatabase.temporary())
             let player = AudioPlayer(library: store.api)
             let podcasts = PodcastsStore(session: session, library: store.api, player: player, database: try! PodcastDatabase.temporary())
-            model.phase = .signedIn(.init(session: session, library: store, player: player, downloads: DownloadsStore(session: session, library: store), podcasts: podcasts))
+            model.phase = .signedIn(.init(session: session, library: store, player: player, downloads: DownloadsStore(session: session, library: store), podcasts: podcasts, authorization: nil, authorizationID: UUID()))
         } else {
             model.phase = .signedOut
         }

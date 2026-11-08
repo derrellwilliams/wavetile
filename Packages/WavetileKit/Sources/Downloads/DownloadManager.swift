@@ -258,6 +258,9 @@ extension DownloadManager: URLSessionDownloadDelegate {
             return
         }
         if let http = downloadTask.response as? HTTPURLResponse, !(200 ..< 300).contains(http.statusCode) {
+            if http.statusCode == 401 {
+                Task { await library.checkAuthentication() }
+            }
             markFailed(trackID, "Server returned \(http.statusCode)")
             return
         }

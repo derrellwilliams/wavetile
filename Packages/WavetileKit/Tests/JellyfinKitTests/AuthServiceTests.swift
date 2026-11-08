@@ -107,4 +107,38 @@ struct AuthServiceTests {
             for try await _ in service.quickConnect(info) {}
         }
     }
+    @Test func unauthorizedRecoveryAndTokenReplacement() async throws {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockURLProtocol.self]
+        let authorization = SessionAuthorization(token: "expired") {}
+        let auth = AuthService(identity: service.identity, sessionConfiguration: config, authorization: authorization)
+        let client = auth.makeClient(for: URL(string: "https://music.example")!, token: "expired")
+        MockURLProtocol.reset(["/Users/Me": (401, "{}")])
+        _ = try? await client.send(Paths.getCurrentUser)
+        #expect(authorization.isRejected)
+
+        authorization.replaceToken("renewed")
+        // A late response to an old request must not expire the replacement credential.
+        authorization.reject(token: "expired")
+        #expect(!authorization.isRejected)
+        MockURLProtocol.reset(["/Users/Me": (200, #"{"Id":"u1"}"#)])
+        _ = try await client.send(Paths.getCurrentUser)
+        #expect(MockURLProtocol.requests.last?.value(forHTTPHeaderField: "Authorization")?.contains("Token=renewed") == true)
+
+        let session = ServerSession(serverURL: URL(string: "https://music.example")!, serverID: "srv1", serverName: "Home", userID: "u1", userName: "Test")
+        let library = LibraryClient(session: session, token: "expired", auth: auth)
+        #expect(library.streamRequest(trackID: "track")?.headers["Authorization"]?.contains("renewed") == true)
+    }
+
+    @Test(arguments: [403, 404, 500, 503])
+    func nonAuthenticationFailuresDoNotExpireSession(_ status: Int) async {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockURLProtocol.self]
+        let authorization = SessionAuthorization(token: "valid") {}
+        let auth = AuthService(identity: service.identity, sessionConfiguration: config, authorization: authorization)
+        MockURLProtocol.reset(["/Users/Me": (status, "{}")])
+        _ = try? await auth.makeClient(for: URL(string: "https://music.example")!, token: "valid").send(Paths.getCurrentUser)
+        #expect(!authorization.isRejected)
+    }
+
 }

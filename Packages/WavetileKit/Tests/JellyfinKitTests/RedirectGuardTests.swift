@@ -67,6 +67,20 @@ struct RedirectGuardTests {
         #expect(RedirectGuard.leftOrigin(requested: URL(string: requested), ended: URL(string: ended)) == expected)
     }
 
+    @Test(arguments: ["secret", "Secret", "api_key", "ApiKey", "access_token", "token"])
+    func refusesQueryCredentialsOffOrigin(_ name: String) {
+        let source = URL(string: "https://music.example/QuickConnect/Connect?\(name)=synthetic")!
+        let clean = URL(string: "https://other.example/poll")!
+        let secret = URL(string: "https://other.example/poll?\(name)=synthetic")!
+        // Refuse even if the redirected URL removed the original secret.
+        #expect(RedirectGuard.request(URLRequest(url: clean), redirectedFrom: source) == nil)
+        #expect(RedirectGuard.request(URLRequest(url: secret), redirectedFrom: source) == nil)
+        #expect(RedirectGuard.request(URLRequest(url: secret), redirectedFrom: URL(string: "https://music.example/poll")) == nil)
+        #expect(RedirectGuard.request(URLRequest(url: source), redirectedFrom: source) != nil)
+        let downgrade = URL(string: "http://music.example/poll?\(name)=synthetic")!
+        #expect(RedirectGuard.request(URLRequest(url: downgrade), redirectedFrom: source) == nil)
+    }
+
     @Test
     func unknownURLsAreNotTreatedAsRedirects() {
         #expect(!RedirectGuard.leftOrigin(requested: nil, ended: URL(string: "https://a.example")))

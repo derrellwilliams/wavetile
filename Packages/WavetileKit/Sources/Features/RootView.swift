@@ -5,7 +5,7 @@ import UIKit
 /// App entry view: applies the theme and switches between sign-in and the main UI.
 public struct RootView: View {
     @ObserveInjection var inject
-    let app: AppModel
+    @Bindable var app: AppModel
     /// Covers the first moments after launch with the turning cube over the drifting waves,
     /// picking up from the launch image.
     @State private var showsSplash = true
@@ -30,6 +30,17 @@ public struct RootView: View {
                     .id(signedIn.session)
                     .transition(.opacity)
             }
+        }
+        .safeAreaInset(edge: .top) {
+            if app.needsReauthentication {
+                Button("Session expired. Sign in again") { app.showsReauthentication = true }
+                    .padding(app.theme.spacing.sm)
+                    .frame(maxWidth: .infinity)
+                    .background(app.theme.palette.surface)
+            }
+        }
+        .sheet(isPresented: $app.showsReauthentication) {
+            SignInFlow(app: app)
         }
         .overlay {
             if showsSplash {
