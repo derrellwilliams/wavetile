@@ -21,14 +21,16 @@ struct StorageView: View {
     @State private var confirmRemovePlayed = false
     @State private var freeBytes: Int64?
 
-    private var music: [DownloadedCollection] {
-        collections.filter { $0.bytes > 0 || $0.status.isRequested }.sorted { $0.bytes > $1.bytes }
-    }
-
+    /// Sorted largest first and kept in state, so a render doesn't re-sort them (see `refresh()`).
+    @State private var music: [DownloadedCollection] = []
     /// Empty with podcasts off: their downloads stay on disk but are out of sight here.
-    private var finishedEpisodes: [EpisodeItem] {
-        guard podcasts.isEnabled else { return [] }
-        return episodes.filter { $0.download?.state == .done }.sorted { ($0.download?.bytes ?? 0) > ($1.download?.bytes ?? 0) }
+    @State private var finishedEpisodes: [EpisodeItem] = []
+
+    private func refresh() {
+        music = collections.filter { $0.bytes > 0 || $0.status.isRequested }.sorted { $0.bytes > $1.bytes }
+        finishedEpisodes = podcasts.isEnabled
+            ? episodes.filter { $0.download?.state == .done }.sorted { ($0.download?.bytes ?? 0) > ($1.download?.bytes ?? 0) }
+            : []
     }
 
     /// Played episodes that aren't saved: what "Remove played downloads" would clear.
@@ -56,7 +58,7 @@ struct StorageView: View {
                             row(
                                 title: item.collection.name,
                                 subtitle: item.collection.subtitle,
-                                bytes: item.bytes > 0 ? item.bytes : nil,
+                                detail: item.bytes > 0 ? Self.size(item.bytes) : "Pending",
                                 artwork: library.artwork(for: item.collection, maxPixelWidth: 120),
                                 tag: "m:\(item.collection.id)"
                             ) { downloads.remove(collectionID: item.collection.id) }
@@ -69,7 +71,7 @@ struct StorageView: View {
                             row(
                                 title: item.episode.title,
                                 subtitle: item.show.title,
-                                bytes: item.download?.bytes,
+                                detail: Self.size(item.download?.bytes ?? 0),
                                 artwork: .unsized(item.artworkURL, maxPixelWidth: 120),
                                 tag: "p:\(item.id)"
                             ) { podcasts.removeDownload(item.id) }
@@ -109,22 +111,27 @@ struct StorageView: View {
                 Button("Remove", role: .destructive) { for item in playedEpisodes { podcasts.removeDownload(item.id) } }
             } message: { Text("Saved episodes are kept.") }
             .tintedSystemBack()
+            .onChange(of: podcasts.isEnabled) { refresh() }
+            // Nothing left to select: leave edit mode, since its button goes with the rows.
+            .onChange(of: music.isEmpty && finishedEpisodes.isEmpty) { _, empty in
+                if empty { editMode = .inactive; selection = [] }
+            }
             // Files go a moment after their rows do, so wait before re-reading free space.
             .task(id: downloads.totalBytes + podcasts.totalBytes) {
-                try? await Task.sleep(for: .milliseconds(600))
+                try? await Task.sleep(for: Self.fileRemovalDelay)
                 freeBytes = Self.freeSpace()
             }
             .task {
                 do {
                     for try await value in library.observe(library.database.downloadedCollections()) {
-                        withAnimation(theme.motion.smooth) { collections = value }
+                        withAnimation(theme.motion.smooth) { collections = value; refresh() }
                     }
                 } catch { Log.observationFailed(error) }
             }
             .task {
                 do {
                     for try await value in podcasts.observe(podcasts.database.downloads()) {
-                        withAnimation(theme.motion.smooth) { episodes = value }
+                        withAnimation(theme.motion.smooth) { episodes = value; refresh() }
                     }
                 } catch { Log.observationFailed(error) }
             }
@@ -161,8 +168,6 @@ struct StorageView: View {
             Text(Self.size(bytes))
                 .font(theme.typography.mono(.callout))
                 .foregroundStyle(theme.palette.textPrimary)
-                .minimumScaleFactor(0.8)
-                .lineLimit(1)
         }
         .padding(theme.spacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -173,7 +178,7 @@ struct StorageView: View {
     // MARK: Rows
 
     @ViewBuilder
-    private func row(title: String, subtitle: String, bytes: Int64?, artwork: ArtworkSource, tag: String, remove: @escaping () -> Void) -> some View {
+    private func row(title: String, subtitle: String, detail: String, artwork: ArtworkSource, tag: String, remove: @escaping () -> Void) -> some View {
         HStack(spacing: theme.spacing.md) {
             ArtworkView(artwork, cornerRadius: theme.radius.small)
                 .frame(width: theme.artwork.rowThumbnail)
@@ -183,7 +188,7 @@ struct StorageView: View {
             }
             .lineLimit(1)
             Spacer(minLength: theme.spacing.sm)
-            Text(bytes.map(Self.size) ?? "Pending")
+            Text(detail)
                 .font(theme.typography.itemMetadata)
                 .foregroundStyle(theme.palette.textSecondary)
         }
@@ -206,12 +211,11 @@ struct StorageView: View {
         withAnimation(theme.motion.smooth) { editMode = .inactive }
     }
 
+    /// Files go a moment after their rows do.
+    private static let fileRemovalDelay = Duration.milliseconds(600)
+
     static func size(_ bytes: Int64) -> String {
-        if bytes == 0 { return "0 KB" }
-        let formatter = ByteCountFormatter()
-        formatter.countStyle = .file
-        formatter.allowsNonnumericFormatting = false
-        return formatter.string(fromByteCount: bytes)
+        bytes == 0 ? "0 KB" : bytes.formatted(.byteCount(style: .file, spellsOutZero: false))
     }
 
     /// Space iOS reports as available for important data (counts purgeable space).

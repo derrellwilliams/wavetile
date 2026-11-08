@@ -86,6 +86,9 @@ struct SettingsDrawer: View {
         .enableInjection()
     }
 
+    /// What Storage Used counts and Remove All Downloads clears: music, plus episodes when podcasts are on.
+    private var storageBytes: Int64 { downloads.totalBytes + (podcasts.isEnabled ? podcasts.totalBytes : 0) }
+
     @ViewBuilder private var downloadsSection: some View {
         @Bindable var downloads = downloads
         Section("Downloads") {
@@ -105,7 +108,7 @@ struct SettingsDrawer: View {
                 Label("Use Cellular Data", glyph: .address)
             }
             Button { showStorage = true } label: {
-                SettingsValue("Storage Used", glyph: .downloads, value: StorageView.size(downloads.totalBytes + (podcasts.isEnabled ? podcasts.totalBytes : 0)))
+                SettingsValue("Storage Used", glyph: .downloads, value: StorageView.size(storageBytes))
             }
             .accessibilityHint("Shows what is using space and lets you remove downloads")
             .sheet(isPresented: $showStorage) { StorageView() }
@@ -114,9 +117,12 @@ struct SettingsDrawer: View {
             } label: {
                 Label("Remove All Downloads", glyph: .trash)
             }
-            .disabled(downloads.totalBytes == 0)
-            .confirmationDialog("Remove all downloaded music?", isPresented: $confirmRemoveDownloads, titleVisibility: .visible) {
-                Button("Remove All", role: .destructive) { downloads.removeAll() }
+            .disabled(storageBytes == 0)
+            .confirmationDialog(podcasts.isEnabled ? "Remove all downloaded music and episodes?" : "Remove all downloaded music?", isPresented: $confirmRemoveDownloads, titleVisibility: .visible) {
+                Button("Remove All", role: .destructive) {
+                    downloads.removeAll()
+                    if podcasts.isEnabled { podcasts.removeAllDownloads() }
+                }
             }
         }
     }
