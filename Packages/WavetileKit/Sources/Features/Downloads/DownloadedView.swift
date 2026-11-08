@@ -15,6 +15,7 @@ struct DownloadedView: View {
     @Environment(PodcastsStore.self) private var podcasts
     @Namespace private var zoom
     @State private var path = NavigationPath()
+    @State private var statusCollection: DownloadCollectionRecord?
     @State private var collections: [DownloadedCollection] = []
     @State private var confirmRemoveAll = false
     @State private var filter: MediaKind = .music
@@ -39,6 +40,7 @@ struct DownloadedView: View {
             }
             .themedBackground()
             .navigationTitle("Downloads")
+            .sheet(item: $statusCollection) { DownloadStatusSheet(collectionID: $0.id) }
             .confirmationDialog(showsPodcasts ? "Remove all downloaded episodes?" : "Remove all downloaded music?", isPresented: $confirmRemoveAll, titleVisibility: .visible) {
                 Button("Remove All", role: .destructive) {
                     if showsPodcasts { podcasts.removeAllDownloads() } else { downloads.removeAll() }
@@ -125,8 +127,12 @@ struct DownloadedView: View {
             VStack(alignment: .leading, spacing: theme.spacing.xs) {
                 ArtworkView(library.artwork(for: collection, maxPixelWidth: 480))
                     .overlay(alignment: .bottomTrailing) {
-                        if item.status.isInProgress {
-                            ProgressRing(progress: item.status.progress)
+                        if item.status.isInProgress || item.status.paused > 0 {
+                            Button { statusCollection = collection } label: {
+                                ProgressRing(progress: item.status.progress)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Download status")
                                 .frame(width: 22, height: 22)
                                 .padding(6)
                                 .background(.black.opacity(0.55), in: .circle)
@@ -144,6 +150,7 @@ struct DownloadedView: View {
         }
         .buttonStyle(.pressable)
         .contextMenu {
+            Button("Download Status") { statusCollection = collection }
             Button("Remove Download", glyph: .trash, role: .destructive) {
                 downloads.remove(collectionID: collection.id)
             }
@@ -151,6 +158,7 @@ struct DownloadedView: View {
     }
 
     private func subtitle(_ item: DownloadedCollection) -> String {
+        if item.status.paused > 0 { return "Paused · \(item.status.done) of \(item.status.total) songs" }
         if item.status.isInProgress { return "\(item.status.done) of \(item.status.total) songs" }
         if item.status.failed > 0 { return "\(item.status.failed) failed" }
         return "\(item.collection.subtitle) · \(ByteCountFormatter.string(fromByteCount: item.bytes, countStyle: .file))"

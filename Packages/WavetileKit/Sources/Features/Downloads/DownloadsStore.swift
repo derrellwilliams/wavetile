@@ -152,7 +152,7 @@ final class DownloadsStore {
     func observe() async {
         async let ids: Void = observeTrackIDs()
         async let bytes: Void = observeBytes()
-        async let resume: Void = resumePending()
+        async let resume: Void = recoverPending()
         async let availability: Void = observeAvailability()
         async let favorites: Void = observeFavoritesDownload()
         async let activities: Void = resumeLiveActivities()
@@ -182,6 +182,23 @@ final class DownloadsStore {
         do {
             for try await bytes in library.observe(database.totalDownloadedBytes()) { totalBytes = bytes }
         } catch { Log.observationFailed(error) }
+    }
+
+    /// Reconcile stranded tasks while this store is observed, including after server recovery.
+    private func recoverPending() async {
+        await resumePending()
+        while !Task.isCancelled {
+            await manager?.resumePending(quality: quality, allowCellular: allowCellular, retryFailed: false)
+            do { try await Task.sleep(for: .seconds(30)) } catch { return }
+        }
+    }
+
+    func pause(collectionID: String) async throws {
+        try await manager?.pause(collectionID: collectionID)
+    }
+
+    func resume(collectionID: String) async throws {
+        try await manager?.resume(collectionID: collectionID, quality: quality, allowCellular: allowCellular)
     }
 
     private func resumePending() async {

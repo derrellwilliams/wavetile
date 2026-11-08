@@ -119,6 +119,26 @@ public extension LibraryDatabase {
         }
     }
 
+    /// Pausing affects shared songs in every collection; finished files are preserved.
+    func setDownloadPaused(collectionID: String, paused: Bool) async throws {
+        try await pool.write { db in
+            try db.execute(sql: """
+                UPDATE downloadedTrack SET state = ?, progress = 0, bytes = 0, error = NULL
+                WHERE state IN (\(paused ? "'queued', 'downloading', 'failed'" : "'paused', 'failed'"))
+                AND trackID IN (SELECT trackID FROM downloadMembership WHERE collectionID = ?)
+                """, arguments: [paused ? "paused" : "queued", collectionID])
+        }
+    }
+
+    func downloadTracks(collectionID: String) -> ValueObservation<ValueReducers.Fetch<[DownloadedTrackRecord]>> {
+        ValueObservation.tracking { db in
+            try DownloadedTrackRecord.fetchAll(db, sql: """
+                SELECT t.* FROM downloadedTrack t JOIN downloadMembership m ON m.trackID = t.trackID
+                WHERE m.collectionID = ? ORDER BY t.trackID
+                """, arguments: [collectionID])
+        }
+    }
+
     func pendingDownloads() throws -> [DownloadedTrackRecord] {
         try pool.read { try DownloadedTrackRecord.filter(["queued", "downloading"].contains(Column("state"))).fetchAll($0) }
     }
@@ -249,6 +269,7 @@ public extension LibraryDatabase {
                 SELECT m.collectionID AS id, COUNT(*) AS total,
                        SUM(t.state = 'done') AS done,
                        SUM(t.state = 'failed') AS failed,
+                   SUM(t.state = 'paused') AS paused,
                        SUM(CASE WHEN t.state = 'done' THEN 1.0 ELSE t.progress END) AS progressSum,
                        COALESCE(SUM(t.bytes), 0) AS bytes
                 FROM downloadMembership m JOIN downloadedTrack t ON t.trackID = m.trackID
@@ -276,6 +297,7 @@ public extension LibraryDatabase {
             SELECT COUNT(*) AS total,
                    SUM(t.state = 'done') AS done,
                    SUM(t.state = 'failed') AS failed,
+                   SUM(t.state = 'paused') AS paused,
                    SUM(CASE WHEN t.state = 'done' THEN 1.0 ELSE t.progress END) AS progressSum
             FROM downloadMembership m JOIN downloadedTrack t ON t.trackID = m.trackID
             WHERE m.collectionID = ?
@@ -290,6 +312,7 @@ public extension LibraryDatabase {
             total: total,
             done: row["done"] ?? 0,
             failed: row["failed"] ?? 0,
+            paused: row["paused"] ?? 0,
             progress: (row["progressSum"] ?? 0.0) / Double(total)
         )
     }

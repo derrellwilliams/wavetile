@@ -47,7 +47,7 @@ public struct DownloadedTrackRecord: Codable, Hashable, Sendable, Identifiable, 
     public static let databaseTableName = "downloadedTrack"
 
     public enum State: String, Codable, Sendable {
-        case queued, downloading, done, failed
+        case queued, downloading, paused, done, failed
     }
 
     public var trackID: String
@@ -90,13 +90,14 @@ public struct DownloadStatus: Sendable, Equatable {
     public var total: Int
     public var done: Int
     public var failed: Int
+    public var paused: Int = 0
     /// 0...1 across all tracks, counting partial progress of in-flight ones.
     public var progress: Double
 
     public static let none = DownloadStatus(total: 0, done: 0, failed: 0, progress: 0)
 
     public var isDownloaded: Bool { total > 0 && done == total }
-    public var isInProgress: Bool { total > 0 && done + failed < total }
+    public var isInProgress: Bool { total > 0 && done + failed + paused < total }
     public var isRequested: Bool { total > 0 }
 }
 

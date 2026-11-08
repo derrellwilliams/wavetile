@@ -34,7 +34,9 @@ public final class DownloadManager: NSObject, Sendable {
 
     private struct MutableState {
         var session: URLSession?
+        var reconciling = false
         var lastProgressWrite: [String: Double] = [:]
+        var lastByteWrite: [String: Int64] = [:]
         /// Automatic retries so far per track, this launch.
         var retries: [String: Int] = [:]
         /// The settings of the last enqueue, for retries that start a fresh request.
@@ -77,6 +79,16 @@ public final class DownloadManager: NSObject, Sendable {
     public func download(_ collection: DownloadCollectionRecord, trackIDs: [String], quality: Quality, allowCellular: Bool) async throws {
         let needed = try await database.requestDownload(collection, trackIDs: trackIDs)
         await enqueue(needed, quality: quality, allowCellular: allowCellular)
+    }
+
+    public func pause(collectionID: String) async throws {
+        try await database.setDownloadPaused(collectionID: collectionID, paused: true)
+        await cancelTasks(notIn: try database.pendingDownloads().map(\.trackID))
+    }
+
+    public func resume(collectionID: String, quality: Quality, allowCellular: Bool) async throws {
+        try await database.setDownloadPaused(collectionID: collectionID, paused: false)
+        await resumePending(quality: quality, allowCellular: allowCellular)
     }
 
     public func remove(collectionID: String) async throws {
@@ -137,10 +149,16 @@ public final class DownloadManager: NSObject, Sendable {
 
     /// Restarts queued downloads that have no running task (e.g. after the app was killed), and
     /// gives failed ones another go.
-    public func resumePending(quality: Quality, allowCellular: Bool) async {
-        let running = Set(await session.allTasks.compactMap(\.taskDescription))
+    public func resumePending(quality: Quality, allowCellular: Bool, retryFailed: Bool = true) async {
+        guard state.withLock({ state in
+            guard !state.reconciling else { return false }
+            state.reconciling = true
+            return true
+        }) else { return }
+        defer { state.withLock { $0.reconciling = false } }
+        let running = Set(await session.allTasks.filter { $0.state == .running || $0.state == .suspended }.compactMap(\.taskDescription))
         await requeueMissingFiles()
-        _ = try? await database.requeueFailedDownloads()
+        if retryFailed { _ = try? await database.requeueFailedDownloads() }
         let pending = (try? database.pendingDownloads().map(\.trackID)) ?? []
         await enqueue(pending.filter { !running.contains($0) }, quality: quality, allowCellular: allowCellular)
     }
@@ -189,7 +207,9 @@ public final class DownloadManager: NSObject, Sendable {
             $0.quality = quality
             $0.allowCellular = allowCellular
         }
-        for trackID in trackIDs {
+        let running = Set(await session.allTasks.filter { $0.state == .running || $0.state == .suspended }.compactMap(\.taskDescription))
+        let pending = Set((try? database.pendingDownloads().map(\.trackID)) ?? [])
+        for trackID in trackIDs where pending.contains(trackID) && !running.contains(trackID) {
             guard let stream = library.streamRequest(trackID: trackID, maxBitrate: quality.maxBitrate) else { continue }
             var request = URLRequest(url: stream.url)
             // Header auth: the token isn't written into the URL (or the system's transfer logs).
@@ -268,14 +288,17 @@ extension DownloadManager: URLSessionDownloadDelegate {
         // Throttle DB writes to ~5% steps.
         let shouldWrite = state.withLock { state in
             let last = state.lastProgressWrite[trackID] ?? -1
-            guard progress - last >= 0.05 else { return false }
+            guard progress - last >= 0.05 || totalBytesWritten - (state.lastByteWrite[trackID] ?? 0) >= 262_144 else { return false }
+            state.lastByteWrite[trackID] = totalBytesWritten
             state.lastProgressWrite[trackID] = progress
             return true
         }
         guard shouldWrite else { return }
         Task {
             try? await database.updateDownload(trackID: trackID) {
+                guard $0.state == .queued || $0.state == .downloading else { return }
                 $0.state = .downloading
+                $0.bytes = totalBytesWritten
                 $0.progress = progress
             }
         }
@@ -388,6 +411,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
     private func markFailed(_ trackID: String, _ message: String) {
         Task {
             try? await database.updateDownload(trackID: trackID) {
+                guard $0.state != .paused && $0.state != .done else { return }
                 $0.state = .failed
                 $0.error = message
             }

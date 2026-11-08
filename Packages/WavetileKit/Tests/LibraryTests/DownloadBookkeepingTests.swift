@@ -17,6 +17,23 @@ struct DownloadBookkeepingTests {
         }
     }
 
+    @Test func pauseSurvivesRecoveryAndPreservesFinishedSongs() async throws {
+        let db = try LibraryDatabase.temporary()
+        _ = try await db.requestDownload(album, trackIDs: ["done", "pending"])
+        _ = try await db.requestDownload(playlist, trackIDs: ["pending"])
+        try await finish(db, "done")
+        try await db.setDownloadPaused(collectionID: album.id, paused: true)
+        #expect(try db.pendingDownloads().isEmpty)
+        #expect(try await db.requeueFailedDownloads().isEmpty)
+        #expect(db.downloadedFileName(trackID: "done") == "done.flac")
+        let status = try db.downloadStatusNow(collectionID: album.id)
+        #expect(status.paused == 1)
+        #expect(!status.isInProgress)
+        #expect(try db.downloadStatusNow(collectionID: playlist.id).paused == 1)
+        try await db.setDownloadPaused(collectionID: album.id, paused: false)
+        #expect(try db.pendingDownloads().map(\.trackID) == ["pending"])
+    }
+
     @Test func requestQueuesOnlyMissingTracks() async throws {
         let db = try LibraryDatabase.temporary()
         #expect(try await db.requestDownload(album, trackIDs: ["t1", "t2"]) == ["t1", "t2"])
