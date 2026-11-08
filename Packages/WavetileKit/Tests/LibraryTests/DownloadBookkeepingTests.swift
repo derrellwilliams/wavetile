@@ -66,6 +66,41 @@ struct DownloadBookkeepingTests {
         #expect(abs(status.progress - 0.75) < 0.001)
     }
 
+    @Test func missingFilesGoBackInTheQueue() async throws {
+        let db = try LibraryDatabase.temporary()
+        _ = try await db.requestDownload(album, trackIDs: ["t1", "t2"])
+        for id in ["t1", "t2"] { try await finish(db, id) }
+        #expect(try db.finishedDownloads().map(\.trackID).sorted() == ["t1", "t2"])
+
+        try await db.requeueDownloads(trackIDs: ["t1"])
+        #expect(db.downloadedFileName(trackID: "t1") == nil)
+        #expect(db.downloadedFileName(trackID: "t2") == "t2.flac")
+        #expect(try db.pendingDownloads().map(\.trackID) == ["t1"])
+        #expect(try db.downloadedTrackIDsNow() == ["t2"])
+        // The membership stays, so the album still counts t1 as wanted and a later pass fetches it.
+        #expect(try await db.requestDownload(album, trackIDs: ["t1", "t2"]).isEmpty)
+    }
+
+    /// The stand-in used when the real database won't open must say so, so downloads stay off against it.
+    @Test func onlyTheStandInDatabaseIsMarkedTemporary() throws {
+        #expect(try LibraryDatabase.temporary().isTemporary)
+        let path = FileManager.default.temporaryDirectory.appending(path: "real-\(UUID().uuidString).sqlite").path(percentEncoded: false)
+        #expect(try LibraryDatabase(path: path).isTemporary == false)
+    }
+
+    @Test func rejectsEmptyAndNonAudioBodies() {
+        func response(_ mime: String?) -> URLResponse {
+            URLResponse(url: URL(string: "https://x/Audio/1/universal")!, mimeType: mime, expectedContentLength: 0, textEncodingName: nil)
+        }
+        #expect(DownloadManager.looksLikeAudio(response("audio/flac"), bytes: 10))
+        #expect(DownloadManager.looksLikeAudio(response("application/octet-stream"), bytes: 10))
+        #expect(DownloadManager.looksLikeAudio(response(nil), bytes: 10))
+        #expect(!DownloadManager.looksLikeAudio(response("audio/flac"), bytes: 0))
+        #expect(!DownloadManager.looksLikeAudio(response("text/html; charset=utf-8"), bytes: 500))
+        #expect(!DownloadManager.looksLikeAudio(response("application/json"), bytes: 500))
+        #expect(!DownloadManager.looksLikeAudio(response("application/xhtml+xml"), bytes: 500))
+    }
+
     @Test func fileExtensionFollowsMimeType() {
         func response(_ mime: String) -> URLResponse {
             URLResponse(url: URL(string: "https://x/Audio/1/universal")!, mimeType: mime, expectedContentLength: 0, textEncodingName: nil)

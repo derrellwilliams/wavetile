@@ -108,10 +108,16 @@ public final class DownloadManager: NSObject, Sendable {
     private func sync(_ download: DownloadCollectionRecord, quality: Quality, allowCellular: Bool) async {
         // A playlist or collection that's gone (deleted here, or on the server) takes its
         // download with it, rather than leaving an empty one behind.
-        let sourceExists: Bool = switch download.kind {
-        case .playlist: (try? database.playlist(id: download.id)) != nil
-        case .collection: (try? database.collection(id: download.id)) != nil
-        case .favorites, .album: true
+        // A failed read isn't "gone": only a successful lookup that finds nothing removes the download.
+        let sourceExists: Bool
+        do {
+            sourceExists = switch download.kind {
+            case .playlist: try database.playlist(id: download.id) != nil
+            case .collection: try database.collection(id: download.id) != nil
+            case .favorites, .album: true
+            }
+        } catch {
+            return
         }
         guard sourceExists else {
             try? await remove(collectionID: download.id)
@@ -133,9 +139,25 @@ public final class DownloadManager: NSObject, Sendable {
     /// gives failed ones another go.
     public func resumePending(quality: Quality, allowCellular: Bool) async {
         let running = Set(await session.allTasks.compactMap(\.taskDescription))
+        await requeueMissingFiles()
         _ = try? await database.requeueFailedDownloads()
         let pending = (try? database.pendingDownloads().map(\.trackID)) ?? []
         await enqueue(pending.filter { !running.contains($0) }, quality: quality, allowCellular: allowCellular)
+    }
+
+    /// A download marked done whose file is gone would show as downloaded and count as playable
+    /// offline, yet not play. Put it back in the queue instead.
+    private func requeueMissingFiles() async {
+        // An unreachable folder (not the files) means nothing can be said about them.
+        guard FileManager.default.fileExists(atPath: directory.path(percentEncoded: false)),
+              let finished = try? database.finishedDownloads() else { return }
+        let missing = finished.filter { record in
+            guard let name = record.fileName else { return true }
+            return !FileManager.default.fileExists(atPath: directory.appending(path: name).path(percentEncoded: false))
+        }
+        guard !missing.isEmpty else { return }
+        log.error("\(missing.count, privacy: .public) finished downloads lost their file; queueing them again")
+        try? await database.requeueDownloads(trackIDs: missing.map(\.trackID))
     }
 
     /// Security: the system carries a background transfer over to a new network on its own,
@@ -215,6 +237,14 @@ public final class DownloadManager: NSObject, Sendable {
         return "\(id.isEmpty ? "track" : id).\(safe(fileExtension(for: response)).prefix(8))"
     }
 
+    /// Rejects an empty body and text, JSON, XML or HTML responses; anything else (including
+    /// `application/octet-stream`, which some servers use for audio) is left to the player.
+    public static func looksLikeAudio(_ response: URLResponse?, bytes: Int64) -> Bool {
+        guard bytes > 0 else { return false }
+        let type = response?.mimeType?.lowercased() ?? ""
+        return !(type.hasPrefix("text/") || type.contains("json") || type.contains("xml") || type.contains("html"))
+    }
+
     /// AVFoundation picks a decoder from the file extension, so map the served MIME type.
     static func fileExtension(for response: URLResponse?) -> String {
         switch response?.mimeType?.lowercased() {
@@ -262,6 +292,12 @@ extension DownloadManager: URLSessionDownloadDelegate {
                 Task { await library.checkAuthentication() }
             }
             markFailed(trackID, "Server returned \(http.statusCode)")
+            return
+        }
+        // A proxy's login page or an error body saved as "music" would show as downloaded and fail to play.
+        let received = (try? location.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init) ?? 0
+        guard Self.looksLikeAudio(downloadTask.response, bytes: received) else {
+            markFailed(trackID, "The server didn't send audio")
             return
         }
         // The temp file is deleted when this method returns, so move it synchronously.

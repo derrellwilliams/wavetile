@@ -12,6 +12,8 @@ struct WavetileApp: App {
         // Restore at launch (not on first frame): when iOS relaunches the app in the background
         // to finish downloads, the download session must exist even though no UI is shown.
         let model = AppModel(deviceName: UIDevice.current.name)
+        // Siri also needs the names after a first sync, a sign-out or an account switch, not just at launch.
+        model.onLibraryVocabularyChanged = { WavetileShortcuts.updateAppShortcutParameters() }
         model.restore()
         model.registerBackgroundTasks()
         _app = State(initialValue: model)

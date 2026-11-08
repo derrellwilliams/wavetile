@@ -14,6 +14,8 @@ final class WidgetBridge {
     private let library: LibraryStore
     private var lastSnapshot: NowPlayingSnapshot?
     private var artworkTask: Task<Void, Never>?
+    /// Bumped by `clear()` (sign-out): work started before it can't write its results after it.
+    private static var clearCount = 0
 
     init(player: AudioPlayer, library: LibraryStore) {
         self.player = player
@@ -87,13 +89,15 @@ final class WidgetBridge {
     /// Call when Home's Recently Played shelf loads.
     func recentsChanged(_ albums: [AlbumSummary]) {
         let top = Array(albums.prefix(8))
+        let started = Self.clearCount
         Task {
             var snapshots: [RecentAlbumSnapshot] = []
             for album in top {
+                guard started == Self.clearCount else { return }
                 let file = await saveArtwork(itemID: album.id, tag: album.imageTag)
                 snapshots.append(RecentAlbumSnapshot(id: album.id, title: album.title, artist: album.artist, artworkFile: file))
             }
-            guard snapshots != WidgetStore.loadRecents() else { return }
+            guard started == Self.clearCount, snapshots != WidgetStore.loadRecents() else { return }
             WidgetStore.saveRecents(snapshots)
             WidgetCenter.shared.reloadTimelines(ofKind: WidgetKind.recentlyPlayed)
             Self.pruneArtwork()
@@ -101,6 +105,7 @@ final class WidgetBridge {
     }
 
     static func clear() {
+        clearCount += 1
         WidgetStore.clear()
         WidgetCenter.shared.reloadAllTimelines()
     }

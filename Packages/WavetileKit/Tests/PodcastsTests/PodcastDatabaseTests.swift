@@ -60,6 +60,54 @@ struct PodcastDatabaseTests {
         #expect(try db.episodeNow(id: id("b")) != nil)
     }
 
+    @Test func aFeedThatBrokePartwayPrunesNothingAndKeepsTheShowDetails() async throws {
+        let db = try PodcastDatabase.temporary()
+        _ = try await db.upsert(feed: feed([episode("a", daysAgo: 3), episode("b", daysAgo: 2), episode("c", daysAgo: 1)]), feedURL: feedURL, validators: FeedValidators(etag: "good", lastModified: nil), follow: true)
+        try await db.savePosition(episodeID: id("a"), position: 3590, duration: 3600)
+
+        var broken = ParsedFeed(title: "Untitled Podcast", author: "", summary: "", artworkURL: nil, websiteURL: nil, isSerial: false, episodes: [episode("c", daysAgo: 1)])
+        broken.isComplete = false
+        let result = try await db.upsert(feed: broken, feedURL: feedURL, validators: FeedValidators(etag: "bad", lastModified: nil), follow: false)
+
+        // The older episodes, including the one marked played, are still there.
+        #expect(try db.episodeNow(id: id("a"))?.episode.isPlayed == true)
+        #expect(try db.episodeNow(id: id("b")) != nil)
+        #expect(result.show.title == "Show")
+        #expect(result.show.etag == "good", "the next refresh must fetch the feed again")
+        // Once the feed parses fully, episodes that really left are pruned as before.
+        _ = try await db.upsert(feed: feed([episode("c", daysAgo: 1)]), feedURL: feedURL, validators: nil, follow: false)
+        #expect(try db.episodeNow(id: id("b")) == nil)
+    }
+
+    @Test func onlyTheStandInDatabaseIsMarkedTemporary() throws {
+        #expect(try PodcastDatabase.temporary().isTemporary)
+        let path = FileManager.default.temporaryDirectory.appending(path: "real-\(UUID().uuidString).sqlite").path(percentEncoded: false)
+        #expect(try PodcastDatabase(path: path).isTemporary == false)
+    }
+
+    @Test func updatingARemovedDownloadReportsItIsNoLongerWanted() async throws {
+        let db = try PodcastDatabase.temporary()
+        _ = try await db.upsert(feed: feed([episode("a", daysAgo: 1)]), feedURL: feedURL, validators: nil, follow: true)
+        #expect(try await db.requestDownload(episodeID: id("a"), automatic: false))
+        #expect(try await db.updateDownload(episodeID: id("a")) { $0.state = .done; $0.fileName = "a.mp3" })
+        _ = try await db.removeDownload(episodeID: id("a"))
+        #expect(try await db.updateDownload(episodeID: id("a")) { $0.state = .done } == false)
+    }
+
+    @Test func finishedEpisodeDownloadsWithoutAFileGoBackInTheQueue() async throws {
+        let db = try PodcastDatabase.temporary()
+        _ = try await db.upsert(feed: feed([episode("a", daysAgo: 2), episode("b", daysAgo: 1)]), feedURL: feedURL, validators: nil, follow: true)
+        for guid in ["a", "b"] {
+            _ = try await db.requestDownload(episodeID: id(guid), automatic: false)
+            try await db.updateDownload(episodeID: id(guid)) { $0.state = .done; $0.fileName = "x.mp3" }
+        }
+        try await db.requeueDownloads(episodeIDs: [id("a")])
+        #expect(db.downloadedFileName(episodeID: id("a")) == nil)
+        #expect(db.downloadedFileName(episodeID: id("b")) == "x.mp3")
+        #expect(try db.pendingDownloads().map(\.episode.id) == [id("a")])
+        #expect(try db.finishedDownloads().map(\.episodeID) == [id("b")])
+    }
+
     @Test func finishingNearTheEndMarksPlayedAndLeavesUpNext() async throws {
         let db = try PodcastDatabase.temporary()
         _ = try await db.upsert(feed: feed([episode("a", daysAgo: 1)]), feedURL: feedURL, validators: nil, follow: true)

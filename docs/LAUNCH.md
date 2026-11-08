@@ -14,10 +14,10 @@ Consolidated 2026-11-06 and reorganized 2026-11-07 (tiers below, evidence and se
 
 | Area | State / evidence |
 |---|---|
-| Candidate | Version 1.0.0, build 202611072010 from `351df13`, uploaded Nov 7; App Store Connect reported processing, and TestFlight availability is not yet verified. This includes the authentication and playback review fixes. Device sign-off and RC requirements remain open |
+| Candidate | Version 1.0.0, build 202611072010 from `351df13`, uploaded Nov 7; App Store Connect reported processing, and TestFlight availability is not yet verified. This includes the authentication and playback review fixes. **The section 3 persistence/sync fixes (`53fa4a2`, on `main`) are in no build**, so the RC must be a new build. Device sign-off and RC requirements remain open |
 | Public beta | Build 202610281900 approved for external testing; link https://testflight.apple.com/join/pk9dyfMq. That approval doesn't cover newer builds |
 | Signing / CarPlay | Team, app record and App Group done. CarPlay Audio granted and enabled; signed CarPlay build 202610301302 uploaded Oct 30 (`8af183f`) |
-| Automated QA | Nov 7 (Debug, iPhone 18 Pro Max, iOS 27.0): package scheme 151/151 (197 runs) and UI 17/17 with zero runtime warnings, after the QA-2/3/4 edits and a medium code review of them. Nov 5: 94/94 under ASan and TSan, none rerun on the Nov 7 edits. One earlier Nov 7 UI run failed `testWaveAndHomeTabScrollToTop` once, then passed (cause not found). Details in qa-evidence.md |
+| Automated QA | Nov 7 (Debug, iPhone 18 Pro Max, iOS 27.0): package scheme 177/177 (245 runs) and UI 17/17, both with zero runtime warnings, with the review 1–8 fixes (1–3 committed in `53fa4a2`, 4–8 uncommitted) and the Settings sign-out alert, so it needs a rerun. Nov 5: 94/94 under ASan and TSan, none rerun on the Nov 7 edits. One earlier Nov 7 UI run failed `testWaveAndHomeTabScrollToTop` once, then passed (cause not found). Details in qa-evidence.md |
 | Website / repo | Site, support/privacy pages, guides, llms.txt, JSON-LD, sitemap live; MPL-2.0 and README in place. Service/account configuration not reverified Nov 6 |
 | Review access | Earlier plan: `https://demo.jellyfin.org/stable`, user `demo`, blank password. **Decision needed:** see P0 |
 | Contact | realslimscrawny@gmail.com (site, support, privacy) |
@@ -27,9 +27,9 @@ Consolidated 2026-11-06 and reorganized 2026-11-07 (tiers below, evidence and se
 1. Quick wins (minutes each): confirm agreements, pricing and territories in App Store Connect; verify domain transfer lock, DNSSEC and Cloudflare 2FA.
 2. Choose the host and licensed demo library using [reviewer-server.md](reviewer-server.md), then provision reviewer access.
 3. Current pins rechecked Nov 7 with no matching OSV advisories; repeat against the final archive to finish the remaining QA-2/QA-3 engineering check. Nov 7 package and UI regressions are passing.
-4. Confirm build 202611072010 finishes processing and becomes available for testparty; investigate any reported failures.
-5. Complete targeted review sections 4–8 below, starting with downloads/offline; resolve findings or record explicit deferrals.
-6. Freeze, cut one RC build, complete P0 listing work and collect the required results from [testparty.md](testparty.md) before submission.
+4. Source reviews are done, so the RC build can be cut once the fixes are committed (decided Nov 7: no TestFlight upload before then, so testparty runs once on a single build). Build 202611072010 is not being used for it.
+5. Targeted source reviews 1–8 are done (findings fixed or deferred in qa-evidence.md); what remains is device verification in [testparty.md](testparty.md), plus the optional items listed under each section.
+6. Freeze, cut one RC build (rerun package and UI tests first), complete P0 listing work and collect the required results from [testparty.md](testparty.md) before submission.
 
 ## Before submission
 
@@ -76,18 +76,18 @@ Project goals, not Apple requirements. Each has a "done when" so it can't run fo
 
 ### Targeted pre-release reviews — added November 7, 2026
 
-As of Nov 7, the initial source reviews and fixes for sections 1–3 are complete; sections 4–8 remain to be reviewed, in order. Sections 1 and 2 still require device verification before they can close. This extends QA-2/QA-3; earlier reviews remain historical evidence, not completion of this pass. Track findings and verification in [qa-evidence.md](qa-evidence.md); real-device execution stays in [testparty.md](testparty.md).
+As of Nov 7, the initial source reviews and fixes for all eight source reviews and their fixes are complete. Sections 1–8 still require device verification before they can close (UI tests were rerun Nov 7 and pass); section 3 also needs stubbed-server sync tests with seeded downloads. This extends QA-2/QA-3; earlier reviews remain historical evidence, not completion of this pass. Track findings and verification in [qa-evidence.md](qa-evidence.md); real-device execution stays in [testparty.md](testparty.md).
 
 | Order | Scope | Status |
 |---|---|---|
 | 1 | Authentication/networking: credentials, redirects, transport, restore, logout and server switching | Initial source review and R1-01/R1-02 fixes Nov 7; device evidence outstanding |
 | 2 | Playback/queue: concurrency, transitions, interruptions, background operation and restoration | Initial source review and R2-01/R2-02 fixes Nov 7; device evidence outstanding |
 | 3 | Persistence/library sync: migrations, partial sync, stale records and account isolation | Source review and R3-01–R3-05 fixes Nov 7 (package 161/161); stubbed-server sync tests and UI rerun outstanding; account-ID filename limitation goes to section 8 |
-| 4 | Downloads/offline: interruption, missing files, cleanup and fallback | Pending |
-| 5 | Podcasts: malformed feeds, subscription sync, progress and external URLs | Pending |
-| 6 | System integrations: CarPlay, Siri, widgets, Live Activities and shared state | Pending |
-| 7 | Screens/release configuration: errors, accessibility, navigation, debug behavior and entitlements | Pending |
-| 8 | Cross-subsystem scenarios: server switch during download, network loss during playback, termination during sync and upgrade with existing data | Pending |
+| 4 | Downloads/offline: interruption, missing files, cleanup and fallback | Source review and R4-01–R4-03 fixes Nov 7 (package 163/163); deferrals recorded in qa-evidence.md; device checks outstanding |
+| 5 | Podcasts: malformed feeds, subscription sync, progress and external URLs | Source review and R5-01–R5-05 fixes Nov 7 (package 173/173); deferrals recorded in qa-evidence.md; device checks outstanding |
+| 6 | System integrations: CarPlay, Siri, widgets, Live Activities and shared state | Source review and R6-01–R6-05 fixes Nov 7 (package 175/175, app target builds); deferrals recorded in qa-evidence.md; device checks outstanding |
+| 7 | Screens/release configuration: errors, accessibility, navigation, debug behavior and entitlements | Source review Nov 7: no defects in configuration, debug flags, entitlements or error surfaces; UI audit 17/17; device accessibility and navigation checks outstanding |
+| 8 | Cross-subsystem scenarios: server switch during download, network loss during playback, termination during sync and upgrade with existing data | Traced Nov 7; R8-01 fixed (stand-in database could delete finished downloads); kill-mid-sync/sign-out and upgrade device checks outstanding |
 
 Each pass traces user flows through dependencies and records findings with source locations, severity, impact and reproduction/verification steps. Fix release blockers and add meaningful regression coverage; record optional refactors separately. A pass closes only when findings are fixed and verified or explicitly deferred with rationale. Source review does not replace device sign-off.
 
@@ -96,6 +96,10 @@ Each pass traces user flows through dependencies and records findings with sourc
 - [x] **R2-01 (high):** delayed failure recovery now checks the current player item and playback intent generation. Device verification remains open; see qa-evidence.md.
 - [x] **R2-02 (medium):** preserve Up Next reordering across shuffle toggles, including edits while shuffled. See qa-evidence.md.
 - [x] **R3-01–R3-05 (high/medium):** incomplete or unvalidated library reads no longer replace, prune or delete cached data or server collections; incomplete sync fails before `lastCompleted`; sign-out cancels sync and closes the database before deleting it (a close failure keeps the session and shows an alert). Details in qa-evidence.md. Still open: UI test rerun after the Settings alert, and stubbed-server sync tests with seeded downloads.
+- [x] **R4-01–R4-03 (high/medium/low):** a failed database read no longer removes a download; empty or non-audio responses are failed instead of saved as done; finished downloads whose file is gone are queued again. Deferrals (orphan-file sweep, disk-full check, duplicate Live Activity and others) are listed in qa-evidence.md.
+- [x] **R5-01–R5-05 (high/medium/low):** a damaged Jellyfin copy of the subscription list no longer unfollows every show; a feed that breaks partway no longer prunes episodes or renames the show; non-audio episode downloads fail instead of saving; removed or missing episode download files are cleaned up or queued again. Deferrals (sync clock skew, GUID-less episodes, sub-30-second episodes and others) are listed in qa-evidence.md.
+- [x] **R6-01–R6-05 (high/medium/low):** sign-out now stops and closes the podcast database before deleting it; Siri's vocabulary updates after syncs and sign-in/out; download Live Activities are ended at sign-out and orphaned ones cleaned up at launch (one per collection); widgets can't be repopulated after sign-out; an odd album ID can't crash the widget. Deferrals (Lock Screen access by design, CarPlay offline feedback and refresh under steady writes) are in qa-evidence.md.
+- [x] **R8-01 (medium):** when a library or podcast database can't open, the temporary stand-in no longer gets download managers, so finished background downloads aren't deleted against it; the fallback is logged. Sections 7 and 8 otherwise produced no defects; deferrals (account-ID file names for cloned servers, silent fallback banner, interrupted sign-out order, manual refresh killed mid-sync) are in qa-evidence.md.
 - [ ] Before closing section 1, complete the media-redirect, Keychain and reauthentication device checks in [testparty.md](testparty.md). Review server-switch cancellation and data isolation in sections 3, 4 and 8.
 - [ ] Before closing section 2, complete the delayed failure/retry and playback, interruption, routing and CarPlay device checks in [testparty.md](testparty.md). Decide whether revisiting previously played tracks on shuffle and queue restoration after relaunch meet the intended release behavior (see qa-evidence.md).
 

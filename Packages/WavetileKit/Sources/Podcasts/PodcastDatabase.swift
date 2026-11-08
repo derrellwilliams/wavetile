@@ -8,6 +8,9 @@ import GRDB
 /// holds a mirror; see `PodcastSync`), so it's protected but included in device backups.
 public final class PodcastDatabase: Sendable {
     public let pool: DatabasePool
+    /// A throwaway database (previews, tests, or the fallback when the real one can't open).
+    /// Downloads are switched off while it stands in, so no file is saved or deleted against it.
+    public let isTemporary: Bool
 
     public static func open(serverID: String, userID: String) throws -> PodcastDatabase {
         let url = try directory().appending(path: "\(safe(serverID))-\(safe(userID)).sqlite")
@@ -16,7 +19,7 @@ public final class PodcastDatabase: Sendable {
 
     public static func temporary() throws -> PodcastDatabase {
         let url = FileManager.default.temporaryDirectory.appending(path: "podcasts-\(UUID().uuidString).sqlite")
-        return try PodcastDatabase(path: url.path(percentEncoded: false))
+        return try PodcastDatabase(path: url.path(percentEncoded: false), isTemporary: true)
     }
 
     /// Removes the database for a session (sign out, or "Remove All Podcast Data").
@@ -28,7 +31,8 @@ public final class PodcastDatabase: Sendable {
         }
     }
 
-    public init(path: String) throws {
+    public init(path: String, isTemporary: Bool = false) throws {
+        self.isTemporary = isTemporary
         var config = Configuration()
         config.foreignKeysEnabled = true
         pool = try DatabasePool(path: path, configuration: config)
@@ -461,19 +465,24 @@ public extension PodcastDatabase {
         let showID = PodcastID.show(feedURL: feedURL)
         return try await pool.write { db in
             let now = Date()
-            var show = try ShowRecord.fetchOne(db, key: showID) ?? ShowRecord(
+            let stored = try ShowRecord.fetchOne(db, key: showID)
+            var show = stored ?? ShowRecord(
                 id: showID, feedURL: feedURL, title: feed.title, author: feed.author, summary: feed.summary,
                 artworkURL: feed.artworkURL, websiteURL: feed.websiteURL, isSerial: feed.isSerial
             )
-            show.title = feed.title
-            show.author = feed.author
-            show.summary = feed.summary
-            show.artworkURL = feed.artworkURL ?? show.artworkURL
-            show.websiteURL = feed.websiteURL
-            show.isSerial = feed.isSerial
-            show.people = feed.people
+            // A feed that broke partway may not have reached its title yet: keep what a good fetch stored.
+            if stored == nil || feed.isComplete {
+                show.title = feed.title
+                show.author = feed.author
+                show.summary = feed.summary
+                show.artworkURL = feed.artworkURL ?? show.artworkURL
+                show.websiteURL = feed.websiteURL
+                show.isSerial = feed.isSerial
+                show.people = feed.people
+            }
             show.lastRefreshed = now
-            if let validators {
+            // No validators for a broken feed, so the next refresh fetches and parses it again.
+            if let validators, feed.isComplete {
                 show.etag = validators.etag
                 show.lastModified = validators.lastModified
                 show.bodyHash = validators.bodyHash
@@ -524,8 +533,10 @@ public extension PodcastDatabase {
                 }
             }
             // Episodes that left the feed: everything this fetch didn't see. A fetch that saw none is
-            // more likely a publisher glitch than every episode being withdrawn, so it prunes nothing.
-            guard !seen.isEmpty else { return UpsertResult(show: show, newEpisodeIDs: newIDs) }
+            // more likely a publisher glitch than every episode being withdrawn, and one that stopped
+            // partway (an unescaped `&` in an old episode ends the parse there) never saw the rest,
+            // so neither prunes anything.
+            guard !seen.isEmpty, feed.isComplete else { return UpsertResult(show: show, newEpisodeIDs: newIDs) }
             try db.execute(sql: "CREATE TEMP TABLE IF NOT EXISTS seenEpisode (id TEXT PRIMARY KEY)")
             try db.execute(sql: "DELETE FROM seenEpisode")
             let insert = try db.makeStatement(sql: "INSERT OR IGNORE INTO seenEpisode (id) VALUES (?)")
@@ -659,11 +670,31 @@ public extension PodcastDatabase {
         }
     }
 
-    func updateDownload(episodeID: String, _ change: @escaping @Sendable (inout EpisodeDownloadRecord) -> Void) async throws {
+    /// Returns false when the download is no longer wanted (its row was removed meanwhile).
+    @discardableResult
+    func updateDownload(episodeID: String, _ change: @escaping @Sendable (inout EpisodeDownloadRecord) -> Void) async throws -> Bool {
         try await pool.write { db in
-            guard var record = try EpisodeDownloadRecord.fetchOne(db, key: episodeID) else { return }
+            guard var record = try EpisodeDownloadRecord.fetchOne(db, key: episodeID) else { return false }
             change(&record)
             try record.update(db)
+            return true
+        }
+    }
+
+    /// Finished downloads with their file names, to check the files are still on disk.
+    func finishedDownloads() throws -> [EpisodeDownloadRecord] {
+        try pool.read { try EpisodeDownloadRecord.filter(Column("state") == "done").fetchAll($0) }
+    }
+
+    /// Puts finished downloads whose file went missing back in the queue.
+    func requeueDownloads(episodeIDs: [String]) async throws {
+        try await pool.write { db in
+            for id in episodeIDs {
+                try db.execute(sql: """
+                    UPDATE episodeDownload SET state = 'queued', fileName = NULL, bytes = 0, progress = 0, error = NULL
+                    WHERE episodeID = ? AND state = 'done'
+                    """, arguments: [id])
+            }
         }
     }
 

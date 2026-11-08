@@ -9,6 +9,9 @@ public struct ParsedFeed: Sendable, Equatable {
     public var isSerial: Bool
     public var episodes: [ParsedEpisode]
     public var people: [PodcastPerson] = []
+    /// False when parsing stopped before the channel closed (broken XML partway through, or the
+    /// parser refused an entity expansion): the episodes are only the ones read so far.
+    public var isComplete = true
 }
 
 public struct ParsedEpisode: Sendable, Equatable {
@@ -78,7 +81,9 @@ public enum FeedParser {
         // Real-world feeds are often slightly malformed at the end; keep what parsed before the error.
         _ = parser.parse()
         guard delegate.sawChannel else { throw FeedError.notAFeed }
-        return delegate.feed()
+        var feed = delegate.feed()
+        feed.isComplete = delegate.finishedChannel
+        return feed
     }
 
     // MARK: - Field helpers (internal for tests)
@@ -172,6 +177,7 @@ public enum FeedParser {
 
     private final class Delegate: NSObject, XMLParserDelegate {
         var sawChannel = false
+        var finishedChannel = false
         private var path: [String] = []
         private var text = ""
 
@@ -273,6 +279,7 @@ public enum FeedParser {
                 path.removeLast()
                 text = ""
             }
+            if element == "channel" { finishedChannel = true }
 
             if element == "podcast:person", let attributes = personAttributes {
                 personAttributes = nil

@@ -74,10 +74,14 @@ public struct PodcastSyncState: Equatable, Sendable {
         func date(_ key: String) -> Date? { prefs[key].flatMap(Double.init).map(Date.init(timeIntervalSince1970:)) }
         enabled = prefs["enabled"].map { $0 == "1" }
         enabledUpdated = date("enabledUpdated")
-        subscriptions = Array((prefs["subs"].flatMap { try? JSONDecoder().decode([String].self, from: Data($0.utf8)) } ?? [])
+        let decodedSubscriptions = prefs["subs"].flatMap { try? JSONDecoder().decode([String].self, from: Data($0.utf8)) }
+        subscriptions = Array((decodedSubscriptions ?? [])
             .compactMap(FeedParser.webURL)
             .prefix(Self.maxSubscriptions))
-        subscriptionsUpdated = date("subsUpdated")
+        // A list that's missing or unreadable is not an empty one: with a newer timestamp it would
+        // unfollow every show here. Without a timestamp the merge keeps this device's list and the
+        // next push replaces the damaged copy.
+        subscriptionsUpdated = decodedSubscriptions == nil ? nil : date("subsUpdated")
         let rawPositions = prefs["pos"].flatMap { try? JSONDecoder().decode([String: [Double]].self, from: Data($0.utf8)) } ?? [:]
         // Keep the newest few; a position must be a real, non-negative time.
         positions = Dictionary(uniqueKeysWithValues: rawPositions.compactMap { id, pair -> (String, Position)? in

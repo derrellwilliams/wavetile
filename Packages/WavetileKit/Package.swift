@@ -94,7 +94,7 @@ let package = Package(
         ),
         .testTarget(
             name: "FeaturesTests",
-            dependencies: ["Features", "JellyfinKit"],
+            dependencies: ["Features", "JellyfinKit", "WidgetShared"],
             swiftSettings: uiSettings
         ),
         .testTarget(

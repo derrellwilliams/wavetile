@@ -109,6 +109,12 @@ public enum WidgetStore {
 
 /// Deep links the widgets open: `wavetile://album/<id>`, `wavetile://now-playing`.
 public enum WidgetLink {
-    public static func album(_ id: String) -> URL { URL(string: "wavetile://album/\(id)")! }
+    /// The ID comes from the server: anything outside letters, digits, `-` and `_` is escaped, so an
+    /// odd ID can't make an invalid URL (and crash the widget).
+    public static func album(_ id: String) -> URL {
+        let safe = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_")
+        let escaped = id.addingPercentEncoding(withAllowedCharacters: safe) ?? ""
+        return URL(string: "wavetile://album/\(escaped)") ?? nowPlaying
+    }
     public static let nowPlaying = URL(string: "wavetile://now-playing")!
 }

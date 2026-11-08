@@ -289,3 +289,161 @@ Account isolation limitation: database filenames sanitize server/user IDs by del
 - **Tests added:** `CompleteItemsTests` (all pages collected; truncated, missing and null items, changing total and wrong offset rejected); `ReauthenticationTests.signOutCancelsAnInFlightSyncAndClosesItsPool` (holds a sync request, signs out, checks the old pool is closed and sign-in again opens a fresh empty database); the existing reauthentication test also checks the old pool is closed after sign-out.
 
 **Verification:** package scheme passed on iPhone 18 Pro Max (iOS 27.0): 161 tests, 215 runs, 0 failures, no runtime warnings (`build/Logs/Test/Test-WavetileKit-Package-2026.11.07_20-50-19--0700.xcresult`). UI tests were not rerun after the Settings alert. Not covered by automation: end-to-end sync tests against a stubbed server for the truncated-playlist/collection cases with seeded downloads (the helper is unit-tested; the call sites are not), a pool-close failure, and the filename-collision limitation above (section 8).
+
+## Targeted review 4 — downloads/offline — 2026-11-07
+
+Reviewed `Downloads/DownloadManager.swift`, `Persistence/DownloadQueries.swift` and `DownloadRecords.swift`, `Features/Downloads/` (`DownloadsStore`, `DownloadButton`, `Offline`), the offline paths in `AppModel` and `AudioPlayer` (`localFile`, `canStream`, `isOnDevice`), and the sign-out cleanup. Podcast episode downloads (`EpisodeDownloadManager`) belong to section 5.
+
+### R4-01 — High (fixed): a failed database read removed a user's download
+
+`DownloadManager.sync` decided a playlist or collection was "gone" with `(try? database.playlist(id:)) != nil`, so a read error (busy or closed pool) counted as a missing source and `remove(collectionID:)` deleted the download and its files, unlike the track lookups just below it, which return on error. Now only a successful lookup that finds nothing removes a download; an error leaves it alone until the next sync.
+
+### R4-02 — Medium (fixed): any 2xx body was saved as music and marked done
+
+`didFinishDownloadingTo` checked the status code only. A proxy login page, an error page returned as 200, or an empty body was moved into the folder as `<id>.mp3` and marked done, so the track showed as downloaded and counted as playable offline but failed in the player. `DownloadManager.looksLikeAudio` now fails the download ("The server didn't send audio") for an empty file or a text, JSON, XML or HTML type; `application/octet-stream` and a missing type pass.
+
+### R4-03 — Low (fixed): a done download could have no file
+
+Row badges, offline dimming and `canPlay` read `state = 'done'` from the database, while `localFile` also checks the file, so a done row with no file showed as playable and then tried to stream with no server. Requesting the download again did nothing, because done rows are not re-fetched. `resumePending` (launch and network change) now puts done rows whose file is gone back in the queue (`finishedDownloads`, `requeueDownloads`), after checking that the folder itself is reachable. No known path creates this state in normal use (the folder and database are both excluded from backup); it is a consistency guard.
+
+### Reviewed, no change needed
+
+Account folder and file-name sanitizing, protection class and backup exclusion, retry bounds and backoff, removal racing a finishing transfer (the file is deleted when its row is gone), orphan cleanup on membership changes, cancel on remove, sign-out (`invalidateAndCancel` then folder delete, after the pool is closed), offline dimming and `requiresServer()` coverage, and Retry/Remove menu behavior. Redirect containment is covered under QA-3.
+
+### Deferred, with rationale
+
+- **Orphan files:** a file with no database row (crash between the move and the row update, or the temporary-database fallback when the cache can't open) is not reclaimed until sign-out and isn't counted in "Storage Used". A sweep could delete a file that just finished before its row lands, so it needs a grace period; low impact, left for after launch.
+- **Disk full:** a failed move marks the track failed and the next launch retries; there is no free-space check before queueing a large album.
+- **Persistent failures retry once per launch** (a track deleted on the server fails again each time).
+- **Cellular toggle:** applies to new transfers, not ones already queued; resume-data retries keep the original setting.
+- **Two overlapping `resumePending` calls** (launch plus a network change) can queue the same track twice; the second file replaces the first, wasting one transfer.
+- **Duplicate Live Activity:** starting a download again while one is running for the same collection requests a second activity.
+- **Download folder name** uses the same non-injective ID sanitizing noted under R3 (section 8).
+
+**Verification:** package scheme passed on iPhone 18 Pro Max (iOS 27.0): 163 tests, 217 runs, 0 failures, no runtime warnings (`build/Logs/Test/Test-WavetileKit-Package-2026.11.07_21-06-16--0700.xcresult`). New tests: `missingFilesGoBackInTheQueue` and `rejectsEmptyAndNonAudioBodies`. Not automated: R4-01's read-error path (needs a `DownloadManager` with a failing database) and the `DownloadManager` delegate paths. Device checks for interruption, airplane mode and relaunch are tracked in testparty.
+
+## Targeted review 5 — podcasts — 2026-11-07
+
+Reviewed `Podcasts/` (`FeedFetcher`, `FeedParser`, `PodcastDatabase` upsert/prune/progress/housekeeping, `PodcastSync`, `EpisodeDownloadManager`, `OPML`, `PodcastNetwork`, `ShowNotes` link handling) and `Features/Podcasts/PodcastsStore` (refresh, follow/unfollow, progress, OPML import, Jellyfin sync apply). Directory search, recommendations, chapters and transcripts were covered by the earlier QA-3 pass (size caps, HTTPS upgrade, no cookies or credentials); not re-reviewed line by line.
+
+### R5-01 — High (fixed): a damaged server copy could unfollow every show
+
+`PodcastSyncState(customPrefs:)` turned an unreadable or missing `subs` list into an empty one but kept its `subsUpdated` timestamp. A truncated or malformed blob in the Jellyfin preferences with a newer timestamp then won the merge, `apply` unfollowed every public show on this device, the empty list was pushed back, and the next launch's `removeUnfollowedShows` deleted the episode data of shows with no listening state. An unreadable or missing list now has no timestamp, so the merge keeps this device's shows and the next push replaces the damaged copy. A list written on purpose as `[]` still unfollows.
+
+### R5-02 — Medium (fixed): a feed that broke partway pruned episodes and overwrote the show
+
+`FeedParser.parse` deliberately keeps what parsed before an XML error, but the upsert treated that prefix as the whole feed. One unescaped `&` in an old episode title (a common publisher bug), or the parser refusing an entity expansion, ended the parse there, so every refresh deleted all later episodes that had no listening state. Played episodes count as stateless once their position resets, so they lost their played mark and came back as new, unplayed episodes on a good fetch. A feed cut off before its title also renamed the show "Untitled Podcast". `ParsedFeed.isComplete` is now true only when the channel closed (trailing junk after `</channel>` still counts as complete). An incomplete feed still adds and updates the episodes it read, but prunes nothing, keeps the stored show details, and stores no validators, so the next refresh fetches it again.
+
+### R5-03 — Medium (fixed): any 2xx body was saved as an episode
+
+`EpisodeDownloadManager` checked only the status code, like the music manager before R4-02. A dead link or paywall answering 200 with a web page or an empty body showed as downloaded and failed in the player. It now uses the same `looksLikeAudio` check (empty or text/JSON/XML/HTML responses fail with "The podcast's server didn't send audio").
+
+### R5-04 — Low (fixed): a download finishing after its row was removed left a file behind
+
+Removing a download, unfollow cleanup or Remove All data while a transfer finished left the file in the folder with no row, uncounted and never deleted. `updateDownload` now reports whether the row still exists and the file is deleted when it doesn't (as for music).
+
+### R5-05 — Low (fixed): a finished episode download could have no file
+
+Same consistency gap as R4-03: the row said done, `localFile` said nothing. `resumePending` now puts such rows back in the queue (after checking the folder is reachable). No known normal path creates this state.
+
+### Reviewed, no change needed
+
+Feed size cap and 304/hash short-circuit; HTTPS-only fetching with `http`→`https` upgrade; no cookies, credentials or Jellyfin headers on any podcast request; XXE and entity-expansion limits; 3,000-episode and 2,000-subscription caps; private-feed filtering before sync; played/position merge rules; OPML import/export escaping; progress saves and auto-delete of played downloads (never saved episodes, never the playing one); external links: show-notes `href`s are limited to http, https and mailto at parse time and again in the open action (other schemes are discarded, timestamps seek), and host/guest links, feed artwork, chapter and transcript URLs go through `webURL` (http/https only).
+
+### Deferred, with rationale
+
+- **Clock skew in sync:** per-key last-write-wins uses device clocks, so a device with a clock far in the future keeps winning until it is corrected. Inherent in the no-backend design.
+- **Entries dropped from a readable list** (a URL this client can't parse, or past 2,000) disappear from the pushed copy.
+- **Episodes without a `<guid>`** are keyed by audio URL: a publisher that changes enclosure URLs creates new episodes and prunes the old ones (played state lost unless the user also has a position or saved mark). Needs a different identity scheme.
+- **Episodes shorter than 30 s** count as finished as soon as progress is first saved (`savePosition` treats the last 30 s as the end). Rare; fix needs a product decision on short clips.
+- **No size cap or retry for episode downloads** (a failure waits for a manual retry). Low risk, as noted under QA-3.
+- **Orphan episode files** from a crash between move and row update are not swept (same reasoning as music in section 4).
+- **Podcast folder name** uses the non-injective ID sanitizing noted under R3 (section 8).
+
+**Verification:** package scheme passed on iPhone 18 Pro Max (iOS 27.0): 173 tests, 230 runs, 0 failures, no runtime warnings (`build/Logs/Test/Test-WavetileKit-Package-2026.11.07_21-10-04--0700.xcresult`). New tests: four `FeedParserTests` cases (normal, trailing junk, broken partway, cut off before the title), three `PodcastDatabaseTests` cases (partial feed, removed-download update, missing-file requeue) and `PodcastSyncDamagedCopyTests` (truncated, malformed, wrong-shape and missing lists; a newer readable list and a deliberate empty list still apply). Not automated: the `EpisodeDownloadManager` delegate paths and `PodcastsStore.sync`/`apply` end to end. Device checks for feeds, sync across two devices and background refresh are tracked in testparty.
+
+## Targeted review 6 — system integrations — 2026-11-07
+
+Reviewed `Features/CarPlay/CarPlayController.swift` and `App/CarPlaySceneDelegate.swift`; `App/MusicIntents.swift` with `Features/Siri/SiriLibrary.swift`; `Shared/PlaybackIntents.swift`, `PlaybackCommandCenter`, `WidgetSnapshots` (`WidgetStore`, `WidgetLink`) and `Features/Widgets/WidgetBridge.swift`; the widget views and `DownloadLiveActivity`; the Live Activity driver in `DownloadsStore`; the deep-link handler in `MainTabView`; entitlements and Info.plist entries in `project.yml`; and how sign-out reaches each of them. Real CarPlay, Siri, Lock Screen widget and Live Activity behavior can't be exercised here; those checks stay in testparty.
+
+### R6-01 — High (fixed): sign-out deleted the podcast database while its store was still using it
+
+R3-05 stopped the library's sync and closed its pool before deleting files, but the podcast database was unlinked with its pool open and its store still running: refresh and auto-download tasks, the debounced Jellyfin sync push, recommendations, and the ordered write queue (the player's final progress save from `player.stop()` runs there). Writes after sign-out landed in an unlinked file, and signing straight back in opened a second pool at the same path. `PodcastsStore.shutdown()` now stops new refreshes, syncs, pushes and writes, cancels and awaits the running ones, waits briefly for a sync already talking to the server, and closes the pool; `signOut()` runs it before the library's shutdown and before deleting anything, and fails the same way (session kept, alert shown) if a pool won't close.
+
+### R6-02 — Medium (fixed): Siri's vocabulary only updated at launch
+
+`WavetileShortcuts.updateAppShortcutParameters()` ran once in `WavetileApp.init`. A first-time user, whose library is empty at that launch, got no spoken names until a later launch after the first sync; and after signing out (or switching accounts) the previous account's album, artist and playlist names stayed in Siri's learned phrases until the next launch. `AppModel.onLibraryVocabularyChanged` now fires after each completed library sync, on sign-in and on sign-out; the app target points it at `updateAppShortcutParameters()`. Siri's lookups themselves were already empty when signed out.
+
+### R6-03 — Medium (fixed): download Live Activities could be left frozen on the Lock Screen
+
+The activity was updated by a task inside the process that started it. If iOS suspended or killed the app mid-download (the background session keeps downloading), nothing ever updated or ended the activity again, so it could show "Downloading 3 of 12" until the system's own limit, and sign-out didn't end it. `DownloadsStore` now ends activities this process isn't tracking when downloads are observed at launch, then re-attaches to downloads still running, ends all of them at sign-out, and keeps one activity per collection (a second Download or Retry tap during a run no longer starts another; this also closes the duplicate noted as deferred in section 4).
+
+### R6-04 — Low (fixed): widgets could be repopulated after sign-out
+
+`recentsChanged` fetches artwork for up to eight albums in a background task and then writes the Recently Played snapshot; one still running when the user signed out wrote the previous account's albums back after `WidgetStore.clear()`. A clear counter now makes such tasks stop before writing. A launch that comes up signed out (no saved session, a no-longer-allowed transport, or unusable storage) also clears the widgets instead of leaving the last session's snapshot and artwork on the Home and Lock Screens.
+
+### R6-05 — Low (fixed): an odd album ID could crash the widget
+
+`WidgetLink.album` built its URL with `URL(string:)!` from the server's album ID; an ID with a space or other URL-invalid character made the force unwrap trap in the widget extension. Unsafe characters are now percent-escaped (the app reads the same ID back from the last path component) with a fallback link instead of a crash.
+
+### Reviewed, no change needed
+
+Deep links: `wavetile://album/<id>` only navigates, after a lookup in the signed-in database; `now-playing` only opens the player; other hosts and a signed-out app do nothing, and no link triggers a purchase, sign-in or other action. Widget and Lock Screen controls (`AudioPlaybackIntent`) forward only play/pause and next through a handler the signed-in app registers; with no session they do nothing. App group data is two small JSON files and artwork, no tokens or server addresses, removed at sign-out. Siri: names and playback come from the local database, nothing is sent anywhere by the app, and entities are looked up by ID so a stale Shortcut for a deleted item fails with "Couldn't play". CarPlay: shows an "Open Wavetile on your iPhone" screen if the app isn't ready, plays through the same queue as the phone (offline, only downloaded songs), and refreshes lists in place. CarPlay audio entitlement and background modes (`audio`, `fetch`) match the features.
+
+### Deferred, with rationale
+
+- **Lock Screen exposure by design:** Siri, the widget buttons and the Now Playing widget work with the phone locked (the same as Apple Music), so a listener can start playback and see the current title and artist without unlocking. Requiring authentication would break Siri in CarPlay with a locked phone. Accepted; mention in privacy answers if reviewers ask what Siri learns (names stay on the device).
+- **CarPlay offline feedback:** with nothing playable offline, picking a row does nothing and the list doesn't dim downloaded music the way the phone does. Needs a CarPlay-specific design.
+- **CarPlay refresh under steady writes:** the one-second debounce restarts on every database write, so lists don't refresh while a download or sync is writing continuously; they refresh when it settles.
+- **Dynamic Island and Lock Screen layouts, widget families and CarPlay templates** need device review (testparty); the Live Activity text shows the album or playlist name by design.
+
+**Verification:** package scheme passed on iPhone 18 Pro Max (iOS 27.0): 175 tests, 243 runs, 0 failures, no runtime warnings (`build/Logs/Test/Test-WavetileKit-Package-2026.11.07_21-14-50--0700.xcresult`); the Wavetile app target also builds (it contains the Siri hook change). New tests: `WidgetLinkTests` (valid links and round-trip for odd IDs) and a check in the sign-out test that the podcast pool is closed. Not automated: Live Activity and Siri behavior, `recentsChanged` racing a sign-out, and `PodcastsStore.shutdown()` with a sync mid-flight. UI tests were not rerun.
+
+## Targeted review 7 — screens and release configuration — 2026-11-07
+
+Reviewed `project.yml` (both targets, entitlements, Info.plist keys, ATS, background modes, launch and scene configuration), the generated entitlements and privacy manifests, `DebugFlags` and every `#if DEBUG` in the package, the sign-in flow and root view (`SignInModel`, `SignInFlow`, `RootView`), the shared error surfaces (`LibraryActions` alerts and banners, sign-out failure alert), the OPML importer, background refresh registration, and launch-argument use. Visual layout, Dynamic Type at the largest sizes, VoiceOver order and navigation on a device stay with the UI audit and testparty.
+
+### Reviewed, no change needed
+
+- **Debug behavior:** every launch flag lives in `DebugFlags`, which returns constants in Release; no other code reads launch arguments or environment variables. The only other `#if DEBUG` is `eraseDatabaseOnSchemaChange` on the library database; the podcast database has no erase-on-change. `-interposable` is applied to Debug only. No `print`, `NSLog` or `dump` in the package.
+- **Entitlements and capabilities:** app and widget extension share only the app group; the app adds CarPlay audio. Background modes are `audio` and `fetch`, and the one scheduled task identifier matches the registered handler. Live Activities, URL scheme and local-network usage text match features that exist. Export compliance is declared, orientation is portrait on iPhone, user script sandboxing is on.
+- **Network configuration:** plain HTTP is allowed for local networking and `.ts.net` only; `NSAllowsArbitraryLoadsInMedia` is the documented podcast-audio exception, with remote HTTP Jellyfin servers refused at sign-in and any saved one dropped at launch. The review notes explain the exception.
+- **Errors:** server edits report a specific alert (permission refusal vs connection), failed favorites and radio say so, sign-in maps each failure to a sentence, a failed sign-out explains how to retry, and observation failures are logged. Sign-in ignores a response that arrives after sign-out or an account change. The OPML importer reads at most 5 MB with a bounded read and security-scoped access.
+- **Background refresh:** after sign-out the pending request wakes the app, finds no session and ends without rescheduling.
+- **Preview code:** `AppModel.preview` uses `try!`; it is reachable only from previews.
+
+### R7-01 — Low (fixed with R8-01): a stand-in database hid or deleted real data
+
+See R8-01; the code paths are in the app's launch (`makeSignedIn`) and the download managers.
+
+### Deferred, with rationale
+
+- **Accessibility at the largest Dynamic Type sizes and VoiceOver order** can't be judged from source; the UI accessibility audit covers the main screens and device checks stay in testparty.
+
+## Targeted review 8 — cross-subsystem scenarios — 2026-11-07
+
+Scenarios traced end to end through the code already reviewed in sections 1–7, looking for steps where one subsystem's cleanup or failure leaves another inconsistent.
+
+| Scenario | Result |
+|---|---|
+| Sign out during a download | Fixed across R3-05, R4-01, R5-04, R6-01, R6-03: sync and podcast work stop and both databases close before any file is deleted, the music and podcast sessions are invalidated, Live Activities end, widgets clear (and late widget writes are dropped), Siri's vocabulary refreshes. Credentials are cleared last, so a kill mid sign-out leaves a signed-in app that finishes cleaning on the next sign-out; deleted files with surviving rows are queued again (R4-03). |
+| Sign in as a different account straight after | Each account has its own folders, databases, background session identifier and widget snapshot; the old stores are stopped before the new ones start. |
+| Network loss during playback | A failed stream asks the server check before deciding; with no way to play the track the queue skips to what is playable and says so once, otherwise it pauses. Downloaded files never hit the network; unreported plays are queued and sent at the next sync. Stalls (as opposed to failures) buffer and resume on their own. |
+| Network loss during a sync | The sync fails before pruning and before `lastCompleted` advances (R3-04); pages already written are upserts and stay; the user sees "Library sync failed. Pull to retry." |
+| App killed during a sync | Page writes are separate transactions and the prune and `lastCompleted` are one, so a kill leaves old data plus some new rows, never a pruned half. A manual refresh killed within an hour of the last good sync isn't retried automatically until the hour passes. |
+| App killed during a download | Background transfers continue; on relaunch `resumePending` restarts queued items with no task, and finished transfers are delivered to the recreated session. A kill between the file move and the row update leaves an unreferenced file (deferred, section 4). |
+| Upgrade with existing data | All migrations are additive and transactional; tests upgrade a first-schema library database (search index included) and a first-schema podcast database with followed shows, listening state, Up Next and a download; library download-table upgrades beyond the v2 tables are P2. Keychain session, preferences, download session identifiers and app-group files carry over; unreadable widget snapshots decode to nothing and are rewritten. |
+| Real database won't open | See R8-01. |
+
+### R8-01 — Medium (fixed): a failed database open could delete freshly downloaded files
+
+When a library or podcast database can't be opened (a failed migration, a full disk), `makeSignedIn` runs the session on an empty temporary database but still created the download managers. If iOS relaunched the app at that moment to deliver finished background downloads, each completed file had no row, `updateDownload` reported "no longer wanted", and the file was deleted (the same rule that cleans up after a removed download). The user also saw their library, downloads and podcast state apparently gone, with nothing in the logs. `LibraryDatabase` and `PodcastDatabase` now know when they are the stand-in (`isTemporary`), the download managers are not created against them (nothing is saved or deleted; the system keeps the finished transfers until a normal launch), and the fallback is logged as a fault with the error. The real database file is untouched, so the next launch that opens it shows everything again.
+
+### Deferred, with rationale
+
+- **Account identity in file names:** database, download and podcast folder names strip characters from the server and user IDs and join them. Real Jellyfin IDs are 32-character GUIDs and never collide, but two servers cloned from the same configuration share a server ID, so one user ID on both would share a database and download folder. Namespacing by server address would orphan every existing install's data and needs a migration; recommended after launch if cloned-server reports appear.
+- **Silent fallback visibility:** apart from the new log entry, the user isn't told when a database couldn't open. A banner or an "your library couldn't be opened" screen is a product decision.
+- **Interrupted sign-out** leaves the session in place (credentials are cleared last) and the user repeats it; the alternative order would leave account data on disk once credentials are gone.
+- **A manual refresh killed mid-sync** isn't retried before the one-hour freshness window ends.
+
+**Verification (7 and 8):** package scheme passed on iPhone 18 Pro Max (iOS 27.0): 177 tests, 245 runs, 0 failures, no runtime warnings (`build/Logs/Test/Test-WavetileKit-Package-2026.11.07_21-25-24--0700.xcresult`). The UI suite (including the accessibility audit) also passed on this code: 17/17, no runtime warnings (`build/Logs/Test/Test-Wavetile-2026.11.07_21-26-00--0700.xcresult`). New tests: `onlyTheStandInDatabaseIsMarkedTemporary` for each database. Not automated: the fallback launch itself (needs an unopenable database and a background relaunch), kill-mid-sign-out and kill-mid-sync, which belong to the device pass.

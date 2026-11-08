@@ -120,6 +120,8 @@ final class DownloadsStore {
     let manager: DownloadManager?
     private let database: LibraryDatabase
     private let library: LibraryStore
+    /// Collections with a Live Activity this process is updating.
+    @ObservationIgnored private var trackedActivities: Set<String> = []
 
     /// Fully downloaded track IDs (row badges, offline availability).
     private(set) var downloadedTrackIDs: Set<String> = []
@@ -138,7 +140,8 @@ final class DownloadsStore {
     init(session: ServerSession, library: LibraryStore) {
         self.library = library
         self.database = library.database
-        self.manager = try? DownloadManager(serverID: session.serverID, userID: session.userID, database: library.database, library: library.api)
+        // With a stand-in database no finished file would match a row, and the manager deletes those.
+        self.manager = library.database.isTemporary ? nil : try? DownloadManager(serverID: session.serverID, userID: session.userID, database: library.database, library: library.api)
         self.quality = UserDefaults.standard.string(forKey: "downloadQuality").flatMap(DownloadManager.Quality.init) ?? .high
         self.allowCellular = UserDefaults.standard.object(forKey: "downloadOverCellular") as? Bool ?? false
         // Read now so offline checks are right before `observe()` runs (and in CarPlay, where it may not).
@@ -152,7 +155,8 @@ final class DownloadsStore {
         async let resume: Void = resumePending()
         async let availability: Void = observeAvailability()
         async let favorites: Void = observeFavoritesDownload()
-        _ = await (ids, bytes, resume, availability, favorites)
+        async let activities: Void = resumeLiveActivities()
+        _ = await (ids, bytes, resume, availability, favorites, activities)
     }
 
     /// Hearting or unhearting updates the Favorites download now, not at the next library sync.
@@ -245,12 +249,34 @@ final class DownloadsStore {
         }
     }
 
-    /// Lock Screen / Dynamic Island progress for one collection's download.
+    /// Live Activities an earlier process left behind (the app was killed or suspended mid-download)
+    /// have nothing updating them, so they'd show frozen progress for hours: end them, then
+    /// pick up the downloads still running.
+    private func resumeLiveActivities() async {
+        for activity in Activity<DownloadActivityAttributes>.activities where !trackedActivities.contains(activity.attributes.collectionID) {
+            await activity.end(nil, dismissalPolicy: .immediate)
+        }
+        for collection in (try? database.allDownloadCollections()) ?? [] {
+            Task { await trackWithLiveActivity(collection) }
+        }
+    }
+
+    /// Sign-out: nothing of this account stays on the Lock Screen.
+    static func endAllLiveActivities() async {
+        for activity in Activity<DownloadActivityAttributes>.activities {
+            await activity.end(nil, dismissalPolicy: .immediate)
+        }
+    }
+
+    /// Lock Screen / Dynamic Island progress for one collection's download. One activity per
+    /// collection: asking again while it runs (Retry, a second tap) keeps the one that's updating.
     private func trackWithLiveActivity(_ record: DownloadCollectionRecord) async {
         guard ActivityAuthorizationInfo().areActivitiesEnabled,
               let status = try? database.downloadStatusNow(collectionID: record.id),
-              status.isInProgress
+              status.isInProgress,
+              trackedActivities.insert(record.id).inserted
         else { return }
+        defer { trackedActivities.remove(record.id) }
         let attributes = DownloadActivityAttributes(collectionID: record.id, name: record.name, subtitle: record.subtitle)
         let initial = DownloadActivityAttributes.ContentState(done: status.done, total: status.total, progress: status.progress)
         guard let activity = try? Activity.request(attributes: attributes, content: .init(state: initial, staleDate: nil)) else { return }

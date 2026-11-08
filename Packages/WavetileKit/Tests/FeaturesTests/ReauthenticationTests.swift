@@ -54,6 +54,7 @@ struct ReauthenticationTests {
         #expect(await app.signOut())
         await sync.value
         #expect(throws: (any Error).self) { try account.library.database.pool.read { _ in () } }
+        #expect(throws: (any Error).self) { try account.podcasts.database.pool.read { _ in () } }
         try app.didSignIn(session, token: "new-synthetic")
         guard case let .signedIn(reopened) = app.phase else { Issue.record("Could not sign in again"); return }
         #expect(try reopened.library.database.syncState() == nil)

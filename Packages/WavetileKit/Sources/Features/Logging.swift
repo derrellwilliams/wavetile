@@ -11,6 +11,12 @@ enum Log {
         library.error("\(action, privacy: .public) failed: \(String(describing: error), privacy: .public)")
     }
 
+    /// A database that wouldn't open, so this session runs on an empty stand-in. The error is a
+    /// SQLite or migration message with no personal data.
+    static func storageFallback(_ name: String, _ error: any Error) {
+        library.fault("\(name, privacy: .public) database didn't open; using a temporary one: \(String(describing: error), privacy: .public)")
+    }
+
     /// For database observations that end with an error: the screen keeps its last values,
     /// but the failure shows up in a sysdiagnose instead of vanishing.
     static func observationFailed(_ error: any Error, file: String = #fileID, line: Int = #line) {

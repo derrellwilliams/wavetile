@@ -65,10 +65,24 @@ public final class EpisodeDownloadManager: NSObject, Sendable {
     }
 
     public func resumePending(allowCellular: Bool) async {
+        await requeueMissingFiles()
         let running = Set(await session.allTasks.compactMap(\.taskDescription))
         for item in (try? database.pendingDownloads()) ?? [] where !running.contains(item.id) {
             enqueue(episodeID: item.id, url: item.episode.audioURL, allowCellular: allowCellular)
         }
+    }
+
+    /// A download marked done whose file is gone would show as downloaded and not play: queue it again.
+    private func requeueMissingFiles() async {
+        guard FileManager.default.fileExists(atPath: directory.path(percentEncoded: false)),
+              let finished = try? database.finishedDownloads() else { return }
+        let missing = finished.filter { record in
+            guard let name = record.fileName else { return true }
+            return !FileManager.default.fileExists(atPath: directory.appending(path: name).path(percentEncoded: false))
+        }
+        guard !missing.isEmpty else { return }
+        log.error("\(missing.count, privacy: .public) finished episode downloads lost their file; queueing them again")
+        try? await database.requeueDownloads(episodeIDs: missing.map(\.episodeID))
     }
 
     public func localFile(episodeID: String) -> URL? {
@@ -170,6 +184,12 @@ extension EpisodeDownloadManager: URLSessionDownloadDelegate {
             markFailed(episodeID, "The podcast's server returned \(http.statusCode)")
             return
         }
+        // A dead link often answers 200 with a web page: don't keep that as an episode.
+        let received = (try? location.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init) ?? 0
+        guard DownloadManager.looksLikeAudio(downloadTask.response, bytes: received) else {
+            markFailed(episodeID, "The podcast's server didn't send audio")
+            return
+        }
         // The temp file is deleted when this method returns, so move it synchronously.
         let name = "\(episodeID).\(Self.fileExtension(for: downloadTask.response))"
         let destination = directory.appending(path: name)
@@ -179,14 +199,16 @@ extension EpisodeDownloadManager: URLSessionDownloadDelegate {
             try (destination as NSURL).setResourceValue(FileProtectionType.completeUntilFirstUserAuthentication, forKey: .fileProtectionKey)
             let bytes = (try? destination.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init) ?? 0
             state.withLock { _ = $0.lastProgressWrite.removeValue(forKey: episodeID) }
-            Task {
-                try? await database.updateDownload(episodeID: episodeID) {
+            Task { [directory] in
+                let wanted = (try? await database.updateDownload(episodeID: episodeID) {
                     $0.state = .done
                     $0.fileName = name
                     $0.bytes = bytes
                     $0.progress = 1
                     $0.error = nil
-                }
+                }) ?? true
+                // Removed while it finished: don't leave the file behind.
+                if !wanted { try? FileManager.default.removeItem(at: directory.appending(path: name)) }
             }
         } catch {
             markFailed(episodeID, error.localizedDescription)

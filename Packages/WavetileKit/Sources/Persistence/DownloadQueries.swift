@@ -123,6 +123,23 @@ public extension LibraryDatabase {
         try pool.read { try DownloadedTrackRecord.filter(["queued", "downloading"].contains(Column("state"))).fetchAll($0) }
     }
 
+    /// Finished downloads with their file names, to check the files are still on disk.
+    func finishedDownloads() throws -> [DownloadedTrackRecord] {
+        try pool.read { try DownloadedTrackRecord.filter(Column("state") == "done").fetchAll($0) }
+    }
+
+    /// Puts finished downloads whose file went missing back in the queue.
+    func requeueDownloads(trackIDs: [String]) async throws {
+        try await pool.write { db in
+            for trackID in trackIDs {
+                try db.execute(sql: """
+                    UPDATE downloadedTrack SET state = 'queued', fileName = NULL, bytes = 0, progress = 0, error = NULL, updatedAt = ?
+                    WHERE trackID = ? AND state = 'done'
+                    """, arguments: [Date(), trackID])
+            }
+        }
+    }
+
     /// Puts failed downloads back in the queue (a retry on launch) and returns their track IDs.
     func requeueFailedDownloads() async throws -> [String] {
         try await pool.write { db in
@@ -130,6 +147,11 @@ public extension LibraryDatabase {
             try db.execute(sql: "UPDATE downloadedTrack SET state = 'queued', progress = 0, error = NULL WHERE state = 'failed'")
             return ids
         }
+    }
+
+    /// Every download, albums included.
+    func allDownloadCollections() throws -> [DownloadCollectionRecord] {
+        try pool.read { try DownloadCollectionRecord.fetchAll($0) }
     }
 
     /// Downloads that follow their source (playlists, collections, Favorites), to bring up to date

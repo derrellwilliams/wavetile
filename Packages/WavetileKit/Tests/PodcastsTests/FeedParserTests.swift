@@ -8,6 +8,33 @@ struct FeedParserTests {
         return try Data(contentsOf: url)
     }
 
+    private let episodeXML = "<item><guid>%@</guid><title>%@</title><enclosure url=\"https://example.com/%@.mp3\" type=\"audio/mpeg\"/></item>"
+
+    @Test func aFeedThatEndsNormallyIsComplete() throws {
+        let xml = "<rss><channel><title>Show</title>\(String(format: episodeXML, "a", "A", "a"))</channel></rss>"
+        let feed = try FeedParser.parse(Data(xml.utf8))
+        #expect(feed.isComplete)
+        #expect(feed.episodes.count == 1)
+    }
+
+    @Test func trailingJunkAfterTheChannelStillCountsAsComplete() throws {
+        let xml = "<rss><channel><title>Show</title>\(String(format: episodeXML, "a", "A", "a"))</channel></rss><!-- ads -->  <p>"
+        #expect(try FeedParser.parse(Data(xml.utf8)).isComplete)
+    }
+
+    /// An unescaped `&` in an old episode ends the parse there; the later episodes were never read.
+    @Test func brokenXMLPartwayIsIncomplete() throws {
+        let xml = "<rss><channel><title>Show</title>\(String(format: episodeXML, "a", "A", "a"))\(String(format: episodeXML, "b", "Q & A", "b"))\(String(format: episodeXML, "c", "C", "c"))</channel></rss>"
+        let feed = try FeedParser.parse(Data(xml.utf8))
+        #expect(!feed.isComplete)
+        #expect(feed.episodes.map(\.guid) == ["a"])
+    }
+
+    @Test func aFeedCutOffBeforeItsTitleIsIncomplete() throws {
+        let feed = try FeedParser.parse(Data("<rss><channel><item><guid>a</guid>".utf8))
+        #expect(!feed.isComplete)
+    }
+
     /// "Billion laughs": nested internal entities that would expand to gigabytes. The parser must
     /// refuse the expansion (libxml2's amplification limit) rather than build it in memory.
     @Test(.timeLimit(.minutes(1))) func nestedEntitiesDontExpand() throws {

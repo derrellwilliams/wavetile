@@ -4,7 +4,7 @@ Moved from [LAUNCH.md](LAUNCH.md) on 2026-11-07. This is the working checklist f
 
 ## Before starting
 
-Use signed TestFlight build 202611072010 from `351df13` once processing and availability are confirmed. It contains the Nov 7 fixes, including background audio-session activation and authentication/playback review fixes. Build 202611061835 lacks those changes. Start with the detailed CarPlay and audio pass below, then run every P0 scenario on the final RC.
+Decided Nov 7: no TestFlight upload until all eight targeted source reviews were done, so everything runs on one build. They are done; the build to test is **RC_BUILD_PLACEHOLDER** (Version 1.0.0, from commit RC_COMMIT_PLACEHOLDER, uploaded RC_DATE_PLACEHOLDER; confirm in TestFlight that processing finished). Builds 202611072010 and 202611061835 predate the review fixes and are not used. Start with the detailed CarPlay and audio pass below and the review-fix checks, then run every P0 scenario on this build.
 
 For each check record device, iOS version, build, date, pass/fail and reproduction notes. Include head-unit/speaker details where relevant. Leave untested checks open; record any explicit deferral and rationale. Put engineering defects in LAUNCH.md with the build and a link to the failed check here.
 
@@ -20,6 +20,22 @@ For each check record device, iOS version, build, date, pass/fail and reproducti
 - [ ] Verify Keychain cleanup on device: sign out, relaunch and confirm the session cannot restore; exercise lock/unlock and failed-deletion retry with engineering assistance. Signed-out UI alone does not prove token deletion. Record evidence of cleanup separately from best-effort server revocation.
 - [ ] From a fresh install, validate reviewer-demo login and playable content using the exact review instructions, including a blank password if applicable.
 - [ ] Verify privacy-policy links open from sign-in and Settings, including a VoiceOver smoke check.
+
+## Checks for the Nov 7 review fixes (R1–R8)
+
+Each of these exercises a fix that automated tests cover only partly (details in [qa-evidence.md](qa-evidence.md)). Use a test account, not your main library, where a step deletes data.
+
+- [ ] **Sign-out cleanup (R3-05, R4, R6):** with a sync running (pull to refresh) and a download in progress, sign out. Expect the sign-in screen with no alert, Lock Screen widgets back to "Nothing playing", no download Live Activity left on the Lock Screen or Dynamic Island, and no downloaded music or podcast files after signing in as a different account. Then sign in again as the first account: an empty library that syncs, nothing carried over.
+- [ ] **Sign-out failure path (R3-05):** nothing to force on a device; if "Couldn't Sign Out" ever appears, record when, then close and reopen the app and sign out again.
+- [ ] **Library sync with big playlists and collections (R3-01–R3-04):** against a server with a playlist over 500 songs and a collection with several albums, sync, then check song counts. Turn the server off mid-sync: expect "Library sync failed. Pull to retry.", no songs missing from playlists, and downloaded playlists still intact.
+- [ ] **Kill during sync and download (section 8):** force-quit during a sync, relaunch: library intact, next refresh completes. Force-quit during a download, relaunch: it resumes; finished tracks play offline.
+- [ ] **Download validity (R4-02):** point a download at a dead or paywalled link if you have one (a podcast enclosure that returns a web page works): expect a failed download, not "Downloaded".
+- [ ] **Download Live Activity (R6-03):** start an album download, lock the phone, force-quit the app. Expect the activity to be gone or updated after the next launch, not frozen at old progress; tapping Download or Retry twice shows one activity.
+- [ ] **Siri names (R6-02):** on a fresh install, sign in and wait for the first sync to finish, then say "Play <album name> in Wavetile" without relaunching the app. After signing out and into another account, an album from the first account is no longer recognized.
+- [ ] **Widgets after sign-out (R6-04):** sign out quickly after Home loads; the Recently Played widget must be empty, and stay empty.
+- [ ] **Podcast feed that breaks partway (R5-02):** follow a show whose feed has an unescaped "&" in an old episode title if you can find one; older episodes must stay, and played marks must survive a refresh.
+- [ ] **Two-device podcast sync (R5-01):** follow a show on device A, check it appears on device B; unfollow on B, check A follows the change. Nothing should unfollow unless you did it.
+- [ ] **Library or podcast storage failure (R8-01):** not reproducible on demand; if you ever see an empty library or podcast list after an update, note the build and time (the log entry "database didn't open" is in a sysdiagnose) and relaunch.
 
 ## Full device pass (QA-6)
 

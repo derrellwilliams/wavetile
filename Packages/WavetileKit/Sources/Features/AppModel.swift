@@ -41,6 +41,10 @@ public final class AppModel {
         didSet { UserDefaults.standard.set(theme.id, forKey: "themeID") }
     }
 
+    /// Called when the names Siri should know change: after a library sync and on sign in or out.
+    /// Set by the app target, which owns the App Shortcuts provider.
+    @ObservationIgnored public var onLibraryVocabularyChanged: (() -> Void)?
+
     /// The app's model, for entry points that don't go through SwiftUI (CarPlay, Siri).
     public private(set) static weak var current: AppModel?
 
@@ -66,6 +70,8 @@ public final class AppModel {
             activate(signedIn)
         } else {
             // No saved session, or no usable library storage (signing in again reports why).
+            // Widgets from an earlier session must not keep showing that account's music.
+            WidgetBridge.clear()
             phase = .signedOut
         }
     }
@@ -99,6 +105,7 @@ public final class AppModel {
         authorization = signedIn.authorization
         authorizationID = signedIn.authorizationID
         phase = .signedIn(signedIn)
+        onLibraryVocabularyChanged?()
     }
 
     /// Throws `StorageUnavailable` only when no database can be created at all (e.g. the disk is full).
@@ -108,6 +115,7 @@ public final class AppModel {
         do {
             database = try LibraryDatabase.open(serverID: session.serverID, userID: session.userID)
         } catch {
+            Log.storageFallback("library", error)
             do { database = try LibraryDatabase.temporary() } catch { throw StorageUnavailable() }
         }
         let authorizationID = UUID()
@@ -123,8 +131,14 @@ public final class AppModel {
         let library = LibraryStore(session: session, token: token, auth: accountAuth, database: database)
         let downloads = DownloadsStore(session: session, library: library)
         let player = AudioPlayer(library: library.api)
-        let podcastDatabase = (try? PodcastDatabase.open(serverID: session.serverID, userID: session.userID)) ?? (try? PodcastDatabase.temporary())
-        guard let podcastDatabase else { throw StorageUnavailable() }
+        let podcastDatabase: PodcastDatabase
+        do {
+            podcastDatabase = try PodcastDatabase.open(serverID: session.serverID, userID: session.userID)
+        } catch {
+            Log.storageFallback("podcast", error)
+            guard let temporary = try? PodcastDatabase.temporary() else { throw StorageUnavailable() }
+            podcastDatabase = temporary
+        }
         let podcasts = PodcastsStore(session: session, library: library.api, player: player, database: podcastDatabase)
         player.localFile = { [weak downloads, weak podcasts] id in
             downloads?.localFile(trackID: id) ?? podcasts?.localFile(episodeID: id)
@@ -150,7 +164,10 @@ public final class AppModel {
         player.onEpisodeProgress = { [weak podcasts] track, position, duration in
             podcasts?.episodeProgress(track, position: position, duration: duration)
         }
-        library.afterSync = { [weak downloads] in await downloads?.syncPlaylists() }
+        library.afterSync = { [weak downloads, weak self] in
+            await downloads?.syncPlaylists()
+            self?.onLibraryVocabularyChanged?()
+        }
         player.onUnreportedPlay = { [weak library] trackID, date in
             Task { try? await library?.database.queuePlay(trackID: trackID, at: date) }
         }
@@ -164,8 +181,9 @@ public final class AppModel {
         defer { signingOut = false }
         if case let .signedIn(signedIn) = phase {
             signedIn.player.stop()
-            guard await signedIn.library.shutdown() else { return false }
+            guard await signedIn.podcasts.shutdown(), await signedIn.library.shutdown() else { return false }
             WidgetBridge.clear()
+            await DownloadsStore.endAllLiveActivities()
             Connectivity.shared.server = nil
             // Downloaded music is tied to this account; remove it from the device.
             signedIn.downloads.manager?.deleteEverything()
@@ -186,6 +204,7 @@ public final class AppModel {
         showsReauthentication = false
         store.clear()
         phase = .signedOut
+        onLibraryVocabularyChanged?()
         return true
     }
 }

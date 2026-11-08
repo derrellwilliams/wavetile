@@ -25,6 +25,7 @@ final class PodcastsStore {
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
     @ObservationIgnored private var recommendTask: Task<Void, Never>?
     @ObservationIgnored private var isSyncing = false
+    @ObservationIgnored private var isShutDown = false
     @ObservationIgnored private var syncAgain = false
     @ObservationIgnored private let log = Logger(subsystem: "com.derrellwilliams.wavetile", category: "podcasts")
     @ObservationIgnored private var cachedLaunchUpNext: [EpisodeItem]?
@@ -104,7 +105,7 @@ final class PodcastsStore {
         self.player = player
         self.defaults = defaults
         self.fetcher = FeedFetcher(database: database)
-        self.downloads = try? EpisodeDownloadManager(serverID: session.serverID, userID: session.userID, database: database)
+        self.downloads = database.isTemporary ? nil : try? EpisodeDownloadManager(serverID: session.serverID, userID: session.userID, database: database)
         self.keyPrefix = "podcasts.\(session.userID)."
         let prefix = keyPrefix
         func value<T>(_ name: String, _ fallback: T) -> T { defaults.object(forKey: prefix + name) as? T ?? fallback }
@@ -216,6 +217,7 @@ final class PodcastsStore {
     }
 
     func refreshAll() async {
+        guard !isShutDown else { return }
         if let refreshTask {
             await refreshTask.value
             return
@@ -423,6 +425,30 @@ final class PodcastsStore {
         downloads?.localFile(episodeID: episodeID)
     }
 
+    // MARK: - Sign out
+
+    /// Stops background work and closes the database so sign-out can delete its files without a
+    /// refresh, sync or progress save still using them (see `LibraryStore.shutdown`). False when
+    /// the database wouldn't close.
+    func shutdown() async -> Bool {
+        isShutDown = true
+        pushTask?.cancel()
+        pushTask = nil
+        refreshTask?.cancel()
+        recommendTask?.cancel()
+        await refreshTask?.value
+        await recommendTask?.value
+        await lastWrite?.value
+        // A sync already talking to the server stops at its next step; give it a moment.
+        for _ in 0 ..< 30 where isSyncing { try? await Task.sleep(for: .milliseconds(100)) }
+        do {
+            try database.pool.close()
+            return true
+        } catch {
+            return false
+        }
+    }
+
     // MARK: - Writes
 
     @ObservationIgnored private var lastWrite: Task<Void, Never>?
@@ -431,6 +457,7 @@ final class PodcastsStore {
     /// Separate tasks could reach the database out of order (Play Next then Remove could leave
     /// an episode queued). Failures are logged instead of dropped.
     private func write(_ caller: String = #function, _ work: @escaping () async throws -> Void) {
+        guard !isShutDown else { return }
         let previous = lastWrite
         lastWrite = Task {
             await previous?.value
@@ -550,7 +577,7 @@ final class PodcastsStore {
     /// Debounces a sync. With `restart: false`, an already-pending push is left to fire on time
     /// (a throttle), so steady progress ticks can't keep postponing it.
     private func schedulePush(after delay: Duration = .seconds(5), restart: Bool = true) {
-        guard syncWithJellyfin else { return }
+        guard syncWithJellyfin, !isShutDown else { return }
         if pushTask != nil, !restart { return }
         pushTask?.cancel()
         pushTask = Task {
@@ -581,7 +608,7 @@ final class PodcastsStore {
 
     /// Pulls the server's copy, applies anything newer here, and pushes the merged result.
     func sync() async {
-        guard syncWithJellyfin else { return }
+        guard syncWithJellyfin, !isShutDown else { return }
         // One sync at a time; a request during one runs once more after it.
         guard !isSyncing else { syncAgain = true; return }
         isSyncing = true

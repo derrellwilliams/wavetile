@@ -5,6 +5,9 @@ import GRDB
 /// with sync writes, so browsing never blocks on a sync.
 public final class LibraryDatabase: Sendable {
     public let pool: DatabasePool
+    /// A throwaway database (previews, tests, or the fallback when the real one can't open).
+    /// Nothing durable may be recorded in it: downloads are switched off while it stands in.
+    public let isTemporary: Bool
 
     /// Opens (creating if needed) the library database in Application Support.
     public static func open(serverID: String, userID: String) throws -> LibraryDatabase {
@@ -24,10 +27,11 @@ public final class LibraryDatabase: Sendable {
     /// In-memory-ish database in a temp file, for tests and previews.
     public static func temporary() throws -> LibraryDatabase {
         let url = FileManager.default.temporaryDirectory.appending(path: "library-\(UUID().uuidString).sqlite")
-        return try LibraryDatabase(path: url.path(percentEncoded: false))
+        return try LibraryDatabase(path: url.path(percentEncoded: false), isTemporary: true)
     }
 
-    public init(path: String) throws {
+    public init(path: String, isTemporary: Bool = false) throws {
+        self.isTemporary = isTemporary
         var config = Configuration()
         config.foreignKeysEnabled = true
         pool = try DatabasePool(path: path, configuration: config)
