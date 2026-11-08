@@ -99,7 +99,7 @@ let package = Package(
         ),
         .testTarget(
             name: "LibraryTests",
-            dependencies: ["Library", "Persistence", "Downloads"],
+            dependencies: ["Library", "Persistence", "Downloads", "JellyfinKit"],
             swiftSettings: serviceSettings
         ),
         .testTarget(

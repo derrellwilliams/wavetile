@@ -50,7 +50,7 @@ public final class LibraryDatabase: Sendable {
         id.filter { $0.isLetter || $0.isNumber || $0 == "-" }
     }
 
-    private static var migrator: DatabaseMigrator {
+    static var migrator: DatabaseMigrator {
         var migrator = DatabaseMigrator()
         #if DEBUG
         // Schema changes during development: wipe and resync instead of writing migrations.

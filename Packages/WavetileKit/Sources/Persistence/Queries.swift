@@ -196,6 +196,8 @@ public enum SortKey {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         for article in ["the ", "a ", "an "] where key.hasPrefix(article) && key.count > article.count {
             key.removeFirst(article.count)
+            // "The  Beatles" (two spaces) must not leave a leading space that sorts first.
+            key = key.trimmingCharacters(in: .whitespacesAndNewlines)
             break
         }
         return key

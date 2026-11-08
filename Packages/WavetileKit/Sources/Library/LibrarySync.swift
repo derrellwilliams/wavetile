@@ -76,15 +76,7 @@ public actor LibrarySync {
             params.enableUserData = true
             return try await client.send(Paths.getAlbumArtists(parameters: params)).value
         } write: { db, items in
-            let records = items.compactMap { item -> ArtistRecord? in
-                guard let id = item.id else { return nil }
-                let name = item.name ?? "Unknown Artist"
-                return ArtistRecord(
-                    id: id, name: name, sortName: SortKey.make(item.sortName ?? name),
-                    imageTag: item.imageTags?["Primary"], isFavorite: item.userData?.isFavorite ?? false,
-                    generation: generation
-                )
-            }
+            let records = items.compactMap { ArtistRecord(item: $0, generation: generation) }
             try ArtistRecord.upsertChanged(records, in: db)
         }
     }
@@ -96,21 +88,9 @@ public actor LibrarySync {
             var records: [AlbumRecord] = []
             var genres: [String: Set<String>] = [:]
             for item in items {
-                guard let id = item.id else { continue }
-                let title = item.name ?? "Unknown Album"
-                records.append(AlbumRecord(
-                    id: id,
-                    title: title,
-                    sortTitle: SortKey.make(item.sortName ?? title),
-                    artistName: item.albumArtist ?? item.artists?.first ?? "Unknown Artist",
-                    artistID: item.albumArtists?.first?.id,
-                    year: item.productionYear,
-                    imageTag: item.imageTags?["Primary"],
-                    dateAdded: item.dateCreated,
-                    isFavorite: item.userData?.isFavorite ?? false,
-                    generation: generation
-                ))
-                genres[id] = Set((item.genres ?? []).flatMap(GenreTag.split))
+                guard let record = AlbumRecord(item: item, generation: generation) else { continue }
+                records.append(record)
+                genres[record.id] = AlbumRecord.genreTags(item.genres)
             }
             try AlbumRecord.upsertChanged(records, in: db)
             // Rewrite an album's genres only when they changed.
@@ -171,10 +151,10 @@ public actor LibrarySync {
         try await database.pool.write { db in
             try PlaylistRecord.upsertChanged([PlaylistRecord(
                 id: id,
-                name: playlist.name ?? "Untitled Playlist",
+                name: ServerText.nonBlank(playlist.name) ?? "Untitled Playlist",
                 imageTag: playlist.imageTags?["Primary"],
                 trackCount: entries.count,
-                durationMs: entries.compactMap { $0.runTimeTicks.map { $0 / 10_000 } }.reduce(0, +),
+                durationMs: entries.compactMap { ServerDuration.milliseconds(ticks: $0.runTimeTicks) }.reduce(0, +),
                 generation: generation
             )], in: db)
             let request = PlaylistEntryRecord.filter(Column("playlistID") == id)
@@ -218,7 +198,7 @@ public actor LibrarySync {
             _ = try await database.pool.write { try CollectionRecord.deleteOne($0, key: id) }
             return false
         }
-        let name = collection.name ?? "Untitled Collection"
+        let name = ServerText.nonBlank(collection.name) ?? "Untitled Collection"
         let rows = albums.enumerated().compactMap { position, album in
             album.id.map { CollectionAlbumRecord(collectionID: id, albumID: $0, position: position) }
         }
@@ -314,24 +294,60 @@ public actor LibrarySync {
     }
 }
 
+extension ArtistRecord {
+    init?(item: BaseItemDto, generation: Int) {
+        guard let id = item.id else { return nil }
+        let name = ServerText.nonBlank(item.name) ?? "Unknown Artist"
+        self.init(
+            id: id, name: name, sortName: SortKey.make(ServerText.nonBlank(item.sortName) ?? name),
+            imageTag: item.imageTags?["Primary"], isFavorite: item.userData?.isFavorite ?? false,
+            generation: generation
+        )
+    }
+}
+
+extension AlbumRecord {
+    init?(item: BaseItemDto, generation: Int) {
+        guard let id = item.id else { return nil }
+        let title = ServerText.nonBlank(item.name) ?? "Unknown Album"
+        self.init(
+            id: id,
+            title: title,
+            sortTitle: SortKey.make(ServerText.nonBlank(item.sortName) ?? title),
+            artistName: ServerText.nonBlank(item.albumArtist) ?? ServerText.first(item.artists) ?? "Unknown Artist",
+            artistID: item.albumArtists?.first?.id,
+            year: item.productionYear,
+            imageTag: item.imageTags?["Primary"],
+            dateAdded: item.dateCreated,
+            isFavorite: item.userData?.isFavorite ?? false,
+            generation: generation
+        )
+    }
+
+    /// An album's genres as separate, cleaned tags.
+    static func genreTags(_ genres: [String]?) -> Set<String> {
+        Set((genres ?? []).flatMap(GenreTag.split))
+    }
+}
+
 extension TrackRecord {
     init?(item: BaseItemDto, generation: Int) {
         guard let id = item.id else { return nil }
-        let title = item.name ?? "Unknown Track"
+        let title = ServerText.nonBlank(item.name) ?? "Unknown Track"
+        let albumArtist = ServerText.nonBlank(item.albumArtist)
         self.init(
             id: id,
             title: title,
             // Not item.sortName: for tracks Jellyfin makes it "disc - track - title" (track order).
             sortTitle: SortKey.make(title),
             albumID: item.albumID,
-            albumTitle: item.album ?? "",
-            artistName: item.artists?.joined(separator: ", ") ?? item.albumArtist ?? "Unknown Artist",
-            albumArtistName: item.albumArtist ?? item.artists?.first ?? "Unknown Artist",
+            albumTitle: ServerText.nonBlank(item.album) ?? "",
+            artistName: ServerText.names(item.artists) ?? albumArtist ?? "Unknown Artist",
+            albumArtistName: albumArtist ?? ServerText.first(item.artists) ?? "Unknown Artist",
             trackNumber: item.indexNumber,
             discNumber: item.parentIndexNumber,
-            // Jellyfin ticks are 100ns.
-            durationMs: item.runTimeTicks.map { $0 / 10_000 },
-            playCount: item.userData?.playCount ?? 0,
+            durationMs: ServerDuration.milliseconds(ticks: item.runTimeTicks),
+            playCount: max(item.userData?.playCount ?? 0, 0),
             isFavorite: item.userData?.isFavorite ?? false,
             lastPlayed: item.userData?.lastPlayedDate,
             dateAdded: item.dateCreated,

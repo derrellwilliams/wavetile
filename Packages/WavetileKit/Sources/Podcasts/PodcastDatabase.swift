@@ -50,7 +50,7 @@ public final class PodcastDatabase: Sendable {
         id.filter { $0.isLetter || $0.isNumber || $0 == "-" }
     }
 
-    private static var migrator: DatabaseMigrator {
+    static var migrator: DatabaseMigrator {
         var migrator = DatabaseMigrator()
         // No erase-on-change here: this database holds user data that can't be re-synced.
         migrator.registerMigration("v1") { db in
