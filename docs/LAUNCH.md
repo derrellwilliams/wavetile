@@ -1,11 +1,12 @@
 # Wavetile release & launch plan
 
-The single working checklist for App Store preparation, launch and follow-up. Update status here with a date and evidence; don't keep competing checklists in agent memory. An unchecked item is unfinished or unverified, not necessarily a known defect.
+The working checklist for engineering, App Store preparation, launch and follow-up. User device checks live separately in [testparty.md](testparty.md); their required results remain release gates. Update status here with a date and evidence; don't keep competing checklists in agent memory. An unchecked item is unfinished or unverified, not necessarily a known defect.
 
 - Evidence behind the gates: [qa-evidence.md](qa-evidence.md) (security, privacy, Release/config, sanitizer records).
 - App Store, web search and LLM discoverability notes (ASO, SEO, GEO): [search-optimization.md](search-optimization.md).
-- Submission drafts (Nov 7, unreviewed): [app-review-notes.md](app-review-notes.md), [privacy-answers.md](privacy-answers.md).
-- CarPlay and background-audio device pass: [carplay-device-checklist.md](carplay-device-checklist.md).
+- Submission copy reviewed Nov 7: [app-store-listing.md](app-store-listing.md), [app-review-notes.md](app-review-notes.md), [privacy-answers.md](privacy-answers.md). Account entry and final-build sign-off remain open.
+- Reviewer server preparation: [reviewer-server.md](reviewer-server.md); not provisioned.
+- User device checks and results: [testparty.md](testparty.md) (QA-2/QA-3 device verification, QA-6, reviewer access and CarPlay/audio).
 
 Consolidated 2026-11-06 and reorganized 2026-11-07 (tiers below, evidence and search notes split out). Historical test results are preserved, not rerun or certification of the latest build. This plan doesn't itself authorize uploads, CI setup, delegation, commits or public posts.
 
@@ -20,31 +21,31 @@ Consolidated 2026-11-06 and reorganized 2026-11-07 (tiers below, evidence and se
 | Website / repo | Site, support/privacy pages, guides, llms.txt, JSON-LD, sitemap live; MPL-2.0 and README in place. Service/account configuration not reverified Nov 6 |
 | Review access | Earlier plan: `https://demo.jellyfin.org/stable`, user `demo`, blank password. **Decision needed:** see P0 |
 | Contact | realslimscrawny@gmail.com (site, support, privacy) |
-| Privacy | Source review done Nov 6: policy links on sign-in and in Settings, policy wording corrected, required-reason declarations validated. Policy is local until the site is deployed; App Store privacy answers not yet entered |
+| Privacy | Source review done Nov 6: policy links on sign-in and in Settings, policy wording corrected, required-reason declarations validated. Live policy verified Nov 7: main content matches the corrected local policy. Privacy worksheet reviewed; service/partner confirmation, final archive report and App Store entry remain open |
 
 **Next steps, in order**
-1. Quick wins (minutes each): deploy the corrected privacy policy with the site; confirm agreements, pricing and territories in App Store Connect; verify domain transfer lock, DNSSEC and Cloudflare 2FA.
-2. Decide the reviewer demo server (P0, first row).
-3. ~~Run the tests on the Nov 7 QA-3/QA-2 edits~~ (done Nov 7, all passing; both warnings fixed, zero runtime warnings), then finish QA-3 and QA-2 against the table below. Both are otherwise down to the device checks.
-4. Early device pass on CarPlay and background audio, since those can force large fixes. Do it on a new TestFlight build, not 202611061835: the audio-session change (activation now off the main thread) is only in `main` and is the main thing to verify (rows 23-29 of [carplay-device-checklist.md](carplay-device-checklist.md)).
-5. Freeze, cut one RC build, run the full QA-6 device checklist and the P0 listing work on it.
+1. Quick wins (minutes each): confirm agreements, pricing and territories in App Store Connect; verify domain transfer lock, DNSSEC and Cloudflare 2FA.
+2. Choose the host and licensed demo library using [reviewer-server.md](reviewer-server.md), then provision reviewer access.
+3. Current pins rechecked Nov 7 with no matching OSV advisories; repeat against the final archive to finish the remaining QA-2/QA-3 engineering check. Nov 7 package and UI regressions are passing.
+4. Prepare a new TestFlight build containing the Nov 7 fixes for testparty; investigate any reported failures.
+5. Freeze, cut one RC build, complete P0 listing work and collect the required results from [testparty.md](testparty.md) before submission.
 
 ## Before submission
 
-Release gates. Finish each or record an explicit deferral with rationale. Original QA numbers are kept so older conversations still map. Owner "Engineering" is coding work; "User" is device, account and release decisions.
+Release gates. Finish each or record an explicit deferral with rationale. Original QA numbers are kept so older conversations still map. Owner "Engineering" is coding work; "User" here is account and release decisions. Device execution is tracked only in testparty.
 
 ### P0 — Apple submission blockers
 
 Nothing ships without these.
 
-- [ ] **Reviewer access.** Use an isolated Jellyfin instance with a non-admin, read-only account and only royalty-free or public-domain music; assume the credentials will leak and keep it apart from the personal server. The public demo (`demo.jellyfin.org`) is the fallback only: it isn't ours, resets, has content we don't control, and review can take days. Validate login and playable content from a fresh install, write exact steps (including a blank password if used), and keep access up throughout review.
-- [ ] **Privacy.** Deploy the policy; enter App Store privacy answers and confirm them against qa-evidence.md (QA-8). Don't assume "Data Not Collected" from the manifest alone. Check Xcode's aggregate privacy report on the final archive. Claims must match the app: "Data Not Collected" is wrong if analytics or crash reporting is added later.
-- [ ] **Listing.** Finalize name, subtitle, keywords, description, categories, support URL and privacy URL (draft copy in [search-optimization.md](search-optimization.md#app-store-aso)).
+- [ ] **Reviewer access.** Use an isolated Jellyfin instance with a non-admin, read-only account and only royalty-free or public-domain music; assume the credentials will leak and keep it apart from the personal server. The public demo (`demo.jellyfin.org`) is the fallback only: it isn't ours, resets, has content we don't control, and review can take days. Write exact steps (including a blank password if used), collect reviewer-access results from testparty, and keep access up throughout review.
+- [ ] **Privacy.** Live corrected policy verified Nov 7; enter the reviewed App Store privacy answers and confirm them against qa-evidence.md (QA-8). Don't assume "Data Not Collected" from the manifest alone. Check Xcode's aggregate privacy report on the final archive. Claims must match the app: "Data Not Collected" is wrong if analytics or crash reporting is added later.
+- [ ] **Listing.** Copy and URLs prepared/reviewed Nov 7 in [app-store-listing.md](app-store-listing.md). Enter the fields in App Store Connect and confirm categories and final-build claims.
 - [ ] **Screenshots** in required sizes from the demo library (licensed/public-domain music and artwork; keep source and license notes). Strip real server addresses, usernames and tokens from every capture and video.
 - [ ] **Compliance.** Age-rating questionnaire, content rights, export compliance.
 - [ ] **Commercial.** Pricing, territories, applicable agreements and account information, release timing.
-- [ ] **Review notes** explain the Jellyfin requirement, optional podcasts, background audio and CarPlay. Verify feature claims (such as lossless playback) against actual settings. Note that "Jellyfin" appears in the subtitle and description as a nominative reference, not in the app name.
-- [ ] **RC (Engineering + User).** Record final commit and build, run relevant automated regressions and the device checklist, confirm TestFlight processing. An uploaded build isn't a tested or approved one.
+- [ ] **Review notes** reviewed Nov 7 in [app-review-notes.md](app-review-notes.md); fill the demo URL, account/contact fields and final build before entry. Notes explain the Jellyfin requirement, optional podcasts, background audio and CarPlay. Verify feature claims (such as lossless playback) against actual settings. Note that "Jellyfin" appears in the subtitle and description as a nominative reference, not in the app name.
+- [ ] **RC (Engineering + User).** Record final commit and build, run relevant automated regressions, collect required testparty results, and confirm TestFlight processing. An uploaded build isn't a tested or approved one.
 - [ ] **Submit** the tested build, resolve warnings, and record submission date, build and review outcome here.
 
 Apple references: [submission](https://developer.apple.com/help/app-store-connect/manage-submissions-to-app-review/submit-an-app), [review access](https://developer.apple.com/help/app-review/before-submitting-for-review/complete-review/), [privacy](https://developer.apple.com/app-store/app-privacy-details/), [review guidelines](https://developer.apple.com/app-store/review/guidelines/). Recheck current requirements when filling the submission.
@@ -55,12 +56,12 @@ Project goals, not Apple requirements. Each has a "done when" so it can't run fo
 
 | ID | Status | Owner | Done when |
 |---|---|---|---|
-| QA-3 | Partial, Nov 7 | Engineering + User | Security review. Fixed: API/OPML bounds, Keychain retry, background-download redirect containment, policy wording. Open items under "QA-2 / QA-3 remaining" below. Further resource-exhaustion testing is accepted residual risk |
-| QA-2 | Partial, Nov 7 | Engineering | Code review of Playback, Downloads, Persistence/Sync, Podcasts, JellyfinKit and CarPlay. Fixed: an endless skip loop, unbounded server-sync decoding, an empty-feed prune (details in qa-evidence.md). Open items under "QA-2 / QA-3 remaining" below. A second-opinion review (was QA-10) is optional |
-| QA-8 | Partial | Engineering + User | Remaining items are P0 (policy deploy, privacy answers, reviewer access) plus runtime background audio and CarPlay checks from QA-6. Privacy slice Nov 6 and Release/config slice Nov 7 are done |
-| QA-6 | Open | User + Engineering | P0 device scenarios below pass on the RC; failures investigated |
+| QA-3 | Partial, Nov 7 | Engineering | Security review. Fixed: API/OPML bounds, Keychain retry, background-download redirect containment, policy wording. Engineering follow-up below; device sign-off is tracked in testparty. Further resource-exhaustion testing is accepted residual risk |
+| QA-2 | Partial, Nov 7 | Engineering | Code review of Playback, Downloads, Persistence/Sync, Podcasts, JellyfinKit and CarPlay. Fixed: an endless skip loop, unbounded server-sync decoding, an empty-feed prune (details in qa-evidence.md). Engineering follow-up below; device sign-off is tracked in testparty. A second-opinion review (was QA-10) is optional |
+| QA-8 | Partial | Engineering + User | Remaining items are P0 (privacy answers, reviewer access, final archive privacy report) and the separate testparty sign-off. Corrected live policy verified Nov 7. Privacy slice Nov 6 and Release/config slice Nov 7 are done |
+| QA-6 | Tracked in testparty; open | Engineering support | Collect required RC results from [testparty.md](testparty.md) and investigate reported failures; device checks are maintained there |
 | QA-4 | Done Nov 7 | Engineering | Database migration tests and unusual-server-data tests added and passing: 28 new tests, full package scheme 150/150 (196 runs), UI 17/17 (qa-evidence.md). They also led to fixes for blank names, bad durations and a sort-key edge case. Download manager/engine and AudioPlayer engine tests are P2 |
-| QA-5 | Open | Engineering | Xcode Analyze triaged and results recorded (the compiler warnings from the Release build included) |
+| QA-5 | Done Nov 7 | Engineering | Release simulator Analyze passed at `4060f29`: 0 analyzer findings/errors, 11 compiler warnings triaged with dispositions in qa-evidence.md. Warnings remain; no release blocker established |
 | QA-7 | Ongoing | User | Organizer/TestFlight crash reports inspected during beta and before submission; record build, period and unresolved crashes |
 | QA-1 | Done Nov 5 | Engineering | Sanitizer runs complete. Retest affected paths after later fixes |
 
@@ -68,28 +69,9 @@ Project goals, not Apple requirements. Each has a "done when" so it can't run fo
 
 - [x] **Engineering:** run the package and UI tests on the Nov 7 edits. Done Nov 7: package 150/150, UI 17/17 (Claude can run `xcodebuild` as a plain command; see qa-evidence.md).
 - [x] **Engineering:** `Environment<Theme/Bool>` warning fixed Nov 7. The cause was the back-chevron renderer reading a bare `TintedBarIcon`'s environment (it also used the default theme); UI run now shows zero runtime warnings.
-- [ ] **User:** the `AVAudioSession` main-thread warning is fixed in code (activation moved to a serial background queue, play waits for it); verify interruptions, route changes, AirPlay and CarPlay on device (QA-6, rows 23-29 of the CarPlay checklist).
-- [x] **Engineering:** note the CarPlay review items for the device pass (QA-6). Done Nov 7 in [carplay-device-checklist.md](carplay-device-checklist.md); the pass itself is a User task.
-- [ ] **User:** verify AVFoundation streaming redirects with a redirecting proxy.
-- [ ] **User:** verify Keychain cleanup on device.
-- [ ] **Engineering:** recheck dependency advisories on the final archive.
-
-### Real-device checklist (QA-6)
-
-Record device, iOS version, build, date and pass/fail. Check normal behavior and recovery after the interruption.
-
-**P0 (on the RC)**
-- [ ] Fresh install, upgrade with existing data, login/Quick Connect, sign-out and expired-token recovery.
-- [ ] Lock Screen / Control Center controls, AirPlay, headphone unplug, calls and audio interruptions, background playback.
-- [ ] Download resume/cancel, network loss mid-download, server outage, background completion.
-- [ ] Airplane-mode playback of downloaded music and podcasts; reconnect recovery.
-- [ ] CarPlay connection, browsing, playback and reconnect.
-- [ ] VoiceOver, larger text, light/dark, first interactions after splash.
-
-**P1**
-- [ ] Widgets, deep links, download Live Activity.
-- [ ] Podcasts: search, follow, stream/download, progress, chapters/transcripts, subscription sync.
-- [ ] 50k-track library, Low Power Mode, low-storage handling. Record expected iOS behavior for system termination versus user force-quit.
+- [x] **Engineering:** note the CarPlay review items for the device pass (QA-6). Done Nov 7 in [testparty.md](testparty.md); results are tracked there.
+- [x] **Engineering:** Nov 7 current-pin advisory recheck: 20 OSV queries returned no matches; recent upstream NIO fix thresholds checked. Details and coverage limits in qa-evidence.md.
+- [ ] **Engineering:** recheck dependency advisories and the actual dependency inventory on the final archive.
 
 ### P2 — Deferred (explicit)
 
@@ -111,7 +93,7 @@ Supports a good launch; none of it blocks App Review.
 
 ## Launch day — after the App Store listing is live
 
-- [ ] Confirm the public listing and install path work; record the App Store ID/URL.
+- [ ] Confirm the public listing is live; record the App Store ID/URL and collect the install result from testparty.
 - [ ] Replace site beta/coming-soon calls to action with the App Store badge/link; keep beta access only where intentional.
 - [ ] Enable the `apple-itunes-app` Smart App Banner in `site/index.html`; replace the `.qr` placeholder with an SVG QR code for the listing.
 - [ ] Add `downloadUrl` and an `offers` object to MobileApplication JSON-LD, matching actual price/currency. Add ratings only once real reviews exist.

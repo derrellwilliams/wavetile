@@ -1,58 +1,55 @@
-# App Review notes (draft)
+# App Review notes — reviewed November 7, 2026
 
-Draft written 2026-11-07 from the code and [qa-evidence.md](qa-evidence.md). Paste the block under "Notes for the reviewer" into App Store Connect → App Review Information. Fill every `⟨…⟩` before submitting; nothing here is confirmed against the final build.
+Reviewed against source and Apple's [review guidelines](https://developer.apple.com/app-store/review/guidelines/). Not submitted. Fill the fields below in App Store Connect; do not commit passwords here. Device verification is tracked in [testparty.md](testparty.md).
 
-## Before you paste
+## App Review Information fields
 
-| Open item | Why it matters |
+| Field | Prepared value / outstanding requirement |
 |---|---|
-| Reviewer server URL, username and password (P0, first row in LAUNCH.md) | Review can't proceed without working credentials. Validate from a fresh install and keep the server up for the whole review |
-| Whether the password is blank | Say so explicitly in the notes; App Store Connect's password field may reject an empty value |
-| Final build number | Name the build the notes describe |
-| Contact phone number | App Store Connect requires one in App Review Information (contact email is realslimscrawny@gmail.com) |
+| Sign-in required | Yes |
+| Username / password | Dedicated reviewer account; enter directly in App Store Connect |
+| Server URL | Pending isolated server setup; see [reviewer-server.md](reviewer-server.md) |
+| Contact email | realslimscrawny@gmail.com |
+| Contact first/last name and phone | Account owner must supply in App Store Connect |
+| Build | Final tested RC; record in LAUNCH.md |
 
 ## Notes for the reviewer
 
-> **What Wavetile is.** Wavetile is a music and podcast player for people who run their own Jellyfin media server (Jellyfin is free, open-source software). It has no content of its own and no accounts of its own: the user signs in to their Jellyfin server and plays the music stored there. Podcasts are optional and off by default.
->
-> **Demo server (please use this to review).**
-> - Server address: `⟨https://…⟩`
-> - Username: `⟨…⟩`
-> - Password: `⟨…⟩` ⟨or "leave the password field empty"⟩
-> - The account is read-only and the library holds only royalty-free / public-domain music.
->
-> **To sign in.** Launch the app → enter the server address → enter the username and password → tap Sign In. (Quick Connect, shown below the form, is an alternative that needs a second signed-in Jellyfin device, so it isn't usable for review.) The first sync takes a few seconds; Home, Music and Search fill in when it finishes.
->
-> **What to try.**
-> 1. Music tab → open an album → play. Playback is gapless; the Now Playing screen, Lock Screen and Control Center controls all work.
-> 2. Download an album (album menu → Download). It appears under the Downloaded tab and plays in Airplane Mode.
-> 3. Settings (side drawer, top left) → turn on Podcasts, then use the Podcasts tab to search the Apple podcast directory and follow a show. Podcasts are fetched from each publisher's own feed, not from the Jellyfin server.
-> 4. Widgets (Now Playing, Recently Played) and a download Live Activity are available from the Home Screen / Lock Screen.
->
-> **Background audio.** The app declares the `audio` background mode so music and podcasts keep playing with the screen locked or the app in the background. It also declares `fetch`, which iOS uses to check followed podcasts for new episodes (a single BGTask, `com.derrellwilliams.wavetile.podcast-refresh`).
->
-> **CarPlay.** The app uses the CarPlay Audio entitlement (granted to our team on 2026-10-30). Sign in on the iPhone first; the CarPlay screen then shows Home, Playlists, Library and (if podcasts are on) Up Next, and uses the system Now Playing screen. Until the user signs in on the iPhone, CarPlay shows "Sign in on your iPhone".
->
-> **Local network and HTTP.** Most Jellyfin servers run on the user's home network, so the app asks for Local Network access (`NSLocalNetworkUsageDescription`) and allows plain HTTP only to local-network hosts and to `*.ts.net` (Tailscale) names, which are encrypted by WireGuard. The app refuses to sign in to a server over HTTP anywhere else, so the access token never travels in cleartext over the internet. `NSAllowsArbitraryLoadsInMedia` is set only because some podcast publishers still serve episode audio over HTTP; it applies to media playback, not to the app's API requests.
->
-> **Data.** The app has no analytics, advertising or tracking and no accounts of its own. It sends requests to the user's chosen Jellyfin server, to Apple's podcast directory (`itunes.apple.com`) when the user searches for podcasts, and to podcast publishers' hosts for feeds and audio. Privacy policy: https://wavetile.com/privacy
->
-> **Purchases.** None. The app is free, with no in-app purchases or subscriptions. ⟨Confirm pricing in App Store Connect.⟩
->
-> Support: https://wavetile.com/support · realslimscrawny@gmail.com
+Copy this block after replacing the server placeholder and confirming the demo account permissions and media licenses:
 
-## Claims to verify before submitting
+```text
+Wavetile is an independent music and podcast player for iPhone. It requires a Jellyfin server account. It provides no music catalog or server hosting and has no separate Wavetile account.
 
-| Claim | Status | Source |
-|---|---|---|
-| Lossless playback | **True for streaming:** FLAC, ALAC, WAV, AIFF, MP3 and AAC direct-play up to 140 Mbps; anything else transcodes to 320 kbps MP3. **Not true of the default download:** downloads default to MP3 (~256 kbps); lossless needs Settings → Downloads → "Original (lossless when possible)". Word the listing as "plays FLAC and ALAC" or "lossless streaming", not "lossless offline", and fix the planned screenshot caption "Gapless, offline, lossless" in [search-optimization.md](search-optimization.md) | `JellyfinKit/PlaybackAPI.swift:13-28`, `Downloads/DownloadManager.swift:12-24`, `Features/Settings/SettingsDrawer.swift:87` |
-| Gapless | Implemented with `AVQueuePlayer`; confirm by ear on device (not in qa-evidence.md) | `Playback/AudioPlayer.swift` |
-| Podcasts optional and off by default | Settings toggle; confirm default on a fresh install | `HomeModel`, `PodcastsStore` |
-| Quick Connect isn't usable for review | True if the demo server has Quick Connect disabled (the Jellyfin default is enabled but needs an already signed-in device to authorize) | `Features/Auth/QuickConnectView.swift` |
-| Siri | Phrases: "Play ⟨item⟩ in/on Wavetile", "Play music in Wavetile"; mention only if the reviewer might try them | `App/MusicIntents.swift` |
+Demo server: <REVIEW_SERVER_HTTPS_URL>
+Use the username and password supplied in App Review Information. This isolated server contains licensed demo music. The account permits browsing, playback and downloads but not server administration or media deletion.
 
-## Likely reviewer questions
+Sign in: launch Wavetile, enter the server address above, then enter the supplied username and password and tap Sign In. Allow the initial library sync to finish. Use these credentials rather than Quick Connect, which requires authorization from another signed-in Jellyfin device.
 
-- **"Why does the app allow arbitrary loads?"** Answer above (podcast audio over HTTP; API traffic stays HTTPS except LAN and `ts.net`). If Apple pushes back, the fallback is dropping `NSAllowsArbitraryLoadsInMedia`, at the cost of some podcasts not playing.
-- **"The app needs a server."** Covered by the demo credentials; Guideline 2.1 expects working access, so keep them live.
-- **"Jellyfin" in the subtitle/description.** Nominative reference, not in the app name (see LAUNCH.md).
+Music: open the Music tab, choose an album and play a track. Open the album menu to download it, then find it in Downloaded. Downloads default to MP3 at 256 kbps. To request original files, open the top-right profile avatar, then Downloads and select Original (lossless when possible).
+
+Podcasts: open the top-right profile avatar and enable podcasts in the Podcasts settings section. On the Podcasts tab, use + and Search Apple Podcasts to find and follow a show. Episodes come from publisher feeds, not the Jellyfin music library. Podcasts are off by default for a new account on this device.
+
+Background modes: audio supports playback with the screen locked or the app in the background; fetch supports opportunistic podcast refresh through com.derrellwilliams.wavetile.podcast-refresh. Refresh timing is controlled by iOS.
+
+CarPlay: sign in on the iPhone first. CarPlay provides Home, Playlists and Library, plus a Podcasts tab when enabled, using the system Now Playing screen. The app has the CarPlay Audio entitlement. Home Screen widgets and a download Live Activity are also included.
+
+Networking: remote server sign-in requires HTTPS, except that the app permits HTTP for local-network addresses and .ts.net hostnames. Local Network permission supports access to home servers. The media ATS exception supports podcast audio from HTTP publishers. Use the HTTPS demo URL above for review.
+
+Privacy: no analytics, advertising or tracking SDK is included. The app contacts the chosen Jellyfin server, Apple's podcast directory/charts and podcast publishers. The server receives session/client identifiers, playback reports and supported library/podcast changes. Podcast hosts receive content requests. Publishers may include ads in episodes.
+
+There are no in-app purchases or subscriptions implemented in this build.
+Privacy: https://wavetile.com/privacy
+Support: https://wavetile.com/support
+Contact: realslimscrawny@gmail.com
+```
+
+## Submission dependencies
+
+- Populate the HTTPS demo URL and App Store Connect credentials after the isolated server is ready. If a blank password is intentionally used, explain it explicitly; a dedicated nonblank password is preferred.
+- Confirm final build and testparty results before describing this block as verified on the submitted binary.
+- Confirm price in App Store Connect. No “free app” assertion is made here because pricing was not inspected.
+- Keep the server reachable throughout review and any appeal. The public Jellyfin demo is a fallback only, not a server whose uptime or library we control.
+
+## Corrections from the earlier draft
+
+Settings is opened by the top-right avatar. CarPlay's tab is labelled Podcasts (its template title is Up Next). Original downloads are optional; default MP3 downloads are not lossless. Quick Connect is an alternative authorization flow, not inherently impossible for reviewers. HTTP host classification and Tailscale naming do not prove that credentials can never leave the intended origin: redirect verification remains in testparty. Source configuration establishes feature intent, not successful device behavior.

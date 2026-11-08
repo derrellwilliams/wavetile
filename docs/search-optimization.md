@@ -7,19 +7,9 @@ Goal: when someone searches or asks an LLM for "a Jellyfin music app for iPhone"
 **Wording.** Use one line, word for word, in the App Store description and GitHub: *Wavetile: your Jellyfin music and your podcasts, in one app.* Spell the name **Wavetile**: one word, capital W only ("Wave tile" brings up flooring and acoustic panels).
 
 ## App Store (ASO)
-| Field | Limit | Draft |
-|---|---|---|
-| Name | 30 | `Wavetile Music` (current App Store Connect name). Keep "Jellyfin" out of the name: Jellyfin's [branding guidelines](https://jellyfin.org/docs/general/contributing/branding/) ask third-party apps not to use it, which would block the jellyfin.org listing. Reference it in the subtitle and description instead |
-| Subtitle | 30 | `Music & podcasts for Jellyfin` |
-| Keywords | 100 | `selfhosted,offline,gapless,player,flac,audio,library,radio,carplay,widget,opml,homelab,nas,stream` |
-| Category | | Music (primary), Entertainment (secondary) |
-| Privacy label | | "Data Not Collected" if that's still true. It's a selling point |
+The prepared submission copy, fields and screenshot captions are maintained in [app-store-listing.md](app-store-listing.md), reviewed November 7. Use that document for entry; avoid maintaining a second copy here. Name remains Wavetile Music, with Jellyfin referenced as compatibility in the subtitle and description.
 
-Keyword rules: separate with commas and no spaces, and don't repeat words that are already in the name or subtitle (Apple indexes those too). Never use competitor trademarks (Plex, Emby, Spotify); App Review rejects them.
-
-**Screenshots** (the first 3 count most): 1. Home feed: "Your Jellyfin library, beautifully". 2. Now Playing: "Gapless, offline, lossless". 3. Downloads/offline. 4. Podcasts. 5. Widgets and Lock Screen. 6. Light/Dark. Use the demo library, so no real server URLs or names appear.
-
-**Description:** put the positioning line first, then a feature list that uses the words people search (Jellyfin, offline, gapless, FLAC, CarPlay, podcasts, self-hosted).
+Keyword rules: use comma-separated relevant terms within Apple's byte limit; avoid duplicating the app name or using competitor trademarks. Privacy answers live in [privacy-answers.md](privacy-answers.md) and remain conditional on service relationships and final archive review.
 
 **After launch:**
 - Use `SKStoreReviewController` at a good moment, e.g. after the 3rd listening session or a finished download, never on first launch.

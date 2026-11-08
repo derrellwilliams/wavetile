@@ -154,3 +154,36 @@ Still open for QA-4: nothing in scope. Migration tests for `downloadedTrack` boo
 **October 24 nonblocking backlog — revalidate before scheduling:** offline-play reporting to Jellyfin, incremental library sync, multi-account support, collection rename and AudioPlayer engine tests. Do not infer these are still missing from an old note; engine coverage is explicitly assessed in QA-4. iPhone/portrait-only support is intentional.
 
 Rive was removed Oct 24; InjectionNext setup is developer convenience, not a release gate. Move the backlog above to GitHub issues when convenient.
+
+
+## QA-5 Xcode Analyze and Release warnings — November 7, 2026
+
+**Scope:** clean working tree at `4060f29b7db230ea8de895d6a985009ed9cd6487`, Xcode 27.2 (27B52), Release, generic iOS Simulator (arm64 and x86_64). Ran `xcodebuild analyze -project Wavetile.xcodeproj -scheme Wavetile -configuration Release -destination 'generic/platform=iOS Simulator' -derivedDataPath build -resultBundlePath build/QA5-Analyze-20261107.xcresult -quiet`. No dev server was running. No source changes, device tests, archive or upload.
+
+**Result:** exit 0; result bundle `build/QA5-Analyze-20261107.xcresult` records 0 analyzer warnings, 0 errors and 11 compiler warnings (unique source locations; console repeats them for both architectures). Inspected the result bundle with `xcresulttool get object --legacy`. The console's “failed with exit code 0 but produced no further output” messages are tool noise, not recorded build errors. The generic-simulator operatingSystemVersion diagnostic did not prevent completion. Earlier stale-file warnings did not recur.
+
+| Warning / location (under Packages/WavetileKit/Sources) | Triage / disposition |
+|---|---|
+| Redundant `public`, `DesignSystem/Theme.swift:140` | Cosmetic: the enclosing public extension already provides public access. Optional cleanup; no behavior change needed |
+| Unused `try?` results, `JellyfinKit/PlaybackAPI.swift:58,70` | Start/progress reports are best effort; failures do not stop playback. Stop reporting separately returns success/failure. Explicit `_ =` would clarify intent; delivery/retry improvements remain deferred with offline reporting |
+| Deprecated `getAlbumArtists`, `Library/LibrarySync.swift:77` | Resolved Jellyfin SDK marks `/Artists/AlbumArtists` deprecated without naming a replacement. Retain for this release to avoid an unverified change to library semantics. Follow-up: select a replacement and test supported server versions; this pass does not verify live server compatibility |
+| Unnecessary `nonisolated(unsafe)`, `Podcasts/FeedParser.swift:106` | Compiler recognizes `[DateFormatter]` as Sendable; private static formatters are configured once and then used for parsing. Redundant annotation, no new race established |
+| Isolated `Content: View` conformance, `Features/Main/MainTabView.swift:460` | In the lazy bar-item initializer calling `resize()`. Controller inherits UIKit main-actor isolation; item is used by its UI installation path. No background invocation found in this path. Nonblocking compiler-isolation cleanup; retain device navigation checks and revisit explicit initializer isolation in maintenance |
+| Five closure-valued `@Entry` diagnostics: `MainTabView.swift:681,683`, `Navigation/LibraryRoute.swift:39`, `Podcasts/PodcastRoute.swift:64,66` | Potential excess dependent-view invalidation because closures are not comparable. Performance risk, not an established correctness defect. Defer action-wrapper/refactoring work until profiling shows material redraw cost |
+
+**Disposition:** QA-5 complete under its defined “Analyze triaged and results recorded” gate; warnings remain visible and are not suppressed. No release-blocking defect established by this pass. Analyze does not provide Clang-style path-sensitive analysis of the Swift application; Swift compiler diagnostics and the earlier code reviews/tests remain the relevant Swift evidence. This incremental Release simulator action is not a final device archive or runtime certification. Dependency advisories still require the separate final-archive check in QA-2/QA-3.
+
+
+## Submission preparation and dependency recheck — November 7, 2026
+
+**Dependencies:** queried OSV for each of the ten pinned commit hashes and each SwiftURL package/version from `Packages/WavetileKit/Package.resolved`. All 20 requests succeeded and returned no matching advisories. Query inputs and results: [dependency-advisories-2026-11-07.json](dependency-advisories-2026-11-07.json). Empty results do not prove an indexed package or complete coverage; this supplements the earlier upstream review rather than replacing it. No dependency upgrade was established as necessary by this pass; this was not a latest-version audit.
+
+Re-read upstream SwiftNIO advisories: [WebSocket length](https://github.com/apple/swift-nio/security/advisories/GHSA-qcc5-f287-vgmq) fixed in 2.101.0; [ByteBuffer overflow](https://github.com/apple/swift-nio/security/advisories/GHSA-r3rc-9hpw-54v9), [header exhaustion](https://github.com/apple/swift-nio/security/advisories/GHSA-rj37-6j9x-74q6) and [CRLF injection](https://github.com/apple/swift-nio/security/advisories/GHSA-cq87-8r7h-962v) fixed in 2.100.0. Pinned 2.104.0 is beyond all four thresholds. Older advisory dispositions are recorded in the earlier table.
+
+All ten pinned revisions/versions match `build/SourcePackages/workspace-state.json`. That cache also retains Rive 6.28.1, which is absent from the current package manifest, project.yml and generated project; cache presence alone does not mean it ships. Recheck the actual final archive graph/resources rather than treating cached packages as a shipping inventory. No archive was produced or certified here. OS frameworks, system SQLite, undisclosed issues and build-tool provenance remain outside this advisory check.
+
+**Submission documents:** prepared [app-store-listing.md](app-store-listing.md), revised [app-review-notes.md](app-review-notes.md) and [privacy-answers.md](privacy-answers.md), and prepared [reviewer-server.md](reviewer-server.md). Reviewed source for playback formats, download defaults, podcast defaults/directory endpoints, settings location, CarPlay labels, manifests and client identity. Corrected lossless-default implications, top-left Settings directions, absolute redirect-security claims, and the assumption that all potentially disclosed data would be unlinked. No credentials invented or committed, and no account fields entered.
+
+**Live policy:** direct HTTPS GETs to privacy and support returned 200. The privacy page's `<main>` content exactly matches `site/privacy.html`, including Keychain retry and remote-revocation wording. Earlier “local until deployed” status is superseded; no deployment performed in this pass. The web-fetch tool could not access these URLs, so the comparison used ordinary HTTPS requests from the workspace.
+
+**Validation:** checked listing field limits and reviewer-notes byte limit, local Markdown link targets and `git diff --check`. Documentation and advisory evidence only; no runtime code changed, so no additional app tests run. App Store Connect entry, final archive/privacy report, service-retention confirmation, demo provisioning/media licensing and testparty sign-off remain open.

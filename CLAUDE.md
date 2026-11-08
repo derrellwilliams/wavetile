@@ -65,7 +65,7 @@ Shelves are read from the local DB on init (first frame, works offline), then `l
 - Debug launch flags (`DebugFlags` in `MainTabView.swift`, compiled out of Release; the doc comments list them all). Most useful: `-freshHome` (Home as a new listener sees it), `-tab <name>`, `-openFirstAlbum [-autoplay]`, `-enablePodcasts`, `-followFeed <url>`.
 
 ## Release planning
-- `docs/LAUNCH.md` is the single working checklist for prerelease QA, App Store readiness, launch and follow-up. Read it when resuming release work and update dated status there; dated QA evidence goes in `docs/qa-evidence.md`, ASO/SEO/GEO notes live in `docs/search-optimization.md`.
+- `docs/LAUNCH.md` is the working checklist for engineering QA, App Store readiness, launch and follow-up. User device checks and their results live in `docs/testparty.md`; keep those checks out of LAUNCH.md and link to their sign-off instead. Read these when resuming release work and update dated status in the appropriate file; dated engineering QA evidence goes in `docs/qa-evidence.md`, ASO/SEO/GEO notes live in `docs/search-optimization.md`.
 
 ## Git
 Commit and push only when asked. When asked, the work lands on `main` (merge any branch into it) and `main` is pushed.
