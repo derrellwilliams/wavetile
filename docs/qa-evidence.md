@@ -447,3 +447,13 @@ When a library or podcast database can't be opened (a failed migration, a full d
 - **A manual refresh killed mid-sync** isn't retried before the one-hour freshness window ends.
 
 **Verification (7 and 8):** package scheme passed on iPhone 18 Pro Max (iOS 27.0): 177 tests, 245 runs, 0 failures, no runtime warnings (`build/Logs/Test/Test-WavetileKit-Package-2026.11.07_21-25-24--0700.xcresult`). The UI suite (including the accessibility audit) also passed on this code: 17/17, no runtime warnings (`build/Logs/Test/Test-Wavetile-2026.11.07_21-26-00--0700.xcresult`). New tests: `onlyTheStandInDatabaseIsMarkedTemporary` for each database. Not automated: the fallback launch itself (needs an unopenable database and a background relaunch), kill-mid-sign-out and kill-mid-sync, which belong to the device pass.
+
+## Automated rerun at `99a1cf7` — November 8, 2026
+
+Rerun after the Nov 7 review fixes, the Settings sign-out alert and the favorite-toggle changes (Debug, iPhone 18 Pro Max, iOS 27.0).
+
+- **Package scheme:** passed, 178 tests (246 runs), 0 failures, no runtime warnings (`build/Logs/Test/Test-WavetileKit-Package-2026.11.08_07-42-37--0700.xcresult`).
+- **UI suite, first run:** 16/17, no runtime warnings (`Test-Wavetile-2026.11.08_07-43-31--0700.xcresult`). `AccessibilityAuditTests/testNowPlayingAudit` failed with "Contrast failed" on the remaining-time label (`-1:44`, `textSecondary` mono caption). The failure screenshot shows the sheet mid-presentation over the album backdrop.
+- **Rerun of that test alone:** passed (`Test-Wavetile-2026.11.08_07-51-57--0700.xcresult`). `textSecondary` (`#989388`) on the Dark background (`#1A1A1A`) computes to about 5.7:1, above the 4.5:1 AA threshold.
+- **Assessment:** intermittent, not reproduced; the likely cause is the audit sampling the label while the sheet or its backdrop is still settling. This is the second unexplained one-off UI failure (Nov 7: `testWaveAndHomeTabScrollToTop`), so UI results are "passes on rerun", not clean. Not yet investigated further; if it recurs, try a longer settle before the audit or a check that the sheet has stopped moving.
+- **Not rerun:** sanitizer (ASan/TSan) runs from Nov 5.
