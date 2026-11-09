@@ -17,8 +17,8 @@ struct MainTabView: View {
     @State private var connectivity = Connectivity.shared
     @State private var actions = LibraryActions()
     @State private var homePath = NavigationPath()
-    /// Bumped when Home's tab is tapped while it's already selected; Home scrolls to the top.
-    @State private var homeReselects = 0
+    /// Bumped per tab when its tab is tapped while already selected: back to the root, then a refresh.
+    @State private var reselects: [AppTab: Int] = [:]
     @State private var widgets: WidgetBridge
     @Namespace private var playerZoom
     @State private var selection: AppTab = DebugFlags.initialTab
@@ -79,13 +79,13 @@ struct MainTabView: View {
     private var tabs: some View {
         TabView(selection: tabSelection) {
             Tab(value: .home) {
-                HomeView(model: home, path: $homePath, reselects: homeReselects, userName: signedIn.session.userName, upNext: signedIn.podcasts.launchUpNext)
+                HomeView(model: home, path: $homePath, reselects: reselects[.home, default: 0], userName: signedIn.session.userName, upNext: signedIn.podcasts.launchUpNext)
                     .environment(\.tabRootReporter, reporter(for: .home))
             } label: {
                 tabLabel("Home", icon: Image(uiImage: WavetileMark.uiImage(color: theme.palette.accent)))
             }
             Tab(value: .music) {
-                LibraryView()
+                LibraryView(reselects: reselects[.music, default: 0])
                     .environment(\.tabRootReporter, reporter(for: .music))
             } label: {
                 tabLabel("Music", glyph: .library)
@@ -93,20 +93,20 @@ struct MainTabView: View {
             // Opt-in from the profile drawer; music-only users never see it.
             if signedIn.podcasts.isEnabled {
                 Tab(value: .podcasts) {
-                    PodcastsView()
+                    PodcastsView(reselects: reselects[.podcasts, default: 0])
                         .environment(\.tabRootReporter, reporter(for: .podcasts))
                 } label: {
                     tabLabel("Podcasts", glyph: .podcasts)
                 }
             }
             Tab(value: .downloaded) {
-                DownloadedView()
+                DownloadedView(reselects: reselects[.downloaded, default: 0])
                     .environment(\.tabRootReporter, reporter(for: .downloaded))
             } label: {
                 tabLabel("Downloads", glyph: .downloads)
             }
             Tab(value: .search, role: .search) {
-                SearchView(text: $searchText, scope: $searchScope)
+                SearchView(text: $searchText, scope: $searchScope, reselects: reselects[.search, default: 0])
                     .environment(\.tabRootReporter, reporter(for: .search))
             } label: {
                 tabLabel("Search", glyph: .search)
@@ -171,13 +171,13 @@ extension MainTabView {
         }
     }
 
-    /// The tab selection; TabView sets it again when the selected tab is tapped, which on Home
-    /// means back to the top.
+    /// The tab selection; TabView sets it again when the selected tab is tapped, which
+    /// means back to the root and, where the tab refreshes, a refresh.
     private var tabSelection: Binding<AppTab> {
         Binding(
             get: { selection },
             set: { tab in
-                if tab == selection, tab == .home { homeReselects += 1 }
+                if tab == selection { reselects[tab, default: 0] += 1 }
                 selection = tab
             }
         )

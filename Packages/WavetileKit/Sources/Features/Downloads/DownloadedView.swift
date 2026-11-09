@@ -14,6 +14,7 @@ struct DownloadedView: View {
     @Environment(DownloadsStore.self) private var downloads
     @Environment(PodcastsStore.self) private var podcasts
     @Namespace private var zoom
+    let reselects: Int
     @State private var path = NavigationPath()
     @State private var statusCollection: DownloadCollectionRecord?
     @State private var collections: [DownloadedCollection] = []
@@ -41,6 +42,7 @@ struct DownloadedView: View {
             }
             .themedBackground()
             .navigationTitle("Downloads")
+            .onChange(of: reselects) { path = NavigationPath() }
             .sheet(item: $statusCollection) { DownloadStatusSheet(collectionID: $0.id) }
             .confirmationDialog(showsPodcasts ? "Remove all downloaded episodes?" : "Remove all downloaded music?", isPresented: $confirmRemoveAll, titleVisibility: .visible) {
                 Button("Remove All", role: .destructive) {

@@ -16,7 +16,9 @@ struct PodcastsView: View {
     @State private var latest: [EpisodeItem] = []
     @State private var recommended: [RecommendedShow] = []
     @State private var hasShows = true
+    let reselects: Int
     @State private var path = NavigationPath()
+    @State private var refreshRequests = 0
     @Namespace private var zoom
     @State private var showSettings = false
     /// `-openLatestEpisode` fires once per launch, not on every refresh of the list.
@@ -67,9 +69,12 @@ struct PodcastsView: View {
         // The offline notice (and dimming) slide in and out.
         .animatesConnectivity()
         .navigationTitle("Podcasts")
-        .markRefreshable {
+        .markRefreshable(trigger: refreshRequests) {
             await podcasts.refreshAll()
             await podcasts.refreshRecommendations()
+        }
+        .onChange(of: reselects) {
+            if path.isEmpty { refreshRequests += 1 } else { path = NavigationPath() }
         }
         // On the always-present scroll view: a task on a shelf that isn't shown never runs.
         .task { await observe(podcasts.database.continueListening()) { continueListening = $0 } }

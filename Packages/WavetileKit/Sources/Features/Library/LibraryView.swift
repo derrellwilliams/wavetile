@@ -9,7 +9,9 @@ struct LibraryView: View {
     @Environment(\.theme) private var theme
     @Environment(LibraryStore.self) private var store
     @Namespace private var zoom
+    let reselects: Int
     @State private var path = NavigationPath()
+    @State private var refreshRequests = 0
     @State private var recentlyAdded: [AlbumRecord] = []
     /// `-openSection` fires once per launch.
     @State private var didOpenSection = false
@@ -58,7 +60,10 @@ struct LibraryView: View {
             .themedBackground()
             // The offline notice (and dimming) slide in and out.
             .animatesConnectivity()
-            .markRefreshable { await store.syncNow() }
+            .markRefreshable(trigger: refreshRequests) { await store.syncNow() }
+            .onChange(of: reselects) {
+                if path.isEmpty { refreshRequests += 1 } else { path = NavigationPath() }
+            }
             .navigationTitle("Music")
             .tabRootChrome()
             .libraryDestinations(zoom: zoom) { path.append($0) }

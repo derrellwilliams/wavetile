@@ -31,6 +31,7 @@ struct SearchView: View {
     @State private var podcastResults = PodcastDatabase.SearchResults()
     /// Apple Podcasts shows for the All filter, already narrowed to ones named like the query.
     @State private var appleShows: [DirectoryShow] = []
+    let reselects: Int
     @State private var path = NavigationPath()
     @State private var recents = RecentSearches()
 
@@ -56,6 +57,7 @@ struct SearchView: View {
                 .background(theme.palette.background)
             }
             .themedBackground()
+            .onChange(of: reselects) { path = NavigationPath() }
             // The offline notice (and dimming) slide in and out.
             .animatesConnectivity()
             // iOS hides the bar's large title while the field is active, and this tab activates it
