@@ -452,7 +452,9 @@ private struct CustomBarItem<Content: View>: UIViewControllerRepresentable {
     final class Controller: UIViewController {
         private let hosting: UIHostingController<Hosted>
         private let container = SizedBarView()
-        private lazy var item: UIBarButtonItem = {
+        private lazy var item: UIBarButtonItem = makeItem()
+
+        private func makeItem() -> UIBarButtonItem {
             hosting.view.backgroundColor = .clear
             // Follows the container wherever the bar places and sizes it.
             hosting.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -461,7 +463,7 @@ private struct CustomBarItem<Content: View>: UIViewControllerRepresentable {
             let item = UIBarButtonItem(customView: container)
             item.hidesSharedBackground = true
             return item
-        }()
+        }
 
         init(content: Hosted) {
             hosting = UIHostingController(rootView: content)
@@ -479,7 +481,15 @@ private struct CustomBarItem<Content: View>: UIViewControllerRepresentable {
             hosting.rootView = content
             // Buttons can arrive after the page loads (an episode, a show's settings); the bar
             // sizes a custom view once, so resize it when its width changes.
-            if container.size != fittingSize { resize() }
+            if container.size != fittingSize {
+                resize()
+                // The bar places a custom item once, from its first size: a wider capsule
+                // would hang off the right edge. A fresh item makes it lay out again.
+                if let page = parent, page.navigationItem.rightBarButtonItem === item {
+                    page.navigationItem.rightBarButtonItem = nil
+                }
+                item = makeItem()
+            }
             install()
         }
 
