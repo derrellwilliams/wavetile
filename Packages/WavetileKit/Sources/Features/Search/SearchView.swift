@@ -57,7 +57,7 @@ struct SearchView: View {
                 .background(theme.palette.background)
             }
             .themedBackground()
-            .onChange(of: reselects) { path = NavigationPath() }
+            .onTabReselect(reselects, path: $path)
             // The offline notice (and dimming) slide in and out.
             .animatesConnectivity()
             // iOS hides the bar's large title while the field is active, and this tab activates it

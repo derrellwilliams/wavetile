@@ -61,9 +61,7 @@ struct LibraryView: View {
             // The offline notice (and dimming) slide in and out.
             .animatesConnectivity()
             .markRefreshable(trigger: refreshRequests) { await store.syncNow() }
-            .onChange(of: reselects) {
-                if path.isEmpty { refreshRequests += 1 } else { path = NavigationPath() }
-            }
+            .onTabReselect(reselects, path: $path) { refreshRequests += 1 }
             .navigationTitle("Music")
             .tabRootChrome()
             .libraryDestinations(zoom: zoom) { path.append($0) }

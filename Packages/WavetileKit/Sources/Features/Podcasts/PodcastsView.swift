@@ -70,12 +70,12 @@ struct PodcastsView: View {
         .animatesConnectivity()
         .navigationTitle("Podcasts")
         .markRefreshable(trigger: refreshRequests) {
+            // Offline there is nothing to fetch (tab tap and pull alike); the scroll to top still plays.
+            guard await Connectivity.shared.hasNetwork else { return }
             await podcasts.refreshAll()
             await podcasts.refreshRecommendations()
         }
-        .onChange(of: reselects) {
-            if path.isEmpty { refreshRequests += 1 } else { path = NavigationPath() }
-        }
+        .onTabReselect(reselects, path: $path) { refreshRequests += 1 }
         // On the always-present scroll view: a task on a shelf that isn't shown never runs.
         .task { await observe(podcasts.database.continueListening()) { continueListening = $0 } }
         .task {

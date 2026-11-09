@@ -42,7 +42,7 @@ struct DownloadedView: View {
             }
             .themedBackground()
             .navigationTitle("Downloads")
-            .onChange(of: reselects) { path = NavigationPath() }
+            .onTabReselect(reselects, path: $path)
             .sheet(item: $statusCollection) { DownloadStatusSheet(collectionID: $0.id) }
             .confirmationDialog(showsPodcasts ? "Remove all downloaded episodes?" : "Remove all downloaded music?", isPresented: $confirmRemoveAll, titleVisibility: .visible) {
                 Button("Remove All", role: .destructive) {

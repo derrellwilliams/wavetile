@@ -708,6 +708,14 @@ extension EnvironmentValues {
 }
 
 extension View {
+    /// A tap on the already-selected tab (`reselects` counts them): from a pushed screen, back to
+    /// the tab's root; at the root, `atRoot` (refresh, if the tab has one).
+    func onTabReselect(_ reselects: Int, path: Binding<NavigationPath>, atRoot: @escaping () -> Void = {}) -> some View {
+        onChange(of: reselects) {
+            if path.wrappedValue.isEmpty { atRoot() } else { path.wrappedValue = NavigationPath() }
+        }
+    }
+
     /// Chrome for a tab's root screen, applied to the content *inside* its `NavigationStack`:
     /// the profile button at top left (opens the drawer), and root reporting so the drawer's
     /// edge swipe only works at the root, never fighting the system back gesture.
