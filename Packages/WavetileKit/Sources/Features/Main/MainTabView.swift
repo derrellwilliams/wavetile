@@ -451,19 +451,12 @@ private struct CustomBarItem<Content: View>: UIViewControllerRepresentable {
 
     final class Controller: UIViewController {
         private let hosting: UIHostingController<Hosted>
-        private let container = SizedBarView()
-        private lazy var item: UIBarButtonItem = makeItem()
-
-        private func makeItem() -> UIBarButtonItem {
-            hosting.view.backgroundColor = .clear
-            // Follows the container wherever the bar places and sizes it.
-            hosting.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            container.addSubview(hosting.view)
-            resize()
-            let item = UIBarButtonItem(customView: container)
-            item.hidesSharedBackground = true
-            return item
-        }
+        /// The bar item and the view it holds. A new pair for each width: the bar places a custom
+        /// item once, from its first size, so a wider capsule in the same item would hang off the
+        /// right edge.
+        private var slot: (item: UIBarButtonItem, container: SizedBarView)?
+        /// True from taking the old item out until the bar has laid out without it.
+        private var isReplacing = false
 
         init(content: Hosted) {
             hosting = UIHostingController(rootView: content)
@@ -477,28 +470,35 @@ private struct CustomBarItem<Content: View>: UIViewControllerRepresentable {
 
         private var fittingSize: CGSize { hosting.sizeThatFits(in: UIView.layoutFittingExpandedSize) }
 
-        func update(_ content: Hosted) {
-            hosting.rootView = content
-            // Buttons can arrive after the page loads (an episode, a show's settings); the bar
-            // sizes a custom view once, so resize it when its width changes.
-            if container.size != fittingSize {
-                resize()
-                // The bar places a custom item once, from its first size: a wider capsule
-                // would hang off the right edge. A fresh item makes it lay out again.
-                if let page = parent, page.navigationItem.rightBarButtonItem === item {
-                    page.navigationItem.rightBarButtonItem = nil
-                    // Lay the bar out without it, so the new item isn't placed from the old one's spot.
-                    page.navigationController?.navigationBar.layoutIfNeeded()
-                }
-                item = makeItem()
-            }
-            install()
+        private func makeSlot(size: CGSize) -> (item: UIBarButtonItem, container: SizedBarView) {
+            let container = SizedBarView(size: size)
+            hosting.view.backgroundColor = .clear
+            hosting.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            hosting.view.frame = container.bounds
+            container.addSubview(hosting.view)
+            let item = UIBarButtonItem(customView: container)
+            item.hidesSharedBackground = true
+            return (item, container)
         }
 
-        /// The bar sizes the item from the container.
-        private func resize() {
-            container.size = fittingSize
-            hosting.view.frame = container.bounds
+        func update(_ content: Hosted) {
+            hosting.rootView = content
+            // Buttons can arrive after the page loads (an episode, a show's settings).
+            let size = fittingSize
+            if let current = slot, current.container.size != size {
+                if let page = parent, page.navigationItem.rightBarButtonItem === current.item {
+                    page.navigationItem.rightBarButtonItem = nil
+                    // Put the new item in on the next turn, once the bar has laid out without
+                    // the old one, so it isn't placed from the old one's spot.
+                    isReplacing = true
+                    DispatchQueue.main.async { [weak self] in
+                        self?.isReplacing = false
+                        self?.install()
+                    }
+                }
+                slot = makeSlot(size: size)
+            }
+            install()
         }
 
         override func viewWillAppear(_ animated: Bool) {
@@ -514,9 +514,14 @@ private struct CustomBarItem<Content: View>: UIViewControllerRepresentable {
         /// The page's own item, so it slides in and out with the page. SwiftUI also writes the
         /// page's bar items (its toolbar), so this puts the capsule back if they replaced it.
         private func install() {
-            guard let page = parent else { return }
+            guard let page = parent, !isReplacing else { return }
+            let size = fittingSize
             // No buttons (an episode still loading): no item, so no empty glass.
-            let wanted = fittingSize.width > 0 ? item : nil
+            var wanted: UIBarButtonItem?
+            if size.width > 0 {
+                if slot == nil { slot = makeSlot(size: size) }
+                wanted = slot?.item
+            }
             guard page.navigationItem.rightBarButtonItem !== wanted else { return }
             page.navigationItem.rightBarButtonItem = wanted
         }
@@ -525,24 +530,11 @@ private struct CustomBarItem<Content: View>: UIViewControllerRepresentable {
 
 /// A custom bar item's view, reporting the size the bar lays it out at.
 private final class SizedBarView: UIView {
-    var size: CGSize = .zero {
-        didSet {
-            frame.size = size
-            // Explicit constraints: the bar lays custom views out with Auto Layout and (on iOS 26)
-            // can keep the first size it saw if only the frame changes.
-            widthConstraint.constant = size.width
-            heightConstraint.constant = size.height
-            invalidateIntrinsicContentSize()
-        }
-    }
+    let size: CGSize
 
-    private lazy var widthConstraint = widthAnchor.constraint(equalToConstant: 0)
-    private lazy var heightConstraint = heightAnchor.constraint(equalToConstant: 0)
-
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([widthConstraint, heightConstraint])
+    init(size: CGSize) {
+        self.size = size
+        super.init(frame: CGRect(origin: .zero, size: size))
     }
 
     required init?(coder: NSCoder) { fatalError() }

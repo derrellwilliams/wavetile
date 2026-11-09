@@ -46,7 +46,8 @@ struct ShowDetailView: View {
         .detailPageChrome()
         .detailBarButtons {
             followButton
-            if let show { settingsMenu(show) }
+            // Always there, so the bar item keeps its width as the show loads.
+            if let show { settingsMenu(show) } else { settingsPlaceholder }
         }
         .confirmationDialog("Mark every episode as played?", isPresented: $confirmMarkAll, titleVisibility: .visible) {
             Button("Mark All as Played") { if let show { podcasts.markAllPlayed(show) } }
@@ -237,6 +238,12 @@ struct ShowDetailView: View {
             Text(season.map { "Season \($0)" } ?? "All Seasons")
         }
         .buttonStyle(.tinted(.small))
+    }
+
+    /// Stands in for the settings menu until the show loads.
+    private var settingsPlaceholder: some View {
+        Menu {} label: { Label("Show Settings", glyph: .more) }
+            .disabled(true)
     }
 
     private func settingsMenu(_ show: ShowRecord) -> some View {
