@@ -41,6 +41,11 @@ final class SignInModel {
             for address in try ServerAddress.candidates(for: addressText) {
                 do {
                     let info = try await app.auth.validate(address)
+                    // Signing in again: the password only goes to the server this account is on.
+                    if case let .signedIn(current) = app.phase,
+                       !ServerIdentity.isSameServer(info.id, current.session.serverID) {
+                        throw AppModel.ReauthenticationError.wrongAccount
+                    }
                     server = info
                     // Show what actually connected so the HTTP warning reflects reality.
                     addressText = address.url.absoluteString

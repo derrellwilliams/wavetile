@@ -65,7 +65,7 @@ final class Connectivity {
         foregroundToken = NotificationCenter.default.addObserver(
             forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.check() }
+            MainActor.assumeIsolated { self?.enteredForeground() }
         }
     }
 
@@ -114,6 +114,14 @@ final class Connectivity {
         }
         hasNetwork = online
         self.interfaces = interfaces
+        check()
+    }
+
+    /// Security: no path update arrives while the app is suspended, and the one for a network
+    /// joined meanwhile can land after the first requests. An HTTP server proves itself again
+    /// before any of them carries the token.
+    private func enteredForeground() {
+        if server?.isCleartext == true { ServerIdentity.shared.networkChanged() }
         check()
     }
 

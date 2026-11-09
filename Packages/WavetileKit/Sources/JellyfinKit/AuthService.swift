@@ -66,7 +66,8 @@ public struct AuthService: Sendable {
         } catch is DecodingError {
             throw AuthError.notAJellyfinServer
         }
-        guard let id = info.id else { throw AuthError.notAJellyfinServer }
+        // The ID is what `ServerIdentity` later checks an HTTP address against, so it can't be blank.
+        guard let id = ServerText.nonBlank(info.id) else { throw AuthError.notAJellyfinServer }
         guard info.isStartupWizardCompleted != false else { throw AuthError.setupIncomplete }
 
         // Endpoint returns a bare JSON boolean; treat any failure as "disabled".
@@ -122,10 +123,10 @@ public struct AuthService: Sendable {
 
     private func makeSession(_ server: ServerInfo, _ result: AuthenticationResult) throws -> (ServerSession, token: String) {
         guard let token = result.accessToken else { throw JellyfinAPI.JellyfinClient.ClientError.noAccessToken }
-        guard let user = result.user, let userID = user.id else { throw AuthError.missingUser }
+        guard let user = result.user, let userID = ServerText.nonBlank(user.id) else { throw AuthError.missingUser }
         let session = ServerSession(
             serverURL: server.address.url,
-            serverID: result.serverID ?? server.id,
+            serverID: ServerText.nonBlank(result.serverID) ?? server.id,
             serverName: server.name,
             userID: userID,
             userName: user.name ?? "User"

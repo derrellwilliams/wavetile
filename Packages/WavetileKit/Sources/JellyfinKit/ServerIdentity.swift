@@ -29,18 +29,29 @@ public final class ServerIdentity: Sendable {
 
     private let state = OSAllocatedUnfairLock(initialState: State())
     /// Short timeout and no waiting for a network: the answer is needed now, not eventually.
-    private let session: URLSession = {
+    private let session: URLSession
+
+    /// `protocolClasses` lets tests answer the check without a network.
+    init(protocolClasses: [AnyClass]? = nil) {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 6
         configuration.waitsForConnectivity = false
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        return URLSession(configuration: configuration)
-    }()
+        if let protocolClasses { configuration.protocolClasses = protocolClasses }
+        session = URLSession(configuration: configuration)
+    }
 
-    /// On sign-in and session restore.
+    /// On sign-in and session restore, before anything is built that sends the token. The address
+    /// proves itself again from here: an earlier answer (another account, or a network the app
+    /// left while signed out) doesn't carry over.
     public func register(_ url: URL, serverID: String) {
         guard let origin = Self.origin(url) else { return }
-        state.withLock { $0.servers[origin] = Server(url: url, id: serverID) }
+        state.withLock { state in
+            state.servers[origin] = Server(url: url, id: serverID)
+            state.generation += 1
+            state.verified.remove(origin)
+            state.pending[origin] = nil
+        }
     }
 
     /// The device changed networks: every HTTP server has to prove itself again before it gets the token.
@@ -104,10 +115,14 @@ public final class ServerIdentity: Sendable {
               let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
               let id = (try? JSONDecoder().decode(PublicInfo.self, from: data))?.Id
         else { return false }
-        // A session saved without an ID can't be matched; any Jellyfin answer has to do.
-        guard !server.id.isEmpty else { return true }
+        return isSameServer(id, server.id)
+    }
+
+    /// Whether two server IDs name the same server (Jellyfin writes its GUIDs with and without
+    /// dashes). An empty ID matches nothing: a session without one can't be told from an impostor.
+    public static func isSameServer(_ a: String, _ b: String) -> Bool {
         let normalized = { (id: String) in id.lowercased().replacingOccurrences(of: "-", with: "") }
-        return normalized(id) == normalized(server.id)
+        return !normalized(a).isEmpty && normalized(a) == normalized(b)
     }
 
     private static func isCleartext(_ url: URL) -> Bool {

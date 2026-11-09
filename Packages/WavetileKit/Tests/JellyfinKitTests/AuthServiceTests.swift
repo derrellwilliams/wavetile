@@ -62,6 +62,14 @@ struct AuthServiceTests {
         }
     }
 
+    @Test func validateRejectsBlankServerID() async throws {
+        // The ID is what an HTTP address is later checked against; blank would match anything.
+        MockURLProtocol.reset(["/System/Info/Public": (200, #"{"Id":" ","ServerName":"Home","StartupWizardCompleted":true}"#)])
+        await #expect(throws: AuthService.AuthError.notAJellyfinServer) {
+            try await service.validate(try ServerAddress("https://example.com"))
+        }
+    }
+
     @Test func validateRefusesRemoteHTTP() async throws {
         MockURLProtocol.reset(["/System/Info/Public": (200, systemInfo)])
         await #expect(throws: AuthService.AuthError.insecureTransport) {

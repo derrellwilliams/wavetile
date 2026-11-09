@@ -13,7 +13,7 @@ struct ServerAddressTests {
         #expect(address.url.absoluteString == "http://192.168.1.20:8096/jellyfin")
     }
 
-    @Test(arguments: ["", "   ", "ftp://host", "https://"])
+    @Test(arguments: ["", "   ", "ftp://host", "https://", "https://me:secret@music.example.com", "http://me@192.168.1.5:8096"])
     func rejectsInvalid(_ input: String) {
         #expect(throws: ServerAddress.InputError.self) { try ServerAddress(input) }
     }
@@ -31,6 +31,14 @@ struct ServerAddressTests {
         ("http://100.101.102.103:8096", false),  // CGNAT: Tailscale or a carrier, so not trusted
         ("http://nas.tail1234.ts.net:8096", true),
         ("http://ts.net.example.com", false),
+        ("http://010.1.1.1", false),  // Octal for 8.1.1.1
+        ("http://192.168.01.5", false),
+        ("http://[fd7a:115c:a1e0::1]:8096", true),
+        ("http://[fe80::1]:8096", true),
+        ("http://[fd::1]", false),  // 00fd::1
+        ("http://[fc:1::1]", false),
+        ("http://[2001:db8::1]", false),
+        ("http://[::1]:8096", true),
     ])
     func classifiesLocalNetwork(_ input: String, isLocal: Bool) throws {
         #expect(try ServerAddress(input).isLocalNetwork == isLocal)

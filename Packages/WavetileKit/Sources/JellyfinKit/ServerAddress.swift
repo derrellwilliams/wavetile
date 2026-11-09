@@ -21,6 +21,8 @@ public struct ServerAddress: Hashable, Sendable {
               let scheme = components.scheme?.lowercased(),
               scheme == "http" || scheme == "https",
               let host = components.host, !host.isEmpty,
+              // A name and password in the address would be saved and shown in plain text.
+              components.user == nil, components.password == nil,
               let url = components.url
         else { throw .invalid }
 
@@ -48,15 +50,18 @@ public struct ServerAddress: Hashable, Sendable {
     /// `*.ts.net` names and fd7a:115c:a1e0::/48 (covered by fd). Tailscale's 100.64.0.0/10 IPv4
     /// addresses aren't included: carriers use the same range (CGNAT), where HTTP isn't encrypted.
     public var isLocalNetwork: Bool {
-        guard let host = url.host()?.lowercased() else { return false }
+        guard let host = url.host()?.lowercased().trimmingCharacters(in: ["[", "]"]) else { return false }
         if host == "localhost" || host.hasSuffix(".local") || host == "::1" { return true }
         if host.hasSuffix(".ts.net") { return true }
         if host.contains(":") {
-            // IPv6 link-local (fe80::/10) and unique-local (fc00::/7).
-            return host.hasPrefix("fe80:") || host.hasPrefix("fc") || host.hasPrefix("fd")
+            // IPv6 link-local (fe80::/10) and unique-local (fc00::/7). The first group has to be
+            // written in full: `fd::1` is 00fd::1, a public address.
+            guard let first = host.split(separator: ":", omittingEmptySubsequences: false).first, first.count == 4 else { return false }
+            return ["fc", "fd", "fe8", "fe9", "fea", "feb"].contains { first.hasPrefix($0) }
         }
         let parts = host.split(separator: ".", omittingEmptySubsequences: false)
-        let octets = parts.compactMap { UInt8($0) }
+        // Plain decimal only: `010.1.1.1` can be read as octal (8.1.1.1), a public address.
+        let octets = parts.compactMap { part in UInt8(part).flatMap { String($0) == part ? $0 : nil } }
         guard parts.count == 4, octets.count == 4 else { return false }
         switch (octets[0], octets[1]) {
         case (10, _), (127, _), (169, 254), (192, 168): return true

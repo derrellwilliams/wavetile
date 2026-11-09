@@ -65,10 +65,13 @@ public final class AppModel {
     /// Restores the saved session from the Keychain. Synchronous so the first frame is already correct.
     public func restore() {
         guard case .launching = phase else { return }
-        if let (session, token) = store.load(), Self.isTransportAllowed(session.serverURL),
+        let saved = store.load()
+        if let (session, token) = saved, Self.isTransportAllowed(session.serverURL),
            let signedIn = try? makeSignedIn(session, token: token) {
             activate(signedIn)
         } else {
+            // A session that can't be used again shouldn't leave its token in the Keychain.
+            if let saved, !Self.isTransportAllowed(saved.session.serverURL) { store.clear() }
             // No saved session, or no usable library storage (signing in again reports why).
             // Widgets from an earlier session must not keep showing that account's music.
             WidgetBridge.clear()
@@ -110,6 +113,8 @@ public final class AppModel {
 
     /// Throws `StorageUnavailable` only when no database can be created at all (e.g. the disk is full).
     private func makeSignedIn(_ session: ServerSession, token: String) throws -> SignedIn {
+        // First, so nothing built below can send the token to an HTTP address that hasn't proved itself.
+        ServerIdentity.shared.register(session.serverURL, serverID: session.serverID)
         // A corrupt or unreadable cache shouldn't block sign-in; fall back to a fresh temp database.
         let database: LibraryDatabase
         do {
