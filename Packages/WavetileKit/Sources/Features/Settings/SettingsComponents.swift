@@ -62,12 +62,13 @@ struct SettingsValue: View {
     }
 }
 
-/// The account's profile picture as a circle, or the Phosphor `user-circle` glyph in the accent color
-/// when the account has none (or the picture fails to load).
+/// The account's profile picture as a circle `size` wide. Without a picture (or if it fails to load) it's the
+/// Phosphor `user-circle` glyph in the accent color at `glyphSize`, the icon's size before pictures existed.
 struct AvatarPicture: View {
     @Environment(\.theme) private var theme
     @Environment(LibraryStore.self) private var library: LibraryStore?
-    var size: CGFloat = 32
+    var size: CGFloat = 72
+    var glyphSize: CGFloat = 32
 
     var body: some View {
         if let url = library?.avatarURL {
@@ -79,10 +80,9 @@ struct AvatarPicture: View {
             LazyImage(request: request) { state in
                 if let image = state.image {
                     image.resizable().scaledToFill()
-                } else if state.error != nil {
-                    glyph
                 } else {
-                    Color.clear
+                    // While loading or after a failure; the frame keeps the header from jumping.
+                    glyph.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                 }
             }
             .frame(width: size, height: size)
@@ -96,17 +96,15 @@ struct AvatarPicture: View {
         Glyph.user.image
             .resizable()
             .scaledToFit()
-            .frame(width: size, height: size)
+            .frame(width: glyphSize, height: glyphSize)
             .foregroundStyle(theme.palette.accent)
     }
 }
 
 /// Profile avatar in the drawer's header.
 struct Avatar: View {
-    var size: CGFloat = 72
-
     var body: some View {
-        AvatarPicture(size: size)
+        AvatarPicture()
             .accessibilityHidden(true)
     }
 }
