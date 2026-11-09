@@ -111,7 +111,7 @@ public struct LibraryEditor: Sendable {
     /// A new collection with the same items in the same order, then the old one deleted. Every
     /// item is copied, not only albums, and the list comes from the server rather than the local
     /// mirror, so nothing added elsewhere is lost. A collection with a cover image isn't recreated
-    /// (`RenameWouldLoseCoverError`). If the old one can't be deleted, the new one is removed again;
+    /// (`RenameWouldLoseCoverError`). If the new one is missing items or the old one can't be deleted, the new one is removed again;
     /// only if that fails too are there two copies (`DuplicateCollectionError`).
     private func recreateCollection(id: String, name: String, image: String?) async throws -> String {
         guard image == nil else { throw RenameWouldLoseCoverError() }
@@ -130,6 +130,16 @@ public struct LibraryEditor: Sendable {
             throw URLError(.badServerResponse)
         }
         do {
+            // The old one is only deleted once the server shows the new one holding every item.
+            let copied = try await completeItems { start, limit in
+                var params = Paths.GetItemsParameters()
+                params.userID = session.userID
+                params.parentID = newID
+                params.startIndex = start
+                params.limit = limit
+                return try await client.send(Paths.getItems(parameters: params)).value
+            }
+            guard Set(itemIDs).isSubset(of: copied.compactMap(\.id)) else { throw URLError(.badServerResponse) }
             try await client.send(Paths.deleteItem(itemID: id))
         } catch {
             do { try await client.send(Paths.deleteItem(itemID: newID)) } catch { throw DuplicateCollectionError() }

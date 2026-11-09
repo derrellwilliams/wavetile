@@ -42,6 +42,9 @@ public actor LibrarySync {
     private let client: JellyfinAPI.JellyfinClient
     private let database: LibraryDatabase
     private var isRunning = false
+    /// Playlists and collections re-read by an edit while a full sync runs, by table. The sync
+    /// listed its items before they existed, so its prune has to keep them.
+    private var refreshedDuringRun: [String: Set<String>] = [:]
 
     public init(session: ServerSession, token: String, auth: AuthService, database: LibraryDatabase) {
         self.session = session
@@ -59,6 +62,7 @@ public actor LibrarySync {
     public func run(progress: @Sendable (Progress) -> Void = { _ in }) async throws {
         guard !isRunning else { return }
         isRunning = true
+        refreshedDuringRun = [:]
         defer { isRunning = false }
 
         let generation = (try database.syncState()?.generation ?? 0) + 1
@@ -74,7 +78,9 @@ public actor LibrarySync {
         guard complete.count == 5 else { throw URLError(.badServerResponse) }
         try Task.checkCancellation()
         progress(.init(phase: .finishing, completed: 0, total: nil))
-        let tables = complete
+        // Read here, with no suspension before the write is queued: an edit that lands later
+        // writes after the prune.
+        let tables = complete.merging(refreshedDuringRun) { $0.union($1) }
         try await database.pool.write { db in
             for (table, seen) in tables {
                 try LibraryDatabase.prune(table, keeping: seen, in: db)
@@ -255,12 +261,14 @@ public actor LibrarySync {
 
     /// Re-reads one playlist from the server into the database.
     public func refreshPlaylist(id: String) async throws {
+        if isRunning { refreshedDuringRun[PlaylistRecord.databaseTableName, default: []].insert(id) }
         let item = try await client.send(Paths.getItem(itemID: id, userID: session.userID)).value
         try await writePlaylist(item, generation: currentGeneration)
     }
 
     /// Re-reads one collection from the server into the database.
     public func refreshCollection(id: String) async throws {
+        if isRunning { refreshedDuringRun[CollectionRecord.databaseTableName, default: []].insert(id) }
         let item = try await client.send(Paths.getItem(itemID: id, userID: session.userID)).value
         try await writeCollection(item, generation: currentGeneration)
     }
@@ -296,7 +304,10 @@ public actor LibrarySync {
     }
 
     /// Pages through a query, writing each page in one transaction.
-    /// Returns the IDs seen when they cover the server's reported total, else nil.
+    /// Returns the IDs seen when they're exactly the server's reported total, else nil. The
+    /// caller prunes everything else, so a total that's negative, smaller than what was sent, or
+    /// that shrinks between pages (an item removed mid-pass shifts the next page past one that's
+    /// still there) fails the pass instead.
     private func paged(
         phase: Progress.Phase,
         pageSize: Int,
@@ -310,15 +321,18 @@ public actor LibrarySync {
         while true {
             try Task.checkCancellation()
             let page = try await fetch(start, pageSize)
-            guard let items = page.items, let reported = page.totalRecordCount else { throw URLError(.badServerResponse) }
+            guard let items = page.items, let reported = page.totalRecordCount,
+                  reported >= (total ?? 0), items.count <= reported - start
+            else { throw URLError(.badServerResponse) }
             total = reported
             try await database.pool.write { db in try write(db, items) }
             seen.formUnion(items.compactMap(\.id))
             start += items.count
             progress(.init(phase: phase, completed: start, total: total))
-            if items.isEmpty || start >= (total ?? 0) { break }
+            if items.isEmpty || start >= reported { break }
         }
-        return seen.count >= (total ?? 0) ? seen : nil
+        // Every item once, each with an ID: a repeat means the pages shifted and one was missed.
+        return start == total && seen.count == start ? seen : nil
     }
 }
 

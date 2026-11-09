@@ -180,6 +180,30 @@ public extension LibraryDatabase {
         try pool.read { try DownloadCollectionRecord.filter(["playlist", "collection", "favorites"].contains(Column("kind"))).fetchAll($0) }
     }
 
+    /// What a synced download should hold now, read from the library mirror.
+    enum SyncedDownloadSource: Sendable, Equatable {
+        /// Leave the download as it is.
+        case keep
+        /// Its playlist or collection no longer exists.
+        case gone
+        case tracks([String])
+    }
+
+    /// Where a download that follows its source stands after a sync. A mirror with no songs at
+    /// all answers `keep`: a server that reports an empty library (its music drive unmounted,
+    /// then rescanned) would otherwise take every downloaded playlist, collection and favorite
+    /// with it, and those files are the only copy the listener can still play. They're kept
+    /// until the library is back or the listener removes them.
+    func syncedDownloadSource(_ download: DownloadCollectionRecord) throws -> SyncedDownloadSource {
+        guard download.kind != .album, try pool.read({ try !TrackRecord.limit(1).isEmpty($0) }) else { return .keep }
+        switch download.kind {
+        case .album: return .keep
+        case .playlist: return try playlist(id: download.id) == nil ? .gone : .tracks(tracks(playlistID: download.id).map(\.id))
+        case .collection: return try collection(id: download.id) == nil ? .gone : .tracks(trackIDs(collectionID: download.id))
+        case .favorites: return .tracks(try favoritesDownloadTrackIDs())
+        }
+    }
+
     /// Every song on a collection's albums, album by album in the collection's order.
     func trackIDs(collectionID: String) throws -> [String] {
         try pool.read { db in

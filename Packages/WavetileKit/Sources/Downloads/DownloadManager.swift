@@ -126,29 +126,20 @@ public final class DownloadManager: NSObject, Sendable {
     private func sync(_ download: DownloadCollectionRecord, quality: Quality, allowCellular: Bool) async {
         // A playlist or collection that's gone (deleted here, or on the server) takes its
         // download with it, rather than leaving an empty one behind.
-        // A failed read isn't "gone": only a successful lookup that finds nothing removes the download.
-        let sourceExists: Bool
-        do {
-            sourceExists = switch download.kind {
-            case .playlist: try database.playlist(id: download.id) != nil
-            case .collection: try database.collection(id: download.id) != nil
-            case .favorites, .album: true
-            }
-        } catch {
+        // A failed read isn't "gone": only a successful lookup that finds nothing removes the
+        // download. An empty library changes nothing (see `syncedDownloadSource`).
+        guard let source = try? database.syncedDownloadSource(download) else { return }
+        let trackIDs: [String]
+        switch source {
+        case .keep:
             return
-        }
-        guard sourceExists else {
+        case .gone:
             try? await remove(collectionID: download.id)
             return
+        case let .tracks(ids):
+            trackIDs = ids
         }
-        let trackIDs: [String]? = switch download.kind {
-        case .playlist: try? database.tracks(playlistID: download.id).map(\.id)
-        case .collection: try? database.trackIDs(collectionID: download.id)
-        case .favorites: try? database.favoritesDownloadTrackIDs()
-        case .album: nil
-        }
-        guard let trackIDs,
-              let (added, orphans) = try? await database.syncDownloadedPlaylist(id: download.id, trackIDs: trackIDs) else { return }
+        guard let (added, orphans) = try? await database.syncDownloadedPlaylist(id: download.id, trackIDs: trackIDs) else { return }
         await enqueue(added, quality: quality, allowCellular: allowCellular)
         deleteFiles(orphans)
     }

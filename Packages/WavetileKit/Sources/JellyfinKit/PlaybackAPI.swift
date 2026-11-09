@@ -1,4 +1,5 @@
 import Foundation
+import Get
 
 /// A resolved audio stream. Auth travels in `headers` (not the URL) so the token never lands
 /// in server/proxy access logs or crash reports that capture URLs.
@@ -6,6 +7,16 @@ public struct StreamRequest: Sendable {
     public let url: URL
     public let headers: [String: String]
     public let playSessionID: String
+}
+
+/// What became of a play reported after the fact.
+public enum PlayReport: Sendable {
+    case recorded
+    /// The server no longer has the song (deleted, or re-added under a new ID): there's nothing
+    /// to count the play against, now or later.
+    case itemGone
+    /// Didn't reach the server, or it couldn't answer: worth another try.
+    case failed
 }
 
 public extension LibraryClient {
@@ -85,8 +96,19 @@ public extension LibraryClient {
 
     /// Records a play that happened earlier (offline), at the time it happened. Jellyfin bumps the
     /// play count and last-played date, which drive Recently Played and Most Played.
-    func markPlayed(trackID: String, at date: Date) async -> Bool {
-        (try? await client.send(Paths.markPlayedItem(itemID: trackID, userID: session.userID, datePlayed: date))) != nil
+    func markPlayed(trackID: String, at date: Date) async -> PlayReport {
+        do {
+            _ = try await client.send(Paths.markPlayedItem(itemID: trackID, userID: session.userID, datePlayed: date))
+            return .recorded
+        } catch is DecodingError {
+            // The server took the play (2xx) and only its reply didn't parse. Sending it again
+            // at every sync would count it again each time.
+            return .recorded
+        } catch APIError.unacceptableStatusCode(404) {
+            return .itemGone
+        } catch {
+            return .failed
+        }
     }
 
     private static func ticks(_ seconds: Double) -> Int {

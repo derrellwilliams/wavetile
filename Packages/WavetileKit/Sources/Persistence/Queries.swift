@@ -376,7 +376,9 @@ public extension LibraryDatabase {
 
     /// Playlists whose name contains `text` (playlists aren't in the search index).
     func playlists(matching text: String, limit: Int = 10) throws -> [PlaylistRecord] {
-        try pool.read { try PlaylistRecord.filter(Column("name").like("%\(text)%")).order(Column("name")).limit(limit).fetchAll($0) }
+        // Escaped, so a spoken "100%" looks for those characters rather than matching everything.
+        let escaped = ["\\", "%", "_"].reduce(text) { $0.replacingOccurrences(of: $1, with: "\\" + $1) }
+        return try pool.read { try PlaylistRecord.filter(Column("name").like("%\(escaped)%", escape: "\\")).order(Column("name")).limit(limit).fetchAll($0) }
     }
 
     func favoriteArtistList(limit: Int) throws -> [ArtistRecord] {

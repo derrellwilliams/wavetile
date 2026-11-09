@@ -138,6 +138,17 @@ struct AuthServiceTests {
         #expect(library.streamRequest(trackID: "track")?.headers["Authorization"]?.contains("renewed") == true)
     }
 
+    @Test func latePlayOfAMissingSongIsNotRetried() async {
+        let session = ServerSession(serverURL: URL(string: "https://music.example")!, serverID: "srv1", serverName: "Home", userID: "u1", userName: "Test")
+        let library = LibraryClient(session: session, token: "tok", auth: service)
+        MockURLProtocol.reset(["/UserPlayedItems/kept": (200, "{}"), "/UserPlayedItems/busy": (503, "")])
+        // An accepted play counts even when the reply doesn't parse (here it lacks `Key`).
+        #expect(await library.markPlayed(trackID: "kept", at: .now) == .recorded)
+        // Unknown to the server (deleted, or re-added under a new ID): retrying can't help.
+        #expect(await library.markPlayed(trackID: "gone", at: .now) == .itemGone)
+        #expect(await library.markPlayed(trackID: "busy", at: .now) == .failed)
+    }
+
     @Test(arguments: [403, 404, 500, 503])
     func nonAuthenticationFailuresDoNotExpireSession(_ status: Int) async {
         let config = URLSessionConfiguration.ephemeral

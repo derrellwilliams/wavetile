@@ -98,12 +98,13 @@ final class LibraryStore {
     }
 
     /// Sends plays recorded offline, oldest first; stops at the first failure (still offline)
-    /// and tries again on the next sync.
+    /// and tries again on the next sync. A play of a song the server no longer has is dropped,
+    /// or it would hold up every play behind it for good.
     func reportPendingPlays() async {
         guard let plays = try? await database.pendingPlays() else { return }
         for play in plays {
             guard !Task.isCancelled else { return }
-            guard let id = play.id, await api.markPlayed(trackID: play.trackID, at: play.playedAt) else { return }
+            guard let id = play.id, await api.markPlayed(trackID: play.trackID, at: play.playedAt) != .failed else { return }
             try? await database.removePendingPlay(id: id)
         }
     }

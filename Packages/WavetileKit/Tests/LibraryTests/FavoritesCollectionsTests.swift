@@ -21,6 +21,50 @@ struct FavoritesCollectionsTests {
         return nil
     }
 
+    func playlist(_ id: String, name: String = "Mix") -> PlaylistRecord {
+        PlaylistRecord(id: id, name: name, imageTag: nil, trackCount: 0, durationMs: 0, generation: 1)
+    }
+
+    @Test func syncedDownloadsFollowTheirSourceButNotAnEmptyLibrary() async throws {
+        let db = try LibraryDatabase.temporary()
+        let mix = DownloadCollectionRecord(id: "pl1", kind: .playlist, name: "Mix", subtitle: "Playlist", imageTag: nil)
+        let deleted = DownloadCollectionRecord(id: "pl2", kind: .playlist, name: "Old", subtitle: "Playlist", imageTag: nil)
+        let favorites = DownloadCollectionRecord(id: DownloadCollectionRecord.favoritesID, kind: .favorites, name: "Favorites", subtitle: "Favorites", imageTag: nil)
+        let album = DownloadCollectionRecord(id: "al1", kind: .album, name: "al1", subtitle: "A", imageTag: nil)
+        try await db.pool.write { db in
+            try self.track("t1", album: "al1", number: 1, favorite: true).insert(db)
+            try self.track("t2", album: "al1", number: 2).insert(db)
+            try self.playlist("pl1").insert(db)
+            try PlaylistEntryRecord(playlistID: "pl1", position: 0, trackID: "t2", entryID: "e0").insert(db)
+        }
+        #expect(try db.syncedDownloadSource(mix) == .tracks(["t2"]))
+        #expect(try db.syncedDownloadSource(deleted) == .gone)
+        #expect(try db.syncedDownloadSource(favorites) == .tracks(["t1"]))
+        #expect(try db.syncedDownloadSource(album) == .keep)
+
+        // The server reports an empty library (drive unmounted, then rescanned): the sync prunes
+        // every song and playlist, and the downloads are left alone.
+        try await db.pool.write { db in
+            try TrackRecord.deleteAll(db)
+            try PlaylistRecord.deleteAll(db)
+        }
+        for download in [mix, deleted, favorites, album] {
+            #expect(try db.syncedDownloadSource(download) == .keep)
+        }
+    }
+
+    @Test func playlistLookupTreatsWildcardsAsText() async throws {
+        let db = try LibraryDatabase.temporary()
+        try await db.pool.write { db in
+            try self.playlist("pl1", name: "100% Hits").insert(db)
+            try self.playlist("pl2", name: "Road Trip").insert(db)
+            try self.playlist("pl3", name: "lo_fi").insert(db)
+        }
+        #expect(try db.playlists(matching: "%").map(\.id) == ["pl1"])
+        #expect(try db.playlists(matching: "_").map(\.id) == ["pl3"])
+        #expect(try db.playlists(matching: "road").map(\.id) == ["pl2"])
+    }
+
     @Test func favoriteFlagAppliesToWhicheverTableHasTheItem() async throws {
         let db = try LibraryDatabase.temporary()
         try await db.pool.write { db in try self.album("al1").insert(db) }
