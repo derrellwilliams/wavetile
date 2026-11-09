@@ -22,7 +22,7 @@ public final class ServerIdentity: Sendable {
         var servers: [String: Server] = [:]
         /// HTTP origins that answered with their ID on the current network.
         var verified: Set<String> = []
-        var pending: [String: Task<Bool, Never>] = [:]
+        var pending: [String: Task<Bool?, Never>] = [:]
         /// Bumped on every network change, so a check from the old network can't vouch for the new one.
         var generation = 0
     }
@@ -67,16 +67,22 @@ public final class ServerIdentity: Sendable {
 
     /// Asks the server at `url` for its ID now (no token), and for HTTP remembers the answer for this network.
     public func check(_ url: URL) async -> Bool {
+        await probe(url) ?? false
+    }
+
+    /// Like `check`, but nil when the device changed networks mid-check: the answer says nothing
+    /// about the new network, so callers should ask again rather than treat it as "unreachable".
+    public func probe(_ url: URL) async -> Bool? {
         guard let origin = Self.origin(url) else { return false }
-        let task: Task<Bool, Never>? = state.withLock { state in
+        let task: Task<Bool?, Never>? = state.withLock { (state) -> Task<Bool?, Never>? in
             guard let server = state.servers[origin] else { return nil }
             if let pending = state.pending[origin] { return pending }
             let generation = state.generation
             let task = Task { [self] in
                 let matches = await Self.identify(server, session: session)
-                return self.state.withLock { state in
+                return self.state.withLock { (state) -> Bool? in
                     // A check that started on another network says nothing about this one.
-                    guard state.generation == generation else { return false }
+                    guard state.generation == generation else { return nil }
                     state.pending[origin] = nil
                     if matches { state.verified.insert(origin) } else { state.verified.remove(origin) }
                     return matches
@@ -85,7 +91,8 @@ public final class ServerIdentity: Sendable {
             state.pending[origin] = task
             return task
         }
-        return await task?.value ?? false
+        guard let task else { return false }
+        return await task.value
     }
 
     @concurrent private static func identify(_ server: Server, session: URLSession) async -> Bool {

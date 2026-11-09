@@ -77,18 +77,28 @@ final class Connectivity {
 
     /// Pings the server now and returns once `serverReachable` has the answer (a stream just
     /// failed to connect: one bad stream shouldn't dim the library on its own).
-    func recheck() async {
+    func recheck() async { await recheck(attempt: 0) }
+
+    private func recheck(attempt: Int) async {
         guard hasNetwork, let server else { return }
-        let reachable = await ServerIdentity.shared.check(server.url)
-        guard !Task.isCancelled, server == self.server, hasNetwork else { return }
+        var reachable = await ServerIdentity.shared.probe(server.url)
+        // A network change mid-check (Wi-Fi waking, roaming) voids the answer: ask again.
+        var stale = 0
+        while reachable == nil, stale < 3, !Task.isCancelled {
+            stale += 1
+            reachable = await ServerIdentity.shared.probe(server.url)
+        }
+        guard !Task.isCancelled, server == self.server, hasNetwork, let reachable else { return }
         serverReachable = reachable
         retryTask?.cancel()
-        // While it doesn't answer, try again every 30 s so the library comes back on its own.
         guard !reachable else { return }
+        // The first misses are often Wi-Fi still waking after foreground: look again in 3 s, then
+        // every 30 s so the library comes back on its own.
+        let delay: Duration = attempt < 2 ? .seconds(3) : .seconds(30)
         retryTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(30))
+            try? await Task.sleep(for: delay)
             guard !Task.isCancelled else { return }
-            await self?.recheck()
+            await self?.recheck(attempt: attempt + 1)
         }
     }
 
