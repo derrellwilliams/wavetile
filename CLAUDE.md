@@ -4,6 +4,7 @@ Native Jellyfin music + podcast player for iPhone (iOS 26.1+, Swift 6, SwiftUI).
 
 ## Build & run
 - `Wavetile.xcodeproj` is generated: edit `project.yml`, then `xcodegen generate` (also after adding/removing files in `App/`).
+- `.claude/settings.json` lets Claude run the build, test, `simctl`, `xcresulttool` and `xcodegen generate` commands below without a prompt. TestFlight archive and export still ask.
 - Feature development: use the Xcode MCP (`xcode` server, needs Xcode running with `Wavetile.xcodeproj` open) for building (`BuildProject`), running (`RunProject`), previews (`RenderPreview`), tests (`RunSomeTests`, `RunAllTests`), build logs and issue checks (`GetBuildLog`, `XcodeRefreshCodeIssuesInFile`), and docs search (`DocumentationSearch`). Run `xcodegen generate` first when `project.yml` or the files in `App/` changed. The `xcodebuild`/`xcrun simctl` commands below are the fallback (Xcode not running, background UI test runs) and are still how TestFlight archives are made.
 - Build (fallback): `xcodebuild -project Wavetile.xcodeproj -scheme Wavetile -destination 'platform=iOS Simulator,name=iPhone 18 Pro Max' -derivedDataPath build build`
 - Run (two separate commands; an `&&` chain keeps them in the sandbox, where they fail): `xcrun simctl install booted build/Build/Products/Debug-iphonesimulator/Wavetile.app`, then `xcrun simctl launch booted com.derrellwilliams.wavetile [flags]`
