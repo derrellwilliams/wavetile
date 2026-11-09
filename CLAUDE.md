@@ -4,7 +4,7 @@ Native Jellyfin music + podcast player for iPhone (iOS 26.1+, Swift 6, SwiftUI).
 
 ## Build & run
 - `Wavetile.xcodeproj` is generated: edit `project.yml`, then `xcodegen generate` (also after adding/removing files in `App/`).
-- `.claude/settings.json` lets Claude run the build, test, `simctl`, `xcresulttool` and `xcodegen generate` commands below without a prompt. TestFlight archive and export still ask.
+- `.claude/settings.json` lets Claude run the build, test, `xcresulttool`, `xcodegen generate` and everyday `simctl` commands below without a prompt. `simctl spawn` is allowed only for `spawn booted log ...`; any other `spawn` asks, because it runs a process outside the sandbox. TestFlight archive and export still ask.
 - Feature development: use the Xcode MCP (`xcode` server, needs Xcode running with `Wavetile.xcodeproj` open) for building (`BuildProject`), running (`RunProject`), previews (`RenderPreview`), tests (`RunSomeTests`, `RunAllTests`), build logs and issue checks (`GetBuildLog`, `XcodeRefreshCodeIssuesInFile`), and docs search (`DocumentationSearch`). Run `xcodegen generate` first when `project.yml` or the files in `App/` changed. The `xcodebuild`/`xcrun simctl` commands below are the fallback (Xcode not running, background UI test runs) and are still how TestFlight archives are made.
 - Build (fallback): `xcodebuild -project Wavetile.xcodeproj -scheme Wavetile -destination 'platform=iOS Simulator,name=iPhone 18 Pro Max' -derivedDataPath build build`
 - Run (two separate commands; an `&&` chain keeps them in the sandbox, where they fail): `xcrun simctl install booted build/Build/Products/Debug-iphonesimulator/Wavetile.app`, then `xcrun simctl launch booted com.derrellwilliams.wavetile [flags]`
@@ -13,12 +13,7 @@ Native Jellyfin music + podcast player for iPhone (iOS 26.1+, Swift 6, SwiftUI).
   - Package: `cd <repo>/Packages/WavetileKit` as its own command (the scheme only exists there), then `xcodebuild test -scheme WavetileKit-Package -destination 'platform=iOS Simulator,name=iPhone 18 Pro Max' ...` (~30 s).
   - UI: `xcodebuild test -project <repo>/Wavetile.xcodeproj -scheme Wavetile -destination ... ...` takes ~5 min, past the 10-minute foreground limit if the machine is busy, so run it in the background.
   - `-quiet` hides results. Read them with `xcrun xcresulttool get test-results summary --path <repo>/build/Logs/Test/<newest>.xcresult` and check `runtimeWarnings` as well as failures (SwiftUI warnings such as "Accessing Environment outside of a View" show up only there). To find a warning's source: `xcrun simctl spawn booted log stream --backtrace --predicate 'eventMessage CONTAINS "<text>"'` in the background while launching the app, then `atos -o build/Build/Products/Debug-iphonesimulator/Wavetile.app/Wavetile.debug.dylib -arch arm64 -l 0x0 <offsets>`.
-- TestFlight (only when asked; uploads whatever is checked out, so confirm it's committed): `scripts/testflight.sh` for me in Terminal. Claude runs its steps directly, since the script would run Xcode inside the sandbox. Run these as four separate plain commands, without `$(...)`:
-  1. `date +%Y%m%d%H%M` → the build number (timestamps, so don't bump `CURRENT_PROJECT_VERSION`)
-  2. `xcodegen generate --spec <repo>/project.yml --project <repo>`
-  3. `xcodebuild archive -project <repo>/Wavetile.xcodeproj -scheme Wavetile -configuration Release -destination generic/platform=iOS -archivePath <repo>/build/Wavetile.xcarchive -allowProvisioningUpdates -quiet CURRENT_PROJECT_VERSION=<number> 2>&1`
-  4. `xcodebuild -exportArchive -archivePath <repo>/build/Wavetile.xcarchive -exportOptionsPlist <repo>/scripts/ExportOptions.plist -exportPath <repo>/build/export -allowProvisioningUpdates 2>&1` (uploads; done at `** EXPORT SUCCEEDED **`)
-  `<repo>` is the absolute repo path. With `-quiet`, "failed with exit code 0 but produced no further output" lines are noise; real failures show `error:` with a file path or `ARCHIVE FAILED`.
+- TestFlight (only when asked): the steps are in `.claude/skills/testflight/SKILL.md` (`/testflight`). Read it first; archive and export still ask for approval.
 - Debug builds link with `-interposable` for hot reload (Inject); Release doesn't.
 
 ## Layout

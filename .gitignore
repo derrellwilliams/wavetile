@@ -8,3 +8,5 @@ Packages/WavetileKit/.build/
 .vercel
 .env*
 scratch/Screenshots/
+.claude/scheduled_tasks.lock
+.claude/settings.local.json
