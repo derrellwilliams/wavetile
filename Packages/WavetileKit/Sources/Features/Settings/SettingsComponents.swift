@@ -1,5 +1,6 @@
 import DesignSystem
 import JellyfinKit
+import NukeUI
 import SwiftUI
 
 /// A native grouped `Form` in the theme's colors, shared by the Settings drawer and Podcast
@@ -60,19 +61,38 @@ struct SettingsValue: View {
     }
 }
 
-/// Profile avatar: the Phosphor `user-circle` glyph in the text color.
+/// Profile avatar: the account's picture when it has one, else the Phosphor `user-circle` glyph in the accent color.
 struct Avatar: View {
     @Environment(\.theme) private var theme
+    @Environment(LibraryStore.self) private var library: LibraryStore?
     var size: CGFloat = 32
 
     var body: some View {
-        // The same glyph as the bar's profile button that opens the drawer.
+        Group {
+            if let url = library?.avatarURL {
+                LazyImage(url: url) { state in
+                    if let image = state.image {
+                        image.resizable().scaledToFill()
+                    } else {
+                        glyph
+                    }
+                }
+                .frame(width: size, height: size)
+                .clipShape(Circle())
+            } else {
+                glyph
+            }
+        }
+        .accessibilityHidden(true)
+    }
+
+    // The same glyph as the bar's profile button that opens the drawer.
+    private var glyph: some View {
         Glyph.user.image
             .resizable()
             .scaledToFit()
             .frame(width: size, height: size)
             .foregroundStyle(theme.palette.accent)
-            .accessibilityHidden(true)
     }
 }
 

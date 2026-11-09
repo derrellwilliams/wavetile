@@ -205,6 +205,14 @@ public struct LibraryClient: Sendable {
         )
     }
 
+    /// The signed-in account's profile picture, or nil when it has none. The tag changes the URL when
+    /// the picture does, which keeps image caches correct.
+    public func avatarURL() async throws -> URL? {
+        let user = try await client.send(Paths.getCurrentUser).value
+        guard let id = user.id, let tag = user.primaryImageTag else { return nil }
+        return client.url(with: Paths.getUserImage(parameters: .init(userID: id, tag: tag)))
+    }
+
     /// Jellyfin image endpoints are unauthenticated, so no token goes in the URL.
     /// `tag` makes the URL change when artwork changes, which keeps image caches correct.
     public func imageURL(itemID: String, tag: String?, maxPixelWidth: Int) -> URL? {

@@ -186,6 +186,8 @@ final class LibraryStore {
     /// Whether the account is a server admin. Only admins can change item images, so Upload and
     /// Remove Cover Image show only for them.
     private(set) var isAdmin = false
+    /// The account's profile picture, shown in the profile drawer; nil without one.
+    private(set) var avatarURL: URL?
     /// Admins rename a collection in place. Other accounts rename by recreating it, which needs
     /// collection management and deletion rights; without both, Rename is hidden for them.
     private(set) var canRenameCollections = false
@@ -193,6 +195,8 @@ final class LibraryStore {
     /// Reads the account's permissions: at launch and whenever the app comes back to the
     /// foreground. A failed check (offline) keeps the last answer instead of hiding the options.
     func loadPermissions() async {
+        // A failed check (offline) keeps the last picture too.
+        if let url = try? await api.avatarURL() { avatarURL = url }
         guard let policy = try? await api.accountPolicy() else { return }
         isAdmin = policy.isAdministrator
         canRenameCollections = policy.isAdministrator || (policy.canManageCollections && policy.canDeleteContent)
