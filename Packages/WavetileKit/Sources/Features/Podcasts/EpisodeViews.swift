@@ -129,18 +129,22 @@ struct EpisodeDownloadButton: View {
     @Environment(\.theme) private var theme
     @Environment(PodcastsStore.self) private var podcasts
     let item: EpisodeItem
+    @State private var showStatus = false
 
     private var indicator: DownloadIndicator { podcasts.downloadStates[item.id]?.indicator ?? .none }
 
     var body: some View {
         Group {
             switch indicator {
-            case .done, .inProgress:
+            case .done:
                 Menu {
-                    Button(indicator == .done ? "Remove Download" : "Cancel Download", glyph: indicator == .done ? .trash : .close, role: .destructive) {
-                        podcasts.removeDownload(item.id)
-                    }
+                    Button("Remove Download", glyph: .trash, role: .destructive) { podcasts.removeDownload(item.id) }
                 } label: {
+                    DownloadIcon(state: indicator, title: indicator.episodeTitle)
+                }
+            case .inProgress:
+                // Like an album's progress ring: the status sheet, where cancelling is confirmed.
+                Button { showStatus = true } label: {
                     DownloadIcon(state: indicator, title: indicator.episodeTitle)
                 }
             case .none, .failed:
@@ -151,8 +155,61 @@ struct EpisodeDownloadButton: View {
         }
         // On the control: a Menu drops its label's accessibility label (see `DownloadButton`).
         .accessibilityLabel(indicator.episodeTitle)
+        .sheet(isPresented: $showStatus) { EpisodeDownloadStatusSheet(episodeID: item.id) }
+        .onChange(of: indicator) { _, new in if case .inProgress = new {} else { showStatus = false } }
         .animation(theme.motion.smooth, value: indicator)
         .sensoryFeedback(.success, trigger: indicator == .done) { _, done in done }
+    }
+}
+
+/// An episode download's progress and its cancel, the twin of `DownloadStatusSheet`.
+struct EpisodeDownloadStatusSheet: View {
+    @Environment(\.theme) private var theme
+    @Environment(PodcastsStore.self) private var podcasts
+    @Environment(\.dismiss) private var dismiss
+    let episodeID: String
+    @State private var confirmCancel = false
+
+    private var record: EpisodeDownloadRecord? { podcasts.downloadStates[episodeID] }
+
+    private var message: String {
+        guard let record else { return "Not downloading" }
+        switch record.state {
+        case .queued: return Connectivity.shared.hasNetwork ? "Waiting to start" : "Waiting for a network connection"
+        case .downloading:
+            let received = ByteCountFormatter.string(fromByteCount: record.bytes, countStyle: .file)
+            return record.bytes > 0 ? "Downloading · \(received) received" : "Downloading"
+        case .done: return "Downloaded"
+        case .failed: return record.error ?? "The download failed"
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text(message)
+                    if let record, record.isInProgress {
+                        Text("\(Int(record.progress * 100))% downloaded")
+                            .font(theme.typography.itemMetadata)
+                    }
+                }
+                Section {
+                    Button("Cancel and Remove Download", role: .destructive) { confirmCancel = true }
+                }
+            }
+            .font(theme.typography.itemTitle)
+            .navigationTitle("Download Status")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .confirmationDialog("Remove this download?", isPresented: $confirmCancel, titleVisibility: .visible) {
+                Button("Remove Download", role: .destructive) {
+                    podcasts.removeDownload(episodeID)
+                    dismiss()
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }
 
