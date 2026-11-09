@@ -155,8 +155,15 @@ struct EpisodeDownloadButton: View {
         }
         // On the control: a Menu drops its label's accessibility label (see `DownloadButton`).
         .accessibilityLabel(indicator.episodeTitle)
+        .accessibilityHint(indicator.isInProgress ? "Shows download status" : "")
         .sheet(isPresented: $showStatus) { EpisodeDownloadStatusSheet(episodeID: item.id) }
-        .onChange(of: indicator) { _, new in if case .inProgress = new {} else { showStatus = false } }
+        // Stays open on a failure, where it shows why; closes once finished or removed.
+        .onChange(of: indicator) { _, new in
+            switch new {
+            case .done, .none: showStatus = false
+            case .inProgress, .failed: break
+            }
+        }
         .animation(theme.motion.smooth, value: indicator)
         .sensoryFeedback(.success, trigger: indicator == .done) { _, done in done }
     }
@@ -189,8 +196,8 @@ struct EpisodeDownloadStatusSheet: View {
             Form {
                 Section {
                     Text(message)
-                    if let record, record.isInProgress {
-                        Text("\(Int(record.progress * 100))% downloaded")
+                    if let record, record.state == .downloading, record.progress.isFinite {
+                        Text("\(Int(min(max(record.progress, 0), 1) * 100))% downloaded")
                             .font(theme.typography.itemMetadata)
                     }
                 }

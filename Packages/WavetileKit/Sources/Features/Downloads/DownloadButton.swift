@@ -67,6 +67,10 @@ struct DownloadButton: View {
 /// Where a download stands, for the shared icon (albums, playlists and episodes).
 enum DownloadIndicator: Equatable {
     case none, inProgress(Double), done, failed
+
+    var isInProgress: Bool {
+        if case .inProgress = self { true } else { false }
+    }
 }
 
 /// The download glyph for each state: download → progress ring → check, or a warning.
