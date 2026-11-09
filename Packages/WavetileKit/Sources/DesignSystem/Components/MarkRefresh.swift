@@ -7,14 +7,18 @@ public extension View {
     /// Keeps the system's pull mechanics (threshold, haptic, holding content down while
     /// refreshing) and only replaces what's drawn: the mark fades in and its edges slide around
     /// the frame as you pull, then it turns briskly until `action` finishes.
-    func markRefreshable(action: @escaping @Sendable () async -> Void) -> some View {
-        modifier(MarkRefreshModifier(action: action))
+    ///
+    /// Bumping `trigger` pulls the content down and refreshes as if the user had pulled, with the
+    /// same mark (a tap on the selected tab uses this). It does nothing while a refresh is running.
+    func markRefreshable(trigger: Int = 0, action: @escaping @Sendable () async -> Void) -> some View {
+        modifier(MarkRefreshModifier(trigger: trigger, action: action))
     }
 }
 
 private struct MarkRefreshModifier: ViewModifier {
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let trigger: Int
     let action: @Sendable () async -> Void
 
     @State private var pull: CGFloat = 0
@@ -39,7 +43,8 @@ private struct MarkRefreshModifier: ViewModifier {
     /// Faster than the loading mark's cadence, so a refresh reads as busy.
     private static let move = 0.4, hold = 0.12
 
-    init(action: @escaping @Sendable () async -> Void) {
+    init(trigger: Int, action: @escaping @Sendable () async -> Void) {
+        self.trigger = trigger
         self.action = action
         Self.hideSystemSpinner
     }
@@ -74,6 +79,7 @@ private struct MarkRefreshModifier: ViewModifier {
                     .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { overlayTop = $0 }
                     .ignoresSafeArea(edges: .top)
             }
+            .background { RefreshTrigger(value: trigger) }
             .background {
                 CompactBarProbe(isMeasuring: pull == 0 && refreshStart == nil) { bottom in
                     // A late measurement once a pull has begun would catch the bar mid-stretch.
@@ -112,6 +118,53 @@ private struct MarkRefreshModifier: ViewModifier {
         .opacity(refreshStart != nil ? 1 : min(1, Double(pull / 60)))
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+}
+
+/// Starts the system refresh control (which SwiftUI's `refreshable` installs on the scroll view)
+/// each time `value` changes: pulls the content down by the control's height, then fires it.
+private struct RefreshTrigger: UIViewRepresentable {
+    let value: Int
+
+    final class Coordinator {
+        var last: Int
+        init(last: Int) { self.last = last }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(last: value) }
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.isUserInteractionEnabled = false
+        return view
+    }
+
+    func updateUIView(_ view: UIView, context: Context) {
+        guard context.coordinator.last != value else { return }
+        context.coordinator.last = value
+        DispatchQueue.main.async { [weak view] in
+            guard let view, let scroll = Self.scrollView(near: view),
+                  let control = scroll.refreshControl, !control.isRefreshing
+            else { return }
+            let top = -scroll.adjustedContentInset.top
+            scroll.setContentOffset(CGPoint(x: scroll.contentOffset.x, y: top - control.frame.height), animated: true)
+            control.beginRefreshing()
+            control.sendActions(for: .valueChanged)
+        }
+    }
+
+    /// The scroll view that has a refresh control, in this screen's view controller.
+    private static func scrollView(near view: UIView) -> UIScrollView? {
+        var responder: UIResponder? = view
+        while let next = responder, !(next is UIViewController) { responder = next.next }
+        guard let root = (responder as? UIViewController)?.view else { return nil }
+        var queue = [root]
+        while !queue.isEmpty {
+            let next = queue.removeFirst()
+            if let scroll = next as? UIScrollView, scroll.refreshControl != nil { return scroll }
+            queue.append(contentsOf: next.subviews)
+        }
+        return nil
     }
 }
 

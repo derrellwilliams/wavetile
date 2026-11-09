@@ -19,6 +19,8 @@ struct HomeView: View {
     /// Bumped when Home's tab is tapped again; scrolls back to the top.
     let reselects: Int
     @State private var scrollPosition = ScrollPosition(edge: .top)
+    /// Bumped to pull down and refresh as if the user had pulled.
+    @State private var refreshRequests = 0
     @State private var didRefresh = false
     @State private var isRefreshing = false
     @State private var podcastUpNext: [EpisodeItem]
@@ -119,10 +121,11 @@ struct HomeView: View {
             .task { await store.observe(store.database.playlists()) { playlists = $0; rebuildLibraryItems() } }
             .task { await store.observe(store.database.collections()) { collections = $0; rebuildLibraryItems() } }
             .task(id: podcasts.isEnabled) { await observePodcasts(podcasts.database.upNextShelf()) { podcastUpNext = $0 } }
-            .markRefreshable { await refresh() }
+            .markRefreshable(trigger: refreshRequests) { await refresh() }
             .onChange(of: reselects) {
-                // Tapping Home again from a pushed screen goes back to Home; at Home, to the top.
-                if path.isEmpty { scrollToTop() } else { path = NavigationPath() }
+                // Tapping Home again from a pushed screen goes back to Home; at Home, to the top,
+                // pulled down and refreshed.
+                if path.isEmpty { refreshRequests += 1 } else { path = NavigationPath() }
             }
             .onChange(of: store.isSyncing) { _, syncing in
                 guard !syncing, !isRefreshing else { return }
