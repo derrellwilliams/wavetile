@@ -487,6 +487,8 @@ private struct CustomBarItem<Content: View>: UIViewControllerRepresentable {
                 // would hang off the right edge. A fresh item makes it lay out again.
                 if let page = parent, page.navigationItem.rightBarButtonItem === item {
                     page.navigationItem.rightBarButtonItem = nil
+                    // Lay the bar out without it, so the new item isn't placed from the old one's spot.
+                    page.navigationController?.navigationBar.layoutIfNeeded()
                 }
                 item = makeItem()
             }
@@ -524,8 +526,26 @@ private struct CustomBarItem<Content: View>: UIViewControllerRepresentable {
 /// A custom bar item's view, reporting the size the bar lays it out at.
 private final class SizedBarView: UIView {
     var size: CGSize = .zero {
-        didSet { frame.size = size; invalidateIntrinsicContentSize() }
+        didSet {
+            frame.size = size
+            // Explicit constraints: the bar lays custom views out with Auto Layout and (on iOS 26)
+            // can keep the first size it saw if only the frame changes.
+            widthConstraint.constant = size.width
+            heightConstraint.constant = size.height
+            invalidateIntrinsicContentSize()
+        }
     }
+
+    private lazy var widthConstraint = widthAnchor.constraint(equalToConstant: 0)
+    private lazy var heightConstraint = heightAnchor.constraint(equalToConstant: 0)
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([widthConstraint, heightConstraint])
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
 
     override var intrinsicContentSize: CGSize { size }
 }
