@@ -22,10 +22,21 @@ public struct ArtworkView: View {
     @Environment(\.displayScale) private var displayScale
     private let source: ArtworkSource
     private let cornerRadius: CGFloat?
+    private let onFailure: (@MainActor @Sendable () -> Void)?
 
-    public init(_ source: ArtworkSource, cornerRadius: CGFloat? = nil) {
+    /// `onFailure` runs when a `.url` or `.unsized` image fails to load (not when it's cancelled),
+    /// so a caller with a second URL can fall back to it.
+    public init(_ source: ArtworkSource, cornerRadius: CGFloat? = nil, onFailure: (@MainActor @Sendable () -> Void)? = nil) {
         self.source = source
         self.cornerRadius = cornerRadius
+        self.onFailure = onFailure
+    }
+
+    private func report(_ result: Result<ImageResponse, Error>) {
+        guard case let .failure(error) = result else { return }
+        if let error = error as? ImagePipeline.Error, case .cancelled = error { return }
+        if error is CancellationError { return }
+        onFailure?()
     }
 
     public var body: some View {
@@ -42,6 +53,7 @@ public struct ArtworkView: View {
                             loadingSurface(showsFallback: url == nil || state.error != nil)
                         }
                     }
+                    .onCompletion { report($0) }
                 case let .unsized(url, maxPixelWidth):
                     let size = CGSize(width: maxPixelWidth, height: maxPixelWidth)
                     let request = url.map { ImageRequest(url: $0, processors: [.resize(size: size, unit: .pixels, contentMode: .aspectFill, crop: true)]) }
@@ -52,6 +64,7 @@ public struct ArtworkView: View {
                             loadingSurface(showsFallback: url == nil || state.error != nil)
                         }
                     }
+                    .onCompletion { report($0) }
                 case .placeholder:
                     loadingSurface(showsFallback: true)
                 case let .generated(seed):

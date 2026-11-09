@@ -22,10 +22,12 @@ struct ShowDetailView: View {
     @State private var season: Int?
     @State private var query = ""
     @State private var similar: [DirectoryShow] = []
+    @State private var routeArtworkFailed = false
 
     /// The route's art wins over the loaded feed's: a directory result and its feed name different
     /// image URLs, and swapping them when the show loads reloads the art and blur (a visible flash).
-    private var artworkURL: URL? { route.artworkURL ?? show?.artworkURL }
+    /// The feed's art is the fallback when the route's image fails to load.
+    private var artworkURL: URL? { routeArtworkFailed ? show?.artworkURL : route.artworkURL ?? show?.artworkURL }
 
     private var showID: String { PodcastID.show(feedURL: route.feedURL) }
 
@@ -34,7 +36,9 @@ struct ShowDetailView: View {
             VStack(spacing: theme.spacing.xl) {
                 VStack(spacing: theme.spacing.md) {
                     // Same as an episode: a smaller square over a blur of the art.
-                    ArtworkSpotlight(artwork: .unsized(artworkURL, maxPixelWidth: 720))
+                    ArtworkSpotlight(artwork: .unsized(artworkURL, maxPixelWidth: 720)) {
+                        if route.artworkURL != nil { routeArtworkFailed = true }
+                    }
                     header
                 }
                 content

@@ -9,6 +9,7 @@ public struct ArtworkSpotlight: View {
     @Environment(\.theme) private var theme
     private let artwork: ArtworkSource
     private let size: CGFloat
+    private let onFailure: (@MainActor @Sendable () -> Void)?
 
     /// Space below the art inside this view.
     private let gap: CGFloat = 40
@@ -17,13 +18,15 @@ public struct ArtworkSpotlight: View {
     /// Length of the fade; it starts just above the art's bottom edge.
     private let fade: CGFloat = 200
 
-    public init(artwork: ArtworkSource, size: CGFloat = 232) {
+    /// `onFailure` runs when the art can't be loaded, so the caller can try another URL.
+    public init(artwork: ArtworkSource, size: CGFloat = 232, onFailure: (@MainActor @Sendable () -> Void)? = nil) {
         self.artwork = artwork
         self.size = size
+        self.onFailure = onFailure
     }
 
     public var body: some View {
-        ArtworkView(artwork, cornerRadius: theme.radius.small)
+        ArtworkView(artwork, cornerRadius: theme.radius.small, onFailure: onFailure)
             .frame(width: size, height: size)
             .shadow(color: .black.opacity(0.35), radius: 20, y: 10)
             // Clears the status bar and the navigation bar's buttons (the page runs under them),
