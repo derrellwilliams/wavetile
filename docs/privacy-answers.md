@@ -31,7 +31,7 @@ On device only: library and podcast databases, downloads, preferences, widget sn
 
 | Item | Result |
 |---|---|
-| `App/PrivacyInfo.xcprivacy` | Tracking false; no collected-data types; UserDefaults `CA92.1`, file timestamp `C617.1` |
+| `App/PrivacyInfo.xcprivacy` | Tracking false; no collected-data types; UserDefaults `CA92.1`, file timestamp `C617.1`, disk space `85F4.1` (free space shown in Storage) |
 | `Widgets/PrivacyInfo.xcprivacy` | Empty API list; shares JSON/artwork files, not App Group UserDefaults |
 | GRDB | Manifest declares no collected data |
 | NIOPosix (via the Jellyfin SDK) | File-timestamp reason `0A2A.1` |

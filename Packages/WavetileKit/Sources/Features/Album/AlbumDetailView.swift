@@ -180,8 +180,10 @@ struct AlbumDetailView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     NavigationStack {
         AlbumDetailView(model: AlbumDetailModel(previewAlbum: Fixtures.albums[0], tracks: Fixtures.tracks))
     }
 }
+#endif

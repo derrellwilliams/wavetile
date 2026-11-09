@@ -143,7 +143,9 @@ struct SettingsDrawer: View {
     }
 }
 
+#if DEBUG
 #Preview {
     @Previewable @State var isOpen = true
     SettingsDrawer(app: .preview(), session: Fixtures.session, isOpen: $isOpen)
 }
+#endif

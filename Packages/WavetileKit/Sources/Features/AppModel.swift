@@ -257,7 +257,8 @@ public extension AppModel {
 /// The device couldn't create the library database (usually no free storage).
 struct StorageUnavailable: Error {}
 
-/// Preview/test factory that skips the Keychain.
+#if DEBUG
+/// Preview/test factory that skips the Keychain. Debug only, so the sample data stays out of Release.
 extension AppModel {
     static func preview(signedIn: Bool = true) -> AppModel {
         let model = AppModel(deviceName: "Preview", store: SessionStore(keychain: Keychain(service: "preview"), defaults: UserDefaults(suiteName: "preview")!))
@@ -273,3 +274,4 @@ extension AppModel {
         return model
     }
 }
+#endif

@@ -470,3 +470,22 @@ Rerun after the Nov 7 review fixes, the Settings sign-out alert and the favorite
 - A valid but empty server prunes the library only; downloads stay.
 
 Not covered: collections (the stub returns none), multi-page tracks (page size 1000), cancellation mid-sync (covered by `ReauthenticationTests`), and the download managers' own sync of downloaded playlists (`syncDownloadedPlaylist` has unit tests in `DownloadBookkeepingTests`).
+
+## Review pass 0: mechanical sweep — November 9, 2026
+
+Scope: git history, dependency pins, `project.yml`, entitlements, Info.plist, privacy manifests, Release-only behavior. First of eight targeted review passes.
+
+| Finding | Result |
+|---|---|
+| Disk-space required-reason API undeclared (`StorageView` reads `volumeAvailableCapacityForImportantUsage`) | Fixed: `NSPrivacyAccessedAPICategoryDiskSpace` / `85F4.1` added to `App/PrivacyInfo.xcprivacy` |
+| Pins behind upstream | Updated: jellyfin-sdk-swift 3.3.0 → 3.4.0, Nuke 13.2.0 → 13.2.3, GRDB 7.11.1 → 7.12.0 (minimums raised in `Package.swift`). swift-nio stays at 2.104.0 (2.105.0 is out; transitive pin) |
+| Public repo had no security policy or update automation | Added `SECURITY.md` and `.github/dependabot.yml` (Swift, weekly) |
+| Preview fixtures linked into Release | `AppModel.preview` and the six feature previews that use `Fixtures` are now `#if DEBUG` |
+| `Log.editFailed` logged a connection error's full description as public (it carries the failing URL: server address and item IDs) | Fixed: `Log.publicText` keeps only the domain and code for `NSURLErrorDomain` errors |
+| `ts.net` plain-HTTP exception | No change: the token waits for `ServerIdentity` to match the saved server ID on each network. Still not authentication against an attacker who knows the ID (existing accepted limit); the empty-saved-ID path is left for pass 1 |
+
+Clean: 844 commits scanned for key patterns, credential files and real hosts (none; only test values). Entitlements are the app group and CarPlay Audio. Inject compiles to a no-op in Release; `DebugFlags` are constants in Release; the token travels in headers, never in URLs.
+
+**Validation:** package tests 185/185 passed on the updated pins with no runtime warnings; Release simulator build succeeded. UI tests not rerun. New build warning from the SDK update: `getAlbumArtists(parameters:)` is deprecated (`LibrarySync.swift:97`).
+
+Not checked: advisories were not re-queried (last check November 7, on the old pins); changelogs of the three updates were not read; GitHub Dependabot and secret-scanning settings.

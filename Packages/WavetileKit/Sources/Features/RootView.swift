@@ -84,6 +84,7 @@ public struct RootView: View {
     }
 }
 
+#if DEBUG
 #Preview("Signed in") {
     RootView(app: .preview())
 }
@@ -91,3 +92,4 @@ public struct RootView: View {
 #Preview("Signed out") {
     RootView(app: .preview(signedIn: false))
 }
+#endif

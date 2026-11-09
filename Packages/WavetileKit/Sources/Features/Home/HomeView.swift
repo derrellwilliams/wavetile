@@ -219,6 +219,7 @@ struct HomeView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     let app = AppModel.preview()
     if case let .signedIn(signedIn) = app.phase {
@@ -231,6 +232,7 @@ struct HomeView: View {
         .environment(signedIn.podcasts)
     }
 }
+#endif
 
 /// A tile in Home's playlists and collections row.
 private enum LibraryShelfItem: Identifiable {

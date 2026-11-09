@@ -4,7 +4,6 @@ import JellyfinKit
 import Library
 import Observation
 import Persistence
-import PreviewSupport
 
 @Observable
 final class HomeModel {

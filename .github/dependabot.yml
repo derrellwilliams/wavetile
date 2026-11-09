@@ -1,0 +1,8 @@
+version: 2
+updates:
+  # Swift packages are pinned in Packages/WavetileKit/Package.resolved.
+  - package-ecosystem: swift
+    directory: /Packages/WavetileKit
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

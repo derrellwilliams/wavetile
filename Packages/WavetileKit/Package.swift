@@ -25,11 +25,11 @@ let package = Package(
         .library(name: "DesignSystem", targets: ["DesignSystem"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/jellyfin/jellyfin-sdk-swift.git", from: "3.3.0"),
+        .package(url: "https://github.com/jellyfin/jellyfin-sdk-swift.git", from: "3.4.0"),
         // The SDK's HTTP layer; JellyfinKit adds a request hook (`ServerIdentityCheck`).
         .package(url: "https://github.com/kean/Get", from: "2.1.6"),
-        .package(url: "https://github.com/kean/Nuke.git", from: "13.2.0"),
-        .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.11.1"),
+        .package(url: "https://github.com/kean/Nuke.git", from: "13.2.3"),
+        .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.12.0"),
         .package(url: "https://github.com/krzysztofzablocki/Inject.git", from: "1.6.0"),
     ],
     targets: [

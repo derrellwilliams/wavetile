@@ -3,7 +3,6 @@ import Foundation
 import JellyfinKit
 import Library
 import Observation
-import PreviewSupport
 
 /// Navigation value for an album. `sourceID` ties the zoom transition to the exact tile tapped,
 /// since the same album can appear in several shelves.
@@ -78,7 +77,7 @@ final class AlbumDetailModel {
 
     /// Hero art spans the screen width (~440pt × 3x).
     var artwork: ArtworkSource {
-        guard let store else { return Fixtures.artwork(for: album) }
+        guard let store else { return .placeholder(seed: album.id.count) }
         return store.artwork(itemID: album.id, tag: album.imageTag, maxPixelWidth: 1320)
     }
 

@@ -89,6 +89,8 @@ struct SignInFlow: View {
     }
 }
 
+#if DEBUG
 #Preview {
     SignInFlow(app: .preview(signedIn: false))
 }
+#endif
