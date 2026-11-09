@@ -195,22 +195,24 @@ public struct LibraryClient: Sendable {
         return try await client.send(Paths.getItems(parameters: params)).value.items ?? []
     }
 
-    /// What the signed-in account may change on the server, from its Jellyfin policy.
-    public func accountPolicy() async throws -> AccountPolicy {
-        let policy = try await client.send(Paths.getCurrentUser).value.policy
-        return AccountPolicy(
-            isAdministrator: policy?.isAdministrator ?? false,
-            canManageCollections: policy?.enableCollectionManagement ?? false,
-            canDeleteContent: policy?.enableContentDeletion ?? false
-        )
-    }
-
-    /// The signed-in account's profile picture, or nil when it has none. The tag changes the URL when
-    /// the picture does, which keeps image caches correct.
-    public func avatarURL() async throws -> URL? {
+    /// The signed-in account's permissions and profile picture, from one request.
+    public func account() async throws -> Account {
         let user = try await client.send(Paths.getCurrentUser).value
-        guard let id = user.id, let tag = user.primaryImageTag else { return nil }
-        return client.url(with: Paths.getUserImage(parameters: .init(userID: id, tag: tag)))
+        let policy = user.policy
+        // The tag changes the URL when the picture does, which keeps image caches correct.
+        let avatarURL: URL? = if let id = user.id, let tag = user.primaryImageTag {
+            client.url(with: Paths.getUserImage(parameters: .init(userID: id, tag: tag)))
+        } else {
+            nil
+        }
+        return Account(
+            policy: AccountPolicy(
+                isAdministrator: policy?.isAdministrator ?? false,
+                canManageCollections: policy?.enableCollectionManagement ?? false,
+                canDeleteContent: policy?.enableContentDeletion ?? false
+            ),
+            avatarURL: avatarURL
+        )
     }
 
     /// Jellyfin image endpoints are unauthenticated, so no token goes in the URL.
@@ -258,6 +260,12 @@ extension TrackSummary {
             normalizationGain: item.normalizationGain.map(Double.init)
         )
     }
+}
+
+/// What `account()` reads: permissions and the profile picture (nil when the account has none).
+public struct Account: Sendable, Equatable {
+    public var policy: AccountPolicy
+    public var avatarURL: URL?
 }
 
 /// The account permissions Wavetile's edit menus depend on.

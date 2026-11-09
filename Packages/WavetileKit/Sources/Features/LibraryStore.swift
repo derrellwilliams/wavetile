@@ -192,12 +192,13 @@ final class LibraryStore {
     /// collection management and deletion rights; without both, Rename is hidden for them.
     private(set) var canRenameCollections = false
 
-    /// Reads the account's permissions: at launch and whenever the app comes back to the
-    /// foreground. A failed check (offline) keeps the last answer instead of hiding the options.
+    /// Reads the account's permissions and picture: at launch and whenever the app comes back to the
+    /// foreground. A failed check (offline) keeps the last answer (and picture) instead of hiding the options.
     func loadPermissions() async {
-        // A failed check (offline) keeps the last picture too.
-        if let url = try? await api.avatarURL() { avatarURL = url }
-        guard let policy = try? await api.accountPolicy() else { return }
+        guard let account = try? await api.account() else { return }
+        let policy = account.policy
+        // Assigned even when nil, so a picture removed on the server disappears.
+        avatarURL = account.avatarURL
         isAdmin = policy.isAdministrator
         canRenameCollections = policy.isAdministrator || (policy.canManageCollections && policy.canDeleteContent)
     }

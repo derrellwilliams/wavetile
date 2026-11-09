@@ -1,5 +1,6 @@
 import DesignSystem
 import JellyfinKit
+import Nuke
 import NukeUI
 import SwiftUI
 
@@ -61,38 +62,52 @@ struct SettingsValue: View {
     }
 }
 
-/// Profile avatar: the account's picture when it has one, else the Phosphor `user-circle` glyph in the accent color.
-struct Avatar: View {
+/// The account's profile picture as a circle, or the Phosphor `user-circle` glyph in the accent color
+/// when the account has none (or the picture fails to load).
+struct AvatarPicture: View {
     @Environment(\.theme) private var theme
     @Environment(LibraryStore.self) private var library: LibraryStore?
     var size: CGFloat = 32
 
     var body: some View {
-        Group {
-            if let url = library?.avatarURL {
-                LazyImage(url: url) { state in
-                    if let image = state.image {
-                        image.resizable().scaledToFill()
-                    } else {
-                        glyph
-                    }
+        if let url = library?.avatarURL {
+            // The server sends the original; shrink it to the circle instead of decoding it whole.
+            let request = ImageRequest(
+                url: url,
+                processors: [.resize(size: CGSize(width: size, height: size), unit: .points, contentMode: .aspectFill, crop: true)]
+            )
+            LazyImage(request: request) { state in
+                if let image = state.image {
+                    image.resizable().scaledToFill()
+                } else if state.error != nil {
+                    glyph
+                } else {
+                    Color.clear
                 }
-                .frame(width: size, height: size)
-                .clipShape(Circle())
-            } else {
-                glyph
             }
+            .frame(width: size, height: size)
+            .clipShape(Circle())
+        } else {
+            glyph
         }
-        .accessibilityHidden(true)
     }
 
-    // The same glyph as the bar's profile button that opens the drawer.
     private var glyph: some View {
         Glyph.user.image
             .resizable()
             .scaledToFit()
             .frame(width: size, height: size)
             .foregroundStyle(theme.palette.accent)
+    }
+}
+
+/// Profile avatar in the drawer's header.
+struct Avatar: View {
+    var size: CGFloat = 72
+
+    var body: some View {
+        AvatarPicture(size: size)
+            .accessibilityHidden(true)
     }
 }
 
