@@ -642,3 +642,11 @@ Not checked: the Vercel dashboard settings (domain, deploy protection, who has a
 UI tests (run after pass 7, first time since before pass 0; `build/Logs/Test/Test-Wavetile-2026.11.09_19-04-41--0700.xcresult`): 21 tests, 19 passed, 2 failed, no runtime warnings. Neither failure comes from passes 0–7 (they changed nothing in the drawer, the player or the design system except a `#if DEBUG` around a preview):
 - `StorageTests/testStorageUsedOpensSheet`: the drawer gained avatar and server rows on Nov 8, so Storage Used sits below the fold and the test never saw it. Fixed: the test scrolls to the row; the test passes on re-run.
 - `AccessibilityAuditTests/testNowPlayingAudit`: **open.** Contrast fails on the remaining-time label ("-2:28", `textSecondary` over the Now Playing background in the test library). The fix is a design decision (the token, or the label's backdrop), so it is left for the owner.
+
+## Dependency update: swift-nio 2.105.0 — November 9, 2026
+
+Pass 0's leftover. `swift package update swift-nio` (run by the owner, since SwiftPM can't write its caches in the sandbox) moved swift-nio from 2.104.0 to 2.105.0; `Package.resolved` is the only file changed. Release notes: a minor release (new `EventLoopFuture` API, a QUIC capacity trap fix, llhttp update), nothing breaking.
+
+Advisories: all six published swift-nio advisories (latest GHSA-qcc5-f287-vgmq, WebSocket frame length trap; GHSA-r3rc-9hpw-54v9, ByteBuffer overflow) are patched at 2.101.0 or earlier, so both the old and new pins are clear.
+
+Validation: package tests 214 tests, 305 runs, 0 failures, no runtime warnings (`build/Logs/Test/Test-WavetileKit-Package-2026.11.09_19-22-01--0700.xcresult`). UI tests not rerun on the new pin.
