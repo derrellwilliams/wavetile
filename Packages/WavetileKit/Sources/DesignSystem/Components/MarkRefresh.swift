@@ -123,6 +123,7 @@ private struct MarkRefreshModifier: ViewModifier {
 
 /// Starts the system refresh control (which SwiftUI's `refreshable` installs on the scroll view)
 /// each time `value` changes: pulls the content down by the control's height, then fires it.
+/// Also keeps that control's own spinner from being drawn, so only the mark shows.
 private struct RefreshTrigger: UIViewRepresentable {
     let value: Int
 
@@ -131,20 +132,36 @@ private struct RefreshTrigger: UIViewRepresentable {
         init(last: Int) { self.last = last }
     }
 
-    func makeCoordinator() -> Coordinator { Coordinator(last: value) }
+    /// Looks for the refresh control whenever it lands in a window or is laid out: SwiftUI can
+    /// install the control after this view appears.
+    final class Anchor: UIView {
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            guard window != nil else { return }
+            DispatchQueue.main.async { [weak self] in self?.hideSystemSpinner() }
+        }
 
-    func makeUIView(context: Context) -> UIView {
-        let view = UIView()
-        view.isUserInteractionEnabled = false
-        return view
-    }
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            hideSystemSpinner()
+        }
 
-    func updateUIView(_ view: UIView, context: Context) {
-        guard context.coordinator.last != value else { return }
-        context.coordinator.last = value
-        DispatchQueue.main.async { [weak view] in
-            guard let view, let scroll = Self.scrollView(near: view),
-                  let control = scroll.refreshControl, !control.isRefreshing
+        /// The clear tint (`MarkRefreshModifier.hideSystemSpinner`) isn't enough: a refresh
+        /// started from code draws the spinner in its default color. An empty mask hides
+        /// whatever the control draws, and UIKit never resets it; the control still tracks the
+        /// pull and holds the content down.
+        @discardableResult
+        func hideSystemSpinner() -> UIScrollView? {
+            guard let scroll = RefreshTrigger.scrollView(near: self), let control = scroll.refreshControl
+            else { return nil }
+            control.tintColor = .clear
+            if control.layer.mask == nil { control.layer.mask = CALayer() }
+            return scroll
+        }
+
+        /// Pulls the content down by the control's height, then fires it.
+        func beginRefreshing() {
+            guard let scroll = hideSystemSpinner(), let control = scroll.refreshControl, !control.isRefreshing
             else { return }
             let top = -scroll.adjustedContentInset.top
             scroll.setContentOffset(CGPoint(x: scroll.contentOffset.x, y: top - control.frame.height), animated: true)
@@ -153,8 +170,24 @@ private struct RefreshTrigger: UIViewRepresentable {
         }
     }
 
+    func makeCoordinator() -> Coordinator { Coordinator(last: value) }
+
+    func makeUIView(context: Context) -> Anchor {
+        let view = Anchor()
+        view.isUserInteractionEnabled = false
+        return view
+    }
+
+    func updateUIView(_ view: Anchor, context: Context) {
+        let fire = context.coordinator.last != value
+        context.coordinator.last = value
+        DispatchQueue.main.async { [weak view] in
+            if fire { view?.beginRefreshing() } else { view?.hideSystemSpinner() }
+        }
+    }
+
     /// The scroll view that has a refresh control, in this screen's view controller.
-    private static func scrollView(near view: UIView) -> UIScrollView? {
+    fileprivate static func scrollView(near view: UIView) -> UIScrollView? {
         var responder: UIResponder? = view
         while let next = responder, !(next is UIViewController) { responder = next.next }
         guard let root = (responder as? UIViewController)?.view else { return nil }
