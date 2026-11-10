@@ -48,7 +48,11 @@ final class LibraryActions {
 
     /// With `undo`, the banner stays longer and offers an Undo button.
     func confirm(_ message: String, undo: (() -> Void)? = nil) {
-        show(Confirmation(message: message, undo: undo), for: undo == nil ? .seconds(2) : .seconds(3.5))
+        // A plain confirmation waits out an Undo banner instead of replacing it.
+        if undo == nil, confirmation?.undo != nil { return }
+        // VoiceOver needs time to reach the button.
+        let undoTime: Duration = UIAccessibility.isVoiceOverRunning ? .seconds(8) : .seconds(3.5)
+        show(Confirmation(message: message, undo: undo), for: undo == nil ? .seconds(2) : undoTime)
     }
 
     func dismissConfirmation() { confirmation = nil }
@@ -183,6 +187,7 @@ private struct ConfirmationBanner: View {
                     dismiss()
                     undo()
                 }
+                .requiresServer()
                 .font(theme.typography.itemTitle)
                 .foregroundStyle(theme.palette.accent)
             }

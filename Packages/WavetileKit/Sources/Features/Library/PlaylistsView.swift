@@ -278,9 +278,10 @@ private struct PlaylistEditor: View {
     let playlistID: String
     let playlistName: String
     @State var items: [PlaylistItem]
-    /// Songs removed during this edit, announced (with Undo) when the editor closes, since the
-    /// banner would sit behind the sheet.
-    @State private var removedTrackIDs: [String] = []
+    /// Server removals made during this edit, each returning the songs it removed (none if it
+    /// failed). Announced with Undo when the editor closes, since the banner would sit behind the
+    /// sheet; waiting on these means a quick Done still gets its Undo.
+    @State private var removals: [Task<[String], Never>] = []
 
     var body: some View {
         NavigationStack {
@@ -299,11 +300,7 @@ private struct PlaylistEditor: View {
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .environment(\.editMode, .constant(.active))
-            .onDisappear {
-                guard !removedTrackIDs.isEmpty else { return }
-                actions.removedFromPlaylist(id: playlistID, name: playlistName, trackIDs: removedTrackIDs, store: store)
-                removedTrackIDs = []
-            }
+            .onDisappear { announceRemovals() }
             .navigationTitle("Edit Songs")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -331,13 +328,26 @@ private struct PlaylistEditor: View {
         let entryIDs = offsets.compactMap { items[$0].entry.entryID }
         let trackIDs = offsets.map { items[$0].entry.trackID }
         items.remove(atOffsets: offsets)
-        Task {
+        removals.append(Task {
             do {
                 try await store.editor.removeFromPlaylist(id: playlistID, entryIDs: entryIDs)
-                removedTrackIDs += trackIDs
+                return trackIDs
             } catch {
                 actions.editFailed("remove songs from this playlist", error)
+                return []
             }
+        })
+    }
+
+    private func announceRemovals() {
+        let pending = removals
+        removals = []
+        guard !pending.isEmpty else { return }
+        let (id, name, store, actions) = (playlistID, playlistName, store, actions)
+        Task {
+            var trackIDs: [String] = []
+            for removal in pending { trackIDs += await removal.value }
+            if !trackIDs.isEmpty { actions.removedFromPlaylist(id: id, name: name, trackIDs: trackIDs, store: store) }
         }
     }
 }
