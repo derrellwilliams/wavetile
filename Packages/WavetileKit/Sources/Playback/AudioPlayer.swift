@@ -789,12 +789,19 @@ public final class AudioPlayer {
             MainActor.assumeIsolated { self?.togglePlayPause() }
             return .success
         }
+        // Earbud double/triple taps send next/previous track; during an episode they skip within it.
         commands.nextTrackCommand.addTarget { [weak self] _ in
-            MainActor.assumeIsolated { self?.next() }
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                if self.commandsForEpisode { self.skip(by: self.skipForwardInterval) } else { self.next() }
+            }
             return .success
         }
         commands.previousTrackCommand.addTarget { [weak self] _ in
-            MainActor.assumeIsolated { self?.previous() }
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                if self.commandsForEpisode { self.skip(by: -self.skipBackInterval) } else { self.previous() }
+            }
             return .success
         }
         commands.changePlaybackPositionCommand.addTarget { [weak self] event in
@@ -838,14 +845,20 @@ public final class AudioPlayer {
         commands.skipForwardCommand.preferredIntervals = [NSNumber(value: skipForwardInterval)]
     }
 
+    /// True while the active item is an episode (next/previous then skip within it).
+    private var commandsForEpisode = false
+
     /// Lock Screen shows skip-back/skip-forward for episodes (like Podcasts) and previous/next for music.
+    /// Next/previous stay enabled for episodes so earbud double/triple taps, which send those, still work;
+    /// iOS prefers the skip buttons on the Lock Screen when both are enabled.
     private func enableCommands(forEpisode isEpisode: Bool) {
+        commandsForEpisode = isEpisode
         let commands = MPRemoteCommandCenter.shared()
         commands.skipBackwardCommand.isEnabled = isEpisode
         commands.skipForwardCommand.isEnabled = isEpisode
         commands.changePlaybackRateCommand.isEnabled = isEpisode
-        commands.nextTrackCommand.isEnabled = !isEpisode
-        commands.previousTrackCommand.isEnabled = !isEpisode
+        commands.nextTrackCommand.isEnabled = true
+        commands.previousTrackCommand.isEnabled = true
     }
 
     private func updateNowPlayingMetadata(_ track: QueuedTrack) {
