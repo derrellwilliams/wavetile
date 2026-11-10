@@ -111,7 +111,9 @@ targets:
     type: app-extension
     platform: iOS
     sources:
-      - Widgets
+      # Claude Code can leave a scratch `.claude` folder here; keep it out of the project.
+      - path: Widgets
+        excludes: [".claude"]
       - Shared
     dependencies:
       - package: WavetileKit
