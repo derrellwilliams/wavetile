@@ -17,7 +17,8 @@ struct PodcastsView: View {
     @State private var recommended: [RecommendedShow] = []
     @State private var hasShows = true
     let reselects: Int
-    @State private var path = NavigationPath()
+    /// Owned by the main tab view, so the player can open an episode or show here.
+    @Binding var path: NavigationPath
     @State private var refreshRequests = 0
     @Namespace private var zoom
     @State private var showSettings = false

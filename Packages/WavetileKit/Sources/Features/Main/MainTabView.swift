@@ -17,6 +17,10 @@ struct MainTabView: View {
     @State private var connectivity = Connectivity.shared
     @State private var actions = LibraryActions()
     @State private var homePath = NavigationPath()
+    @State private var podcastsPath = NavigationPath()
+    /// The last page the player opened, with its stack's depth right after, so opening the same
+    /// page again from the player doesn't stack a copy on top of it.
+    @State private var playerRoute: (route: PodcastRoute, tab: AppTab, depth: Int)?
     /// Bumped per tab when its tab is tapped while already selected: back to the root, then a refresh.
     @State private var reselects: [AppTab: Int] = [:]
     @State private var widgets: WidgetBridge
@@ -94,7 +98,7 @@ struct MainTabView: View {
             // Opt-in from the profile drawer; music-only users never see it.
             if signedIn.podcasts.isEnabled {
                 Tab(value: .podcasts) {
-                    PodcastsView(reselects: reselects[.podcasts, default: 0])
+                    PodcastsView(reselects: reselects[.podcasts, default: 0], path: $podcastsPath)
                         .environment(\.tabRootReporter, reporter(for: .podcasts))
                 } label: {
                     tabLabel("Podcasts", glyph: .podcasts)
@@ -209,13 +213,17 @@ extension MainTabView {
         }
     }
 
-    /// From the player: closes it and pushes the route on Home's stack, on top of whatever is
-    /// open there (Home is the one tab whose path lives here).
+    /// From the player: closes it and opens the route on the Podcasts tab's stack (Home's when
+    /// podcasts are off), on top of whatever is open there.
     fileprivate func openPodcastRoute(_ route: PodcastRoute) {
         showNowPlaying = false
         showSettings = false
-        selection = .home
-        homePath.append(route)
+        let tab: AppTab = signedIn.podcasts.isEnabled ? .podcasts : .home
+        selection = tab
+        let depth = tab == .podcasts ? podcastsPath.count : homePath.count
+        if let last = playerRoute, last.route == route, last.tab == tab, last.depth == depth { return }
+        if tab == .podcasts { podcastsPath.append(route) } else { homePath.append(route) }
+        playerRoute = (route, tab, depth + 1)
     }
 
     fileprivate func openPodcastSearch() {

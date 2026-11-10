@@ -569,6 +569,8 @@ private struct CurrentChapterLabel: View {
         .buttonStyle(.plain)
         .disabled(chapters.isEmpty)
         .accessibilityHint("Shows all chapters")
+        // Nothing to read or open until chapters load, or for an episode without any.
+        .accessibilityHidden(chapters.isEmpty)
     }
 }
 
