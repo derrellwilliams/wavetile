@@ -64,6 +64,8 @@ extension EnvironmentValues {
     @Entry var openPodcastSearch: () -> Void = {}
     /// Pushes a podcast route on the current tab's stack (menus can't hold a NavigationLink).
     @Entry var pushPodcastRoute: (PodcastRoute) -> Void = { _ in }
+    /// Closes the player and opens a podcast route on Home's stack (the player sits above the tabs).
+    @Entry var openPodcastRoute: (PodcastRoute) -> Void = { _ in }
 }
 
 extension View {

@@ -48,6 +48,7 @@ struct MainTabView: View {
             tabs
                 .environment(\.openProfile) { showSettings = true }
                 .environment(\.openNowPlaying) { showNowPlaying = true }
+                .environment(\.openPodcastRoute, openPodcastRoute)
                 .environment(\.openPodcastSearch, openPodcastSearch)
         } drawer: {
             SettingsDrawer(app: app, session: signedIn.session, isOpen: $showSettings)
@@ -206,6 +207,15 @@ extension MainTabView {
                 if DebugFlags.openNowPlaying { showNowPlaying = true }
             }
         }
+    }
+
+    /// From the player: closes it and pushes the route on Home's stack, on top of whatever is
+    /// open there (Home is the one tab whose path lives here).
+    fileprivate func openPodcastRoute(_ route: PodcastRoute) {
+        showNowPlaying = false
+        showSettings = false
+        selection = .home
+        homePath.append(route)
     }
 
     fileprivate func openPodcastSearch() {

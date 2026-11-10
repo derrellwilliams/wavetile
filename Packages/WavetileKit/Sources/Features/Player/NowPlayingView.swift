@@ -12,6 +12,7 @@ struct NowPlayingView: View {
     @Environment(\.theme) private var theme
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.openPodcastRoute) private var openPodcastRoute
     @Environment(AudioPlayer.self) private var player
     @Environment(LibraryStore.self) private var store
     @Environment(PodcastsStore.self) private var podcasts
@@ -101,7 +102,8 @@ struct NowPlayingView: View {
     private var info: some View {
         HStack(alignment: .bottom, spacing: theme.spacing.md) {
             VStack(alignment: .leading, spacing: theme.spacing.xs) {
-                Text(player.current?.title ?? "")
+                // An episode's title opens its page and the show name opens the show.
+                linked(Text(player.current?.title ?? ""), to: .episode)
                     .font(theme.typography.title)
                     .foregroundStyle(theme.palette.textPrimary)
                     .accessibilityIdentifier("nowPlayingTitle")
@@ -112,13 +114,15 @@ struct NowPlayingView: View {
                         Label(error, glyph: .warning)
                             .transition(.opacity)
                     } else {
-                        Text(subtitle)
+                        linked(Text(subtitle), to: .show)
                             .accessibilityIdentifier("nowPlayingSubtitle")
                     }
                 }
                 .font(theme.typography.lead)
                 .foregroundStyle(theme.palette.textSecondary)
-                if isEpisode { CurrentChapterLabel(chapters: chapters) }
+                if isEpisode {
+                    CurrentChapterLabel(chapters: chapters) { showChapters = true }
+                }
             }
             .animation(theme.motion.smooth, value: player.errorMessage)
             .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
@@ -134,6 +138,26 @@ struct NowPlayingView: View {
         }
         .contentTransition(.opacity)
         .animation(theme.motion.smooth, value: player.current?.queueID)
+    }
+
+    private enum Destination { case episode, show }
+
+    /// The text as a link to the playing episode's page or show for an episode; plain for a song.
+    @ViewBuilder private func linked(_ text: Text, to destination: Destination) -> some View {
+        if isEpisode {
+            Button { open(destination) } label: { text }
+                .buttonStyle(.plain)
+                .accessibilityHint(destination == .episode ? "Opens the episode page" : "Opens the show page")
+        } else {
+            text
+        }
+    }
+
+    private func open(_ destination: Destination) {
+        guard let track = player.current, track.isEpisode,
+              let item = try? podcasts.database.episodeNow(id: track.trackID)
+        else { return }
+        openPodcastRoute(destination == .episode ? .episode(id: item.id) : .show(ShowRoute(item.show)))
     }
 
     /// Close only, using the same circle treatment as the navigation bar buttons;
@@ -527,15 +551,24 @@ private struct CurrentChapterLabel: View {
     @Environment(\.theme) private var theme
     @Environment(AudioPlayer.self) private var player
     let chapters: [Chapter]
+    /// Opens the chapters list.
+    let showAll: () -> Void
 
     var body: some View {
         let chapter = chapters.current(at: player.currentTime)
         // A space keeps the line's height before chapters load or the first one starts.
-        Text(chapter?.title ?? " ")
-            .font(theme.typography.caption)
-            .foregroundStyle(theme.palette.textSecondary)
-            .contentTransition(.opacity)
-            .animation(theme.motion.smooth, value: chapter)
+        Button(action: showAll) {
+            Text(chapter?.title ?? " ")
+                .font(theme.typography.caption)
+                .foregroundStyle(theme.palette.textSecondary)
+                .contentTransition(.opacity)
+                .animation(theme.motion.smooth, value: chapter)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .disabled(chapters.isEmpty)
+        .accessibilityHint("Shows all chapters")
     }
 }
 
