@@ -197,6 +197,9 @@ public final class AppModel {
             PodcastDatabase.delete(serverID: signedIn.session.serverID, userID: signedIn.session.userID)
             // The cached library is private to this account; don't leave it on disk.
             LibraryDatabase.delete(serverID: signedIn.session.serverID, userID: signedIn.session.userID)
+            // A stand-in database (the real one wouldn't open) lives in the temporary folder.
+            signedIn.library.database.deleteStandInFiles()
+            signedIn.podcasts.database.deleteStandInFiles()
             RecentSearches.clearStored()
             ImageCaching.removeAll()
         }

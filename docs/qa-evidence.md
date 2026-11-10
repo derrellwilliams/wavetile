@@ -554,3 +554,24 @@ Read in full: `Podcasts` (feed fetch/parse, OPML, chapters, transcripts, show no
 **Validation:** package scheme passed on iPhone 18 Pro Max (iOS 27.0): 208 tests, 297 runs, 0 failures, no runtime warnings (`build/Logs/Test/Test-WavetileKit-Package-2026.11.09_18-38-36--0700.xcresult`). 11 new tests in `UntrustedInputTests`; before the fixes, 8 of them failed or crashed.
 
 **Not checked:** UI tests not rerun; no real feed corpus (a spot check of a few large public feeds would confirm none now lose episodes to the stricter URL rule); the SwiftUI views were read only for data flow, not layout.
+
+## Review pass 4: files and account lifecycle — November 9, 2026
+
+Scope: `Downloads/DownloadManager`, `Podcasts/EpisodeDownloadManager`, `Features/Downloads`, `Persistence/DownloadQueries`, `LibraryStore`/`PodcastsStore` shutdown, `AppModel.signOut`, stand-in databases.
+
+| # | Severity | Finding | Status |
+|---|---|---|---|
+| 1 | Medium | A stand-in database (used when the real one won't open) lives in the temporary folder as `library-<uuid>.sqlite` and was never deleted at sign-out, so the signed-out account's cached library stayed on disk | Fixed: `deleteStandInFiles()` on both databases, called in `signOut`. Tested |
+| 2 | Low | A music download had no size limit (a transcode that never ends could fill the phone); episodes already had one | Fixed: 2 GB cap, also checked against the stated length. Limit check tested; the delegate path is not |
+| 3 | Low | A song removed from a synced playlist, collection or Favorites kept downloading to the end before its file was deleted | Fixed: tasks for songs no longer wanted are cancelled after the sync. No automated test (needs a live background session) |
+
+Accepted notes:
+- `signOut` shuts down podcasts before the library; if the library database won't close it returns false with podcasts already stopped. The alert tells the user to reopen the app, which restores a clean state.
+- Per-account preference keys (`coverShuffles.*`, hidden recents, `podcasts.<user>.*`) stay in UserDefaults after sign-out. They hold item IDs and settings only.
+- Failed downloads are retried at every launch, including permanent failures such as a deleted song.
+
+Checked and clean: file names come from filtered IDs and can't leave the folder; every delete is by a name the app wrote; a finish racing a removal deletes its file (`updateDownload` returns false); a finish after sign-out writes to a closed pool and fails harmlessly; credentials are cleared last; widgets, Live Activities, recent searches and image cache are cleared at sign-out; an empty library never removes downloads (pass 2); redirect-off-origin stops the queue and persists across launches.
+
+Validation: package tests 210 tests, 299 runs, 0 failures, no runtime warnings (`build/Logs/Test/Test-WavetileKit-Package-2026.11.09_18-44-42--0700.xcresult`).
+
+Not checked: UI tests, real background transfers, a failed database close on a device.

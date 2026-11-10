@@ -50,6 +50,15 @@ public final class LibraryDatabase: Sendable {
         }
     }
 
+    /// Deletes a stand-in database's files (sign out). They hold the cached library, and the
+    /// system's temporary folder isn't cleaned until it chooses to. Does nothing for the real one.
+    public func deleteStandInFiles() {
+        guard isTemporary else { return }
+        for suffix in ["", "-wal", "-shm"] {
+            try? FileManager.default.removeItem(atPath: pool.path + suffix)
+        }
+    }
+
     private static func safe(_ id: String) -> String {
         id.filter { $0.isLetter || $0.isNumber || $0 == "-" }
     }

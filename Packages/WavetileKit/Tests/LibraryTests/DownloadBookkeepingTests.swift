@@ -105,6 +105,25 @@ struct DownloadBookkeepingTests {
         #expect(try LibraryDatabase(path: path).isTemporary == false)
     }
 
+    /// Sign-out deletes the stand-in's files (they hold the cached library); a real database is never touched.
+    @Test func signOutRemovesOnlyTheStandInFiles() throws {
+        let standIn = try LibraryDatabase.temporary()
+        let standInPath = standIn.pool.path
+        #expect(FileManager.default.fileExists(atPath: standInPath))
+        standIn.deleteStandInFiles()
+        #expect(!FileManager.default.fileExists(atPath: standInPath))
+
+        let path = FileManager.default.temporaryDirectory.appending(path: "real-\(UUID().uuidString).sqlite").path(percentEncoded: false)
+        let real = try LibraryDatabase(path: path)
+        real.deleteStandInFiles()
+        #expect(FileManager.default.fileExists(atPath: path))
+    }
+
+    @Test func songDownloadSizeIsCapped() {
+        #expect(!DownloadManager.exceedsLimit(written: 400 * 1024 * 1024))
+        #expect(DownloadManager.exceedsLimit(written: DownloadManager.maxBytes + 1))
+    }
+
     @Test func rejectsEmptyAndNonAudioBodies() {
         func response(_ mime: String?) -> URLResponse {
             URLResponse(url: URL(string: "https://x/Audio/1/universal")!, mimeType: mime, expectedContentLength: 0, textEncodingName: nil)

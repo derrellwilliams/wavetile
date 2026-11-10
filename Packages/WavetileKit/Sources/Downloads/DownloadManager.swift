@@ -47,6 +47,12 @@ public final class DownloadManager: NSObject, Sendable {
         var allowCellular = true
     }
 
+    /// The most one song may write. A lossless track is a few hundred MB at most; a server that
+    /// keeps sending (a transcode that never ends) would otherwise fill the phone.
+    static let maxBytes: Int64 = 2 * 1024 * 1024 * 1024
+
+    static func exceedsLimit(written: Int64) -> Bool { written > maxBytes }
+
     /// A dropped transfer is retried this many times (resuming where it stopped when it can).
     static let maxRetries = 3
 
@@ -141,6 +147,8 @@ public final class DownloadManager: NSObject, Sendable {
         }
         guard let (added, orphans) = try? await database.syncDownloadedPlaylist(id: download.id, trackIDs: trackIDs) else { return }
         await enqueue(added, quality: quality, allowCellular: allowCellular)
+        // A song taken off the playlist while it downloads shouldn't keep downloading.
+        if !orphans.isEmpty || !added.isEmpty { await cancelTasks(notIn: (try? database.pendingDownloads().map(\.trackID)) ?? []) }
         deleteFiles(orphans)
     }
 
@@ -289,6 +297,11 @@ public final class DownloadManager: NSObject, Sendable {
 extension DownloadManager: URLSessionDownloadDelegate {
     public func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData _: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
         guard let trackID = downloadTask.taskDescription else { return }
+        if Self.exceedsLimit(written: max(totalBytesWritten, totalBytesExpectedToWrite)) {
+            downloadTask.cancel()
+            markFailed(trackID, "This song is too large to download.")
+            return
+        }
         // Transcoded streams have no length; show indeterminate-ish progress until done.
         let progress = totalBytesExpectedToWrite > 0 ? Double(totalBytesWritten) / Double(totalBytesExpectedToWrite) : 0.05
         // Throttle DB writes to ~5% steps.

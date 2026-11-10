@@ -31,6 +31,14 @@ public final class PodcastDatabase: Sendable {
         }
     }
 
+    /// Deletes a stand-in database's files (sign out); does nothing for the real one.
+    public func deleteStandInFiles() {
+        guard isTemporary else { return }
+        for suffix in ["", "-wal", "-shm"] {
+            try? FileManager.default.removeItem(atPath: pool.path + suffix)
+        }
+    }
+
     public init(path: String, isTemporary: Bool = false) throws {
         self.isTemporary = isTemporary
         var config = Configuration()
