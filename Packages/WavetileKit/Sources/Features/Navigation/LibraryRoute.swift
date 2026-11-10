@@ -107,6 +107,8 @@ struct AlbumLink: View {
     var context: String = ""
     /// Adds "Remove from Recently Played" to the long-press menu (Home's Recently Played shelf).
     var onRemoveFromRecents: (() -> Void)?
+    /// Adds "Remove from Collection" to the long-press menu (a collection's own page).
+    var onRemoveFromCollection: (() -> Void)?
 
     var body: some View {
         let route = AlbumRoute(album: album, sourceID: "\(context)-\(album.id)")
@@ -127,6 +129,11 @@ struct AlbumLink: View {
             // Hidden on the artist's own page.
             if context != "artist", let route = store.artistRoute(albumID: album.id) {
                 Button("Go to Artist", glyph: .artist) { push(route) }
+            }
+            if let onRemoveFromCollection {
+                Divider()
+                Button("Remove from Collection", glyph: .trash, role: .destructive, action: onRemoveFromCollection)
+                    .requiresServer()
             }
             if let onRemoveFromRecents {
                 Divider()

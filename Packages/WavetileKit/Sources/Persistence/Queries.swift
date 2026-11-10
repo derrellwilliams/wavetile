@@ -257,6 +257,21 @@ public extension LibraryDatabase {
         }
     }
 
+    /// Collections that already hold every one of `albumIDs`, so "Add to Collection" can skip them.
+    func collectionIDs(containingAll albumIDs: [String]) -> ValueObservation<ValueReducers.Fetch<Set<String>>> {
+        ValueObservation.tracking { db in
+            guard !albumIDs.isEmpty else { return [] }
+            let marks = databaseQuestionMarks(count: albumIDs.count)
+            let ids = try String.fetchAll(db, sql: """
+                SELECT collectionID FROM collectionAlbum
+                WHERE albumID IN (\(marks))
+                GROUP BY collectionID
+                HAVING COUNT(DISTINCT albumID) = ?
+                """, arguments: StatementArguments(albumIDs) + [Set(albumIDs).count])
+            return Set(ids)
+        }
+    }
+
     func albums(collectionID: String) -> ValueObservation<ValueReducers.Fetch<[AlbumRecord]>> {
         ValueObservation.tracking { db in
             try AlbumRecord.fetchAll(db, sql: """

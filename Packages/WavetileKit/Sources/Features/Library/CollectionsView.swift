@@ -146,17 +146,16 @@ struct CollectionDetailView: View {
                     spacing: theme.spacing.xl
                 ) {
                     ForEach(albums) { album in
-                        AlbumLink(album: album.summary, context: "collection")
-                            .contextMenu {
-                                Button("Remove from Collection", glyph: .trash, role: .destructive) {
-                                    Task {
-                                        do { try await store.editor.removeFromCollection(id: collection.id, albumIDs: [album.id]) } catch {
-                                            actions.editFailed("remove albums from this collection", error)
-                                        }
-                                    }
+                        AlbumLink(album: album.summary, context: "collection", onRemoveFromCollection: {
+                            Task {
+                                do {
+                                    try await store.editor.removeFromCollection(id: collection.id, albumIDs: [album.id])
+                                    actions.removedFromCollection(collection, albumIDs: [album.id], store: store)
+                                } catch {
+                                    actions.editFailed("remove albums from this collection", error)
                                 }
-                                .requiresServer()
                             }
+                        })
                     }
                 }
                 .padding(.horizontal, theme.spacing.screenInset)

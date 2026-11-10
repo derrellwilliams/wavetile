@@ -25,6 +25,10 @@ final class LibraryActions {
         let message: String
         var glyph: Glyph = .check
         var isWarning = false
+        /// Shows an Undo button on the banner (for removals).
+        var undo: (() -> Void)?
+
+        static func == (lhs: Confirmation, rhs: Confirmation) -> Bool { lhs.id == rhs.id }
     }
 
     var addToPlaylist: TrackSelection?
@@ -42,8 +46,33 @@ final class LibraryActions {
             : "Couldn't \(action). Check your connection."
     }
 
-    func confirm(_ message: String) {
-        show(Confirmation(message: message), for: .seconds(2))
+    /// With `undo`, the banner stays longer and offers an Undo button.
+    func confirm(_ message: String, undo: (() -> Void)? = nil) {
+        show(Confirmation(message: message, undo: undo), for: undo == nil ? .seconds(2) : .seconds(3.5))
+    }
+
+    func dismissConfirmation() { confirmation = nil }
+
+    /// Tells the person albums left a collection, with Undo to put them back.
+    func removedFromCollection(_ collection: CollectionRecord, albumIDs: [String], store: LibraryStore) {
+        confirm("Removed from \(collection.name)") { [self] in
+            Task {
+                do { try await store.editor.addToCollection(id: collection.id, albumIDs: albumIDs) } catch {
+                    editFailed("add albums back to this collection", error)
+                }
+            }
+        }
+    }
+
+    /// Tells the person songs left a playlist, with Undo to add them back (at the end).
+    func removedFromPlaylist(id: String, name: String, trackIDs: [String], store: LibraryStore) {
+        confirm("Removed from \(name)") { [self] in
+            Task {
+                do { try await store.editor.addToPlaylist(id: id, trackIDs: trackIDs) } catch {
+                    editFailed("add songs back to this playlist", error)
+                }
+            }
+        }
     }
 
     /// Tried to play something that isn't downloaded while it can't stream.
@@ -120,7 +149,7 @@ private struct LibraryActionSheets: ViewModifier {
             // Slides in from the top and leaves the same way.
             .overlay(alignment: .top) {
                 if let confirmation = actions.confirmation {
-                    ConfirmationBanner(confirmation: confirmation)
+                    ConfirmationBanner(confirmation: confirmation, dismiss: actions.dismissConfirmation)
                         .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
                 }
             }
@@ -136,23 +165,36 @@ private struct LibraryActionSheets: ViewModifier {
     }
 }
 
-/// Glass capsule with an icon and a short message, shown below the status bar.
+/// Glass capsule with an icon and a short message, shown below the status bar. Removals add an
+/// Undo button.
 private struct ConfirmationBanner: View {
     @Environment(\.theme) private var theme
     let confirmation: LibraryActions.Confirmation
+    let dismiss: () -> Void
 
     var body: some View {
-        Label(confirmation.message, glyph: confirmation.glyph)
-            .labelStyle(.tintedIcon)
-            .font(theme.typography.itemTitle)
-            .multilineTextAlignment(.leading)
-            .padding(.horizontal, theme.spacing.lg)
-            .padding(.vertical, theme.spacing.md)
-            .glassEffect(.regular, in: .rect(cornerRadius: theme.radius.card))
-            .padding(.horizontal, theme.spacing.screenInset)
-            .padding(.top, theme.spacing.sm)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)  // Announced when shown instead.
+        HStack(spacing: theme.spacing.lg) {
+            Label(confirmation.message, glyph: confirmation.glyph)
+                .labelStyle(.tintedIcon)
+                .font(theme.typography.itemTitle)
+                .multilineTextAlignment(.leading)
+            if let undo = confirmation.undo {
+                Button("Undo") {
+                    dismiss()
+                    undo()
+                }
+                .font(theme.typography.itemTitle)
+                .foregroundStyle(theme.palette.accent)
+            }
+        }
+        .padding(.horizontal, theme.spacing.lg)
+        .padding(.vertical, theme.spacing.md)
+        .glassEffect(.regular, in: .rect(cornerRadius: theme.radius.card))
+        .padding(.horizontal, theme.spacing.screenInset)
+        .padding(.top, theme.spacing.sm)
+        .allowsHitTesting(confirmation.undo != nil)
+        // Announced when shown instead, unless it holds a button VoiceOver needs to reach.
+        .accessibilityHidden(confirmation.undo == nil)
     }
 }
 
@@ -292,6 +334,8 @@ struct AddToCollectionSheet: View {
     @Environment(LibraryActions.self) private var actions
     let albumIDs: [String]
     @State private var collections: [CollectionRecord] = []
+    /// Collections that already hold all of these albums; not offered again.
+    @State private var alreadyIn: Set<String> = []
     @State private var newName = ""
     @State private var showNew = false
 
@@ -304,7 +348,7 @@ struct AddToCollectionSheet: View {
                         .labelStyle(.tintedIcon)
                 }
                 .listRowBackground(Color.clear)
-                ForEach(collections) { collection in
+                ForEach(collections.filter { !alreadyIn.contains($0.id) }) { collection in
                     Button {
                         perform("Added to \(collection.name)") { try await store.editor.addToCollection(id: collection.id, albumIDs: albumIDs) }
                     } label: {
@@ -342,6 +386,11 @@ struct AddToCollectionSheet: View {
             .task {
                 do {
                     for try await value in store.observe(store.database.collections()) { collections = value }
+                } catch { Log.observationFailed(error) }
+            }
+            .task {
+                do {
+                    for try await value in store.observe(store.database.collectionIDs(containingAll: albumIDs)) { alreadyIn = value }
                 } catch { Log.observationFailed(error) }
             }
             // Brand bar titles and the tinted Back (SwiftUI's own bar appearances ignore the proxy).

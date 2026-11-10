@@ -223,7 +223,7 @@ struct PlaylistDetailView: View {
                 .presentationBackground(theme.palette.background)
         }
         .sheet(isPresented: $showEditor) {
-            PlaylistEditor(playlistID: playlist.id, items: items)
+            PlaylistEditor(playlistID: playlist.id, playlistName: playlist.name, items: items)
                 .presentationBackground(theme.palette.background)
         }
         .task { await observe() }
@@ -276,7 +276,11 @@ private struct PlaylistEditor: View {
     @Environment(LibraryStore.self) private var store
     @Environment(LibraryActions.self) private var actions
     let playlistID: String
+    let playlistName: String
     @State var items: [PlaylistItem]
+    /// Songs removed during this edit, announced (with Undo) when the editor closes, since the
+    /// banner would sit behind the sheet.
+    @State private var removedTrackIDs: [String] = []
 
     var body: some View {
         NavigationStack {
@@ -295,6 +299,11 @@ private struct PlaylistEditor: View {
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .environment(\.editMode, .constant(.active))
+            .onDisappear {
+                guard !removedTrackIDs.isEmpty else { return }
+                actions.removedFromPlaylist(id: playlistID, name: playlistName, trackIDs: removedTrackIDs, store: store)
+                removedTrackIDs = []
+            }
             .navigationTitle("Edit Songs")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -320,9 +329,13 @@ private struct PlaylistEditor: View {
 
     private func delete(at offsets: IndexSet) {
         let entryIDs = offsets.compactMap { items[$0].entry.entryID }
+        let trackIDs = offsets.map { items[$0].entry.trackID }
         items.remove(atOffsets: offsets)
         Task {
-            do { try await store.editor.removeFromPlaylist(id: playlistID, entryIDs: entryIDs) } catch {
+            do {
+                try await store.editor.removeFromPlaylist(id: playlistID, entryIDs: entryIDs)
+                removedTrackIDs += trackIDs
+            } catch {
                 actions.editFailed("remove songs from this playlist", error)
             }
         }
