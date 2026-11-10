@@ -1,4 +1,5 @@
 import Foundation
+import JellyfinKit
 
 public struct ParsedFeed: Sendable, Equatable {
     public var title: String
@@ -88,6 +89,10 @@ public enum FeedParser {
 
     // MARK: - Field helpers (internal for tests)
 
+    /// The longest episode or position kept, a week. Real audiobook-style feeds run to a few days;
+    /// anything past this is bad data, and the cap keeps absurd values out of time arithmetic.
+    static let maxDuration: Double = 7 * 24 * 3600
+
     /// `3723`, `3723.5`, `62:03` or `1:02:03` → seconds.
     static func duration(_ text: String) -> Double? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -95,7 +100,7 @@ public enum FeedParser {
         let parts = trimmed.split(separator: ":").map { Double($0.trimmingCharacters(in: .whitespaces)) }
         guard !parts.isEmpty, parts.count <= 3, parts.allSatisfy({ $0 != nil && $0! >= 0 }) else { return nil }
         let value = parts.compactMap(\.self).reduce(0) { $0 * 60 + $1 }
-        return value > 0 ? value : nil
+        return value > 0 && value <= maxDuration ? value : nil
     }
 
     private static let dateFormats = [
@@ -125,12 +130,16 @@ public enum FeedParser {
         return nil
     }
 
-    /// Only web URLs: never `file:`, `javascript:` or app schemes from a feed.
+    /// Only web URLs: never `file:`, `javascript:` or app schemes from a feed, and no plain-HTTP
+    /// address on the local network. Audio and images may load over HTTP (the media and local
+    /// networking exceptions), so a feed naming `http://192.168.1.1/...` would have the phone
+    /// send that device a request. HTTPS to such a host fails its certificate check first.
     static func webURL(_ text: String?) -> URL? {
         guard let text = text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty,
               let url = URL(string: text) ?? URL(string: text.addingPercentEncoding(withAllowedCharacters: .urlFragmentAllowed) ?? ""),
-              let scheme = url.scheme?.lowercased(), scheme == "https" || scheme == "http", url.host() != nil
+              let scheme = url.scheme?.lowercased(), scheme == "https" || scheme == "http", let host = url.host()
         else { return nil }
+        if scheme == "http", !host.contains(".") || (try? ServerAddress(url.absoluteString))?.isLocalNetwork == true { return nil }
         return url
     }
 

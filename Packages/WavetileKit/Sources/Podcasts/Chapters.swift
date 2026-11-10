@@ -16,11 +16,26 @@ public struct Chapter: Hashable, Sendable, Identifiable {
 /// them, then chapters embedded in the audio file (ID3 / MP4), then a timestamp list in the
 /// show notes ("00:00 Intro", "(12:34) Topic").
 public enum ChapterLoader {
+    /// More than this isn't a chapter list anyone navigates, and each is a row.
+    static let maxChapters = 500
+
     @concurrent public static func load(chaptersURL: URL?, audioURL: URL, notesHTML: String = "", duration: Double? = nil) async -> [Chapter] {
         if let chaptersURL, let chapters = try? await json(chaptersURL), !chapters.isEmpty { return chapters }
         let embedded = await embedded(audioURL)
         if !embedded.isEmpty { return embedded }
         return ShowNotes.chapters(html: notesHTML, duration: duration)
+    }
+
+    /// Chapters from a feed or an audio file, both untrusted: real start times only, one row per
+    /// start (`Chapter.id` is the start, and a list can't hold two rows with one ID), in order,
+    /// at most `maxChapters`, with short titles.
+    static func normalized(_ chapters: [Chapter]) -> [Chapter] {
+        var seen = Set<Double>()
+        return chapters
+            .filter { $0.start.isFinite && $0.start >= 0 && $0.start <= FeedParser.maxDuration && seen.insert($0.start).inserted }
+            .sorted { $0.start < $1.start }
+            .prefix(maxChapters)
+            .map { Chapter(start: $0.start, title: String($0.title.prefix(200))) }
     }
 
     static func json(_ url: URL) async throws -> [Chapter] {
@@ -40,10 +55,9 @@ public enum ChapterLoader {
                 var toc: Bool?
             }
         }
-        return try JSONDecoder().decode(File.self, from: data).chapters
+        return normalized(try JSONDecoder().decode(File.self, from: data).chapters
             .filter { $0.toc != false }
-            .map { Chapter(start: max($0.startTime, 0), title: $0.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "") }
-            .sorted { $0.start < $1.start }
+            .map { Chapter(start: max($0.startTime, 0), title: $0.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "") })
     }
 
     /// Embedded chapters. Streams only the file's header for remote audio; no Jellyfin headers.
@@ -55,6 +69,6 @@ public enum ChapterLoader {
             let title = (try? await AVMetadataItem.metadataItems(from: group.items, filteredByIdentifier: .commonIdentifierTitle).first?.load(.stringValue)) ?? nil
             chapters.append(Chapter(start: group.timeRange.start.seconds, title: title ?? "Chapter \(chapters.count + 1)"))
         }
-        return chapters
+        return normalized(chapters)
     }
 }

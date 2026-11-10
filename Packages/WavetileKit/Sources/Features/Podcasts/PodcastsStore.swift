@@ -640,7 +640,9 @@ final class PodcastsStore {
                 withMutation(keyPath: \.isEnabled) { _isEnabled = enabled }
             }
         }
-        if merged.subscriptionsUpdated != local.subscriptionsUpdated {
+        // With podcasts off nothing here contacts a podcast host: the server's list is left for
+        // the sync that follows turning them on (the stored date stays old, so it still differs).
+        if isEnabled, merged.subscriptionsUpdated != local.subscriptionsUpdated {
             let have = Set(local.subscriptions.map { PodcastID.show(feedURL: $0) })
             let want = Set(merged.subscriptions.map { PodcastID.show(feedURL: $0) })
             for url in merged.subscriptions where !have.contains(PodcastID.show(feedURL: url)) {

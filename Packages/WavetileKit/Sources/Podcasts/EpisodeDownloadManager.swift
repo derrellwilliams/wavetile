@@ -19,6 +19,12 @@ public final class EpisodeDownloadManager: NSObject, Sendable {
         var lastProgressWrite: [String: Double] = [:]
     }
 
+    /// The most one episode download may write. Real episodes (even long audiobook-style feeds)
+    /// are far smaller; a host that keeps sending would otherwise fill the phone.
+    static let maxBytes: Int64 = 2 * 1024 * 1024 * 1024
+
+    static func exceedsLimit(written: Int64) -> Bool { written > maxBytes }
+
     public static func sessionIdentifier(serverID: String, userID: String) -> String {
         "com.derrellwilliams.wavetile.podcasts.\(serverID).\(userID)"
     }
@@ -162,6 +168,12 @@ public final class EpisodeDownloadManager: NSObject, Sendable {
 extension EpisodeDownloadManager: URLSessionDownloadDelegate {
     public func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData _: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
         guard let episodeID = downloadTask.taskDescription else { return }
+        // The host's stated size counts too: refuse at once rather than after gigabytes.
+        if Self.exceedsLimit(written: max(totalBytesWritten, totalBytesExpectedToWrite)) {
+            downloadTask.cancel()
+            markFailed(episodeID, "This episode is too large to download.")
+            return
+        }
         let progress = totalBytesExpectedToWrite > 0 ? Double(totalBytesWritten) / Double(totalBytesExpectedToWrite) : 0.05
         let shouldWrite = state.withLock { state in
             let last = state.lastProgressWrite[episodeID] ?? -1

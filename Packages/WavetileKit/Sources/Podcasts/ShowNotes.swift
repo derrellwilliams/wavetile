@@ -25,7 +25,9 @@ public enum ShowNotes {
         var pendingBreaks = 0
 
         func appendText(_ raw: String) {
-            let decoded = decodeEntities(raw.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression))
+            // Collapsed after decoding: `&nbsp;` is a space, and a line of 190 of them would otherwise
+            // survive as one and stall the chapter patterns (seconds of CPU per line).
+            let decoded = decodeEntities(raw).replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
             guard !decoded.trimmingCharacters(in: .whitespaces).isEmpty || (!output.characters.isEmpty && decoded == " ") else { return }
             var piece = decoded
             if pendingBreaks > 0 {

@@ -34,6 +34,13 @@ public struct PodcastSyncState: Equatable, Sendable {
     static let maxSubscriptions = 2000
     static let playedWindow: TimeInterval = 90 * 24 * 3600
 
+    /// Whether `seconds` could be a date this app wrote: after 1970, before 2100. The record is
+    /// readable and writable by the server and every other client, so anything else (infinity,
+    /// NaN, 1e300) is ignored rather than adopted by the merge and written back out.
+    static func isPlausibleDate(_ seconds: Double) -> Bool {
+        seconds.isFinite && seconds >= 0 && seconds < 4_102_444_800
+    }
+
     public init(enabled: Bool? = nil, enabledUpdated: Date? = nil, subscriptions: [URL] = [], subscriptionsUpdated: Date? = nil,
                 positions: [String: Position] = [:], played: [String: Date] = [:]) {
         self.enabled = enabled
@@ -71,7 +78,9 @@ public struct PodcastSyncState: Equatable, Sendable {
     // MARK: CustomPrefs encoding
 
     public init(customPrefs prefs: [String: String]) {
-        func date(_ key: String) -> Date? { prefs[key].flatMap(Double.init).map(Date.init(timeIntervalSince1970:)) }
+        func date(_ key: String) -> Date? {
+            prefs[key].flatMap(Double.init).flatMap { Self.isPlausibleDate($0) ? Date(timeIntervalSince1970: $0) : nil }
+        }
         enabled = prefs["enabled"].map { $0 == "1" }
         enabledUpdated = date("enabledUpdated")
         let decodedSubscriptions = prefs["subs"].flatMap { try? JSONDecoder().decode([String].self, from: Data($0.utf8)) }
@@ -85,17 +94,22 @@ public struct PodcastSyncState: Equatable, Sendable {
         let rawPositions = prefs["pos"].flatMap { try? JSONDecoder().decode([String: [Double]].self, from: Data($0.utf8)) } ?? [:]
         // Keep the newest few; a position must be a real, non-negative time.
         positions = Dictionary(uniqueKeysWithValues: rawPositions.compactMap { id, pair -> (String, Position)? in
-            guard pair.count == 2, pair[0].isFinite, pair[0] >= 0 else { return nil }
+            guard pair.count == 2, pair[0].isFinite, pair[0] >= 0, pair[0] <= FeedParser.maxDuration,
+                  Self.isPlausibleDate(pair[1]) else { return nil }
             return (id, Position(seconds: pair[0], updated: Date(timeIntervalSince1970: pair[1])))
         }.sorted { $0.1.updated > $1.1.updated }.prefix(Self.maxPositions))
-        let rawPlayed = prefs["played"].flatMap { try? JSONDecoder().decode([String: Double].self, from: Data($0.utf8)) } ?? [:]
+        let rawPlayed = (prefs["played"].flatMap { try? JSONDecoder().decode([String: Double].self, from: Data($0.utf8)) } ?? [:])
+            .filter { Self.isPlausibleDate($0.value) }
         played = Dictionary(uniqueKeysWithValues: rawPlayed.sorted { $0.value > $1.value }.prefix(Self.maxPlayed)
             .map { ($0.key, Date(timeIntervalSince1970: $0.value)) })
     }
 
     public var customPrefs: [String: String] {
         func json(_ value: some Encodable) -> String { (try? String(decoding: JSONEncoder().encode(value), as: UTF8.self)) ?? "" }
-        func epoch(_ date: Date) -> String { String(Int(date.timeIntervalSince1970)) }
+        func epoch(_ date: Date) -> String {
+            let seconds = date.timeIntervalSince1970
+            return String(Int(Self.isPlausibleDate(seconds) ? seconds : 0))
+        }
         var prefs: [String: String] = [:]
         if let enabled { prefs["enabled"] = enabled ? "1" : "0" }
         if let enabledUpdated { prefs["enabledUpdated"] = epoch(enabledUpdated) }
