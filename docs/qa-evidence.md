@@ -619,3 +619,26 @@ Checked and clean: every server edit goes through `requiresServer()` and reports
 Validation: package tests 214 tests, 305 runs, 0 failures, no runtime warnings (`build/Logs/Test/Test-WavetileKit-Package-2026.11.09_19-01-55--0700.xcresult`). New: `SignOutPreferencesTests` (2 tests).
 
 Not checked: UI tests and the accessibility audit (not rerun since before pass 0), VoiceOver and Dynamic Type on a device, the custom navigation-bar code (`CustomBarItem`, `TintedSystemBack`) beyond reading it, and `Features/Podcasts` views (reviewed with the feed passes).
+
+## Review pass 7: outside the app — November 9, 2026
+
+Scope: `site/` (HTML, `main.js`, `styles.css`, `vercel.json`, `robots.txt`, `sitemap.xml`, `llms.txt`, manifest), `scripts/` (`testflight.sh`, `fetch-icons.sh`, `design-system.py`, `ExportOptions.plist`), `.claude/settings.json` and the testflight skill. There is no root `vercel.json`; the site's is `site/vercel.json`.
+
+| # | Severity | Finding | Status |
+|---|---|---|---|
+| 1 | Low | **`fetch-icons.sh` pulled icons from Phosphor's `main` branch.** Re-running it took whatever upstream held that day straight into the app bundle (supply chain, and icons changing without a review) | Fixed: pinned to commit `2b75f3a` (`REF`, overridable); the pinned copy is byte-identical to the catalog's current icon |
+| 2 | Low | **`testflight.sh` archived the working tree without checking it.** Uncommitted changes would ship in a build the repo can't reproduce (the skill says to commit first, the script didn't enforce it) | Fixed: the script exits if tracked files have uncommitted changes |
+
+Accepted notes:
+- `.claude/settings.json` allows `xcodebuild test/build *` and `simctl io/install/openurl *`. Those commands run outside the sandbox, so a build script phase added to `project.yml` or a `simctl io screenshot <path>` runs with full file access. That is the intended trade-off of the allow list; the sandbox denies edits to `settings.json` itself.
+- The contact address is a personal Gmail address in every page footer and the privacy policy (spam harvesting). A forwarding address on wavetile.com would avoid it.
+- The Team ID in `project.yml` is public by design (it is in every signed app).
+- `Access-Control-Allow-Origin: *` is Vercel's default for static files; everything served is public.
+
+Checked and clean: live headers on wavetile.com match `site/vercel.json` (CSP with no inline script or style, HSTS, nosniff, COOP, Referrer and Permissions Policy); http redirects to https and `www` to the apex; no inline handlers or `style=` attributes, so the CSP needs no `unsafe-inline`; `main.js` writes only numbers it computed into `innerHTML`; external links carry `rel="noopener"`; no forms, third-party scripts, fonts or trackers; every internal link resolves and all JSON-LD parses; `design-system.py` escapes all text it writes, runs no subprocess and writes only `docs/design-system.html`; `ExportOptions.plist` uploads with automatic signing; no keys, tokens or provisioning files tracked, and `.env*` and `build/` are ignored.
+
+Not checked: the Vercel dashboard settings (domain, deploy protection, who has access), Cloudflare DNS and DNSSEC, and the privacy policy's wording against App Store Connect's privacy answers.
+
+UI tests (run after pass 7, first time since before pass 0; `build/Logs/Test/Test-Wavetile-2026.11.09_19-04-41--0700.xcresult`): 21 tests, 19 passed, 2 failed, no runtime warnings. Neither failure comes from passes 0–7 (they changed nothing in the drawer, the player or the design system except a `#if DEBUG` around a preview):
+- `StorageTests/testStorageUsedOpensSheet`: the drawer gained avatar and server rows on Nov 8, so Storage Used sits below the fold and the test never saw it. Fixed: the test scrolls to the row; the test passes on re-run.
+- `AccessibilityAuditTests/testNowPlayingAudit`: **open.** Contrast fails on the remaining-time label ("-2:28", `textSecondary` over the Now Playing background in the test library). The fix is a design decision (the token, or the label's backdrop), so it is left for the owner.

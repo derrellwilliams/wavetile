@@ -29,7 +29,9 @@ final class StorageTests: XCTestCase {
     @MainActor func testStorageUsedOpensSheet() throws {
         let app = launch(["-openSettings"])
         let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Storage Used'")).firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 8), "No Storage Used row")
+        // The profile and account rows push it below the fold on some screens.
+        for _ in 0..<4 where !(row.waitForExistence(timeout: 2) && row.isHittable) { app.swipeUp() }
+        XCTAssertTrue(row.exists, "No Storage Used row")
         row.tap()
         XCTAssertTrue(app.navigationBars["Storage"].waitForExistence(timeout: 5), "Storage sheet didn't open")
     }

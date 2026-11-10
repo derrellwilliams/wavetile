@@ -10,6 +10,13 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# The archive is built from the working tree, so uncommitted changes would ship in a build the
+# repo can't reproduce.
+if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
+  echo "Uncommitted changes: commit them first so the build matches the repo." >&2
+  exit 1
+fi
+
 BUILD_NUMBER="${1:-$(date +%Y%m%d%H%M)}"
 ARCHIVE="build/Wavetile.xcarchive"
 

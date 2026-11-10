@@ -8,6 +8,9 @@
 set -euo pipefail
 
 WEIGHT="${WEIGHT:-bold}"
+# Pinned to a commit, so a change upstream can't alter what ships. To update, pick a newer commit
+# of phosphor-icons/core, re-run, and review the diff before committing.
+REF="${REF:-2b75f3ad12b420c9504ef05df8d2564a28f8500e}"
 ICONS=(
   house stack box-arrow-down magnifying-glass
   playlist microphone-stage vinyl-record music-note guitar
@@ -35,7 +38,7 @@ for entry in "${ICONS[@]}"; do
     weight="${entry##*:}"
     asset="$name-$weight"
   fi
-  base="https://raw.githubusercontent.com/phosphor-icons/core/main/assets/$weight"
+  base="https://raw.githubusercontent.com/phosphor-icons/core/$REF/assets/$weight"
   file="$name-$weight.svg"
   [[ "$weight" == "regular" ]] && file="$name.svg"
   set_dir="$CATALOG/$asset.imageset"
