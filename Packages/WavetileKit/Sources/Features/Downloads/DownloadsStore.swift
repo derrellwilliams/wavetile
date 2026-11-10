@@ -46,6 +46,9 @@ final class Connectivity {
     /// Called when the device changes networks, before the server is checked again.
     @ObservationIgnored var onNetworkChange: (() async -> Void)?
 
+    /// Called when the app returns to the foreground, where no network change was seen.
+    @ObservationIgnored var onForeground: (() async -> Void)?
+
     @ObservationIgnored private let monitor = NWPathMonitor()
     /// Which interfaces the last path used: Wi-Fi to cellular stays "connected" but can put a
     /// LAN-only server out of reach, so any change means checking again.
@@ -121,7 +124,10 @@ final class Connectivity {
     /// joined meanwhile can land after the first requests. An HTTP server proves itself again
     /// before any of them carries the token.
     private func enteredForeground() {
-        if server?.isCleartext == true { ServerIdentity.shared.networkChanged() }
+        if server?.isCleartext == true {
+            ServerIdentity.shared.networkChanged()
+            if let onForeground { Task { await onForeground() } }
+        }
         check()
     }
 

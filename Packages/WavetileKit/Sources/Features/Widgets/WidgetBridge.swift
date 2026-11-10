@@ -124,8 +124,11 @@ final class WidgetBridge {
     }
 
     private func saveArtwork(url: URL, id: String) async -> String? {
+        let started = Self.clearCount
         guard let image = try? await ImagePipeline.shared.image(for: url) else { return nil }
         let data = await Self.thumbnailJPEG(image)
+        // Signed out meanwhile: the clear has run, and this account's art mustn't land after it.
+        guard started == Self.clearCount else { return nil }
         return data.flatMap { WidgetStore.saveArtwork($0, id: id) }
     }
 

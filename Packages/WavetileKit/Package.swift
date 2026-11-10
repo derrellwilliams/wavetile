@@ -99,7 +99,7 @@ let package = Package(
         ),
         .testTarget(
             name: "PlaybackTests",
-            dependencies: ["Playback"],
+            dependencies: ["Playback", "JellyfinKit"],
             swiftSettings: serviceSettings
         ),
         .testTarget(

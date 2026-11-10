@@ -575,3 +575,26 @@ Checked and clean: file names come from filtered IDs and can't leave the folder;
 Validation: package tests 210 tests, 299 runs, 0 failures, no runtime warnings (`build/Logs/Test/Test-WavetileKit-Package-2026.11.09_18-44-42--0700.xcresult`).
 
 Not checked: UI tests, real background transfers, a failed database close on a device.
+
+## Review pass 5: playback and system surfaces — November 9, 2026
+
+Scope: `Playback` (`AudioPlayer`, `PlaybackQueue`), `Features/Player`, `Features/CarPlay` and `App/CarPlaySceneDelegate`, `App/MusicIntents` and `Features/Siri`, `Shared/PlaybackIntents`, `Widgets`, `WidgetShared`, `Features/Widgets/WidgetBridge`, the app group, the `wavetile://` scheme and its handler in `MainTabView`, and what sign-out leaves behind.
+
+| # | Severity | Finding | Status |
+|---|---|---|---|
+| 1 | Medium | **A loaded stream kept its token across a network change (pass 1 item 7).** On a plain-HTTP server an `AVPlayerItem` built before the change keeps its `Authorization` header, and a buffering or resumed one reconnects by itself, so on a café network where the saved address belongs to someone else the token went to that machine. No path update reaches a suspended app, so a paused player was exposed the same way after foreground | Fixed: a network change drops the server's streams (the playing one and the preloaded next one) and rebuilds them, at the same position, only once `ServerIdentity` has vouched for the server; if it can't, playback pauses with the offline notice. A paused player does the same on foreground. Downloaded files and podcast episodes play on. Not unit-tested past the no-op cases (needs a real stream and a second network) |
+| 2 | Low | **A remote seek to a non-finite time.** Bluetooth and other remote controls send the position as they please, and `NaN` or infinity makes an invalid `CMTime`, which raises inside AVFoundation | Fixed: `seek(to:)` ignores non-finite times. Tested |
+| 3 | Low | **Widget art could land after sign-out.** Artwork saved for the widgets was written after the fetch returned, so one in flight when `WidgetBridge.clear()` ran left that account's album art in the app group until the next sign-in pruned it | Fixed: the write checks the clear counter after the fetch. No automated test (needs the image pipeline and the app group) |
+| 4 | Low | The Recently Played widget showed the listening history (art, links) on a locked phone in StandBy | Fixed: `.privacySensitive()`. The Now Playing widget is left as it was: the same track is already on the Lock Screen |
+
+Accepted notes:
+- Siri's Play Music and the widget buttons run while the phone is locked (App Intents default). That is the point of the feature, and they only play or skip.
+- The `wavetile://` links only navigate (open the player, push an album found in the local database); any app or web page may open one. They carry no action and no data into the app.
+- Podcast artwork for the Lock Screen follows redirects; a feed host could redirect an image request to a local address (a blind GET). The feed's own URLs are filtered (pass 3), redirects are not.
+- A stream that fails for any other reason after a network change is handled by the existing skip and offline logic.
+
+Checked and clean: podcast items are plain assets with no headers or token; the token never enters a URL; the stream request is refused while an HTTP server is unverified; sign-out stops the player first and `stop()` now also cancels a pending rebuild; queue edits keep indices consistent (tested in `PlaybackQueueTests`); CarPlay lists read the local database with `try?` so a closed pool shows nothing instead of crashing, and the templates are rebuilt on sign-out; Siri reads only the local database and its names are refreshed after sign-out; widget deep-link IDs are percent-escaped (tested); the app group holds only titles, art and a play state, and is cleared at sign-out; Live Activities end at sign-out; Lock Screen artwork is fetched with no cookies and capped at 10 MB.
+
+Validation: package tests 212 tests, 303 runs, 0 failures, no runtime warnings (`build/Logs/Test/Test-WavetileKit-Package-2026.11.09_18-55-52--0700.xcresult`). New: `RemoteInputTests` (2 tests, 4 runs).
+
+Not checked: UI tests; CarPlay in the simulator; Siri and the widget buttons on a device; the rebuild after a real network change (needs a plain-HTTP server and two networks); `NowPlayingView`, `QueueView` and `PlayableRow` were only searched for URL, link and clipboard use (full read is pass 6).

@@ -105,9 +105,18 @@ public final class AudioPlayer {
     /// instead of skipping on, which under repeat-all would wrap around the queue forever.
     private static let maxConsecutiveFailures = 10
 
+    /// Bumped whenever the player is rebuilt or stopped, so work waiting on a server check can tell
+    /// the listener has moved on.
+    @ObservationIgnored private var loadGeneration = 0
+    /// The server's streams were dropped after a network change and aren't rebuilt yet: the empty
+    /// player isn't the end of the queue.
+    @ObservationIgnored private var reloadingStreams = false
+
     private struct Entry {
         let track: QueuedTrack
         let playSessionID: String
+        /// A server stream: its request carries the Jellyfin token.
+        var sendsToken = false
     }
 
     public init(library: LibraryClient) {
@@ -203,6 +212,9 @@ public final class AudioPlayer {
     }
 
     public func seek(to seconds: Double) {
+        // Remote commands (Bluetooth, other devices) pass whatever number they like; an invalid
+        // time raises inside AVFoundation.
+        guard seconds.isFinite else { return }
         let target = CMTime(seconds: max(0, seconds), preferredTimescale: 600)
         isSeeking = true
         currentTime = seconds
@@ -275,6 +287,8 @@ public final class AudioPlayer {
 
     /// Stops playback and clears the queue (sign out).
     public func stop() {
+        loadGeneration += 1
+        reloadingStreams = false
         reportStopped()
         setSleepTimer(nil)
         player.pause()
@@ -290,7 +304,9 @@ public final class AudioPlayer {
     // MARK: - Queue → AVQueuePlayer
 
     /// Rebuilds the player around the queue's current track and starts it if playing.
-    private func loadCurrent() {
+    private func loadCurrent(startAt position: Double? = nil) {
+        loadGeneration += 1
+        reloadingStreams = false
         reportStopped()
         forgetAllItems()
         errorMessage = nil
@@ -300,7 +316,7 @@ public final class AudioPlayer {
         duration = track.duration.map { Double($0.components.seconds) } ?? 0
         enqueueNext()
         applyRate()
-        seekToResumePosition(track)
+        if let position, position > 1 { seekAfterLoad(to: position) } else { seekToResumePosition(track) }
         if isPlaying { playOnceSessionIsActive() }
         didStart(track)
     }
@@ -308,6 +324,10 @@ public final class AudioPlayer {
     /// Episodes pick up where the listener left off (positions under 5 s start from the top).
     private func seekToResumePosition(_ track: QueuedTrack) {
         guard track.isEpisode, let position = resumePosition?(track), position > 5 else { return }
+        seekAfterLoad(to: position)
+    }
+
+    private func seekAfterLoad(to position: Double) {
         isSeeking = true
         currentTime = position
         // A second of tolerance: exact seeks in long MP3s can scan the whole file.
@@ -384,7 +404,7 @@ public final class AudioPlayer {
         let item = AVPlayerItem(asset: asset)
         item.preferredForwardBufferDuration = 30
         level(item, gain: track.normalizationGain)
-        entries[ObjectIdentifier(item)] = Entry(track: track, playSessionID: request.playSessionID)
+        entries[ObjectIdentifier(item)] = Entry(track: track, playSessionID: request.playSessionID, sendsToken: true)
         observeStatus(of: item)
         return item
     }
@@ -408,7 +428,7 @@ public final class AudioPlayer {
     private func currentItemChanged(to item: AVPlayerItem?) {
         guard let item else {
             // End of queue without repeat: rewind to the last track, paused.
-            guard hasQueue, player.items().isEmpty, !isSeeking else { return }
+            guard hasQueue, player.items().isEmpty, !isSeeking, !reloadingStreams else { return }
             reportStopped()
             isPlaying = false
             loadCurrent()
@@ -571,6 +591,62 @@ public final class AudioPlayer {
         }
         // Skip unplayable tracks rather than stalling the queue.
         if queue.skipForward() { loadCurrent() } else { pause() }
+    }
+
+    // MARK: - Network changes
+
+    /// Security: an HTTP server's address can be a different machine on another network, and an
+    /// item that's already loaded keeps sending its token header there (a buffering one
+    /// reconnects by itself). So after a network change the server's streams are dropped, and
+    /// rebuilt where they were once the server has proved itself again (see `ServerIdentity`).
+    /// Downloaded files and podcast episodes carry no token and play on.
+    public func networkChanged() {
+        guard library.session.serverURL.scheme?.lowercased() == "http",
+              entries.values.contains(where: \.sendsToken) else { return }
+        let position = currentTime
+        let reloadCurrent = currentEntry?.sendsToken == true
+        if reloadCurrent {
+            reloadingStreams = true
+            forgetAllItems()
+        } else {
+            for item in player.items() where entries[ObjectIdentifier(item)]?.sendsToken == true {
+                player.remove(item)
+                entries.removeValue(forKey: ObjectIdentifier(item))
+                statusObservations.removeValue(forKey: ObjectIdentifier(item))
+            }
+        }
+        let generation = loadGeneration
+        Task {
+            let allowed = await serverMayGetToken()
+            // Unless the listener has moved on in the meantime.
+            guard generation == loadGeneration else { return }
+            if !allowed {
+                reloadingStreams = false
+                if reloadCurrent, isPlaying { pause() }
+                notifyOffline()
+            } else if reloadCurrent {
+                loadCurrent(startAt: position)
+            } else {
+                enqueueNext()
+            }
+        }
+    }
+
+    /// The app came back to the foreground: no network change reaches a suspended app, so a
+    /// paused player (the only kind that can be suspended) treats it as one. Playing audio keeps
+    /// the app running and hears about changes as they happen.
+    public func enteredForeground() {
+        if !isPlaying { networkChanged() }
+    }
+
+    private func serverMayGetToken() async -> Bool {
+        let url = library.session.serverURL
+        // A check that straddles a second network change answers nil: ask again.
+        for _ in 0 ..< 3 {
+            if ServerIdentity.shared.allowsToken(to: url) { return true }
+            if let answer = await ServerIdentity.shared.probe(url) { return answer }
+        }
+        return false
     }
 
     // MARK: - Offline

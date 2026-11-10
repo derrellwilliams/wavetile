@@ -27,6 +27,8 @@ struct RecentlyPlayedWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: WidgetKind.recentlyPlayed, provider: RecentsProvider()) { entry in
             RecentsView(entry: entry)
+                // Listening history stays hidden while the phone is locked (StandBy, Lock Screen data).
+                .privacySensitive()
                 .containerBackground(Theme.dark.palette.background, for: .widget)
         }
         .configurationDisplayName("Recently Played")
