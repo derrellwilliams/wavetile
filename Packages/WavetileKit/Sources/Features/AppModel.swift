@@ -205,6 +205,8 @@ public final class AppModel {
             signedIn.library.database.deleteStandInFiles()
             signedIn.podcasts.database.deleteStandInFiles()
             RecentSearches.clearStored()
+            HomeModel.clearStored(userID: signedIn.session.userID)
+            LibraryStore.clearStored(serverID: signedIn.session.serverID, userID: signedIn.session.userID)
             ImageCaching.removeAll()
         }
         if let (session, token) = store.load() {

@@ -84,8 +84,12 @@ struct SearchView: View {
             // Debounce typing; FTS queries are fast but there's no need to run one per keystroke.
             try? await Task.sleep(for: .milliseconds(150))
             guard !Task.isCancelled else { return }
-            results = (try? await store.database.search(text)) ?? .init()
-            podcastResults = podcasts.isEnabled ? ((try? await podcasts.database.search(text)) ?? .init()) : .init()
+            let found = (try? await store.database.search(text)) ?? .init()
+            let podcastFound = podcasts.isEnabled ? ((try? await podcasts.database.search(text)) ?? .init()) : .init()
+            // A slow search for earlier text must not land on top of the newer one's results.
+            guard !Task.isCancelled else { return }
+            results = found
+            podcastResults = podcastFound
             searchedText = text
         }
         .task(id: "\(scope)|\(text)") { await searchApple() }

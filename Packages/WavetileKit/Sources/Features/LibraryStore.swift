@@ -18,7 +18,8 @@ final class LibraryStore {
     private let sync: LibrarySync
     @ObservationIgnored private var syncTask: Task<Void, Never>?
 
-    private var shuttingDown = false
+    /// Set at sign-out; work that finishes after it must not start anything (playback, writes).
+    private(set) var shuttingDown = false
 
     private(set) var progress: LibrarySync.Progress?
     private(set) var isSyncing = false
@@ -39,8 +40,15 @@ final class LibraryStore {
         self.sync = sync
         self.editor = LibraryEditor(session: session, token: token, auth: auth, database: database, sync: sync)
         self.hasSyncedOnce = (try? database.syncState()?.lastCompleted) != nil
-        self.coverShufflesKey = "coverShuffles.\(session.serverID).\(session.userID)"
+        self.coverShufflesKey = Self.coverShufflesKey(serverID: session.serverID, userID: session.userID)
         self.coverShuffles = UserDefaults.standard.dictionary(forKey: coverShufflesKey) as? [String: Int] ?? [:]
+    }
+
+    private static func coverShufflesKey(serverID: String, userID: String) -> String { "coverShuffles.\(serverID).\(userID)" }
+
+    /// Sign-out: the shuffle counts are this account's, kept on the device.
+    static func clearStored(serverID: String, userID: String) {
+        UserDefaults.standard.removeObject(forKey: coverShufflesKey(serverID: serverID, userID: userID))
     }
 
     func syncIfNeeded() async {

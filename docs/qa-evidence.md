@@ -598,3 +598,24 @@ Checked and clean: podcast items are plain assets with no headers or token; the 
 Validation: package tests 212 tests, 303 runs, 0 failures, no runtime warnings (`build/Logs/Test/Test-WavetileKit-Package-2026.11.09_18-55-52--0700.xcresult`). New: `RemoteInputTests` (2 tests, 4 runs).
 
 Not checked: UI tests; CarPlay in the simulator; Siri and the widget buttons on a device; the rebuild after a real network change (needs a plain-HTTP server and two networks); `NowPlayingView`, `QueueView` and `PlayableRow` were only searched for URL, link and clipboard use (full read is pass 6).
+
+## Review pass 6: UI layer — November 9, 2026
+
+Scope: `Features/Library`, `Home`, `Search`, `Main`, `Navigation`, `Settings`, `Player/NowPlayingView`, `QueueView`, `PlayableRow`, and `DesignSystem` (components, image cache, cover generator).
+
+| # | Severity | Finding | Status |
+|---|---|---|---|
+| 1 | Low | **Search could show results for earlier text.** The search task checked for cancellation only before the database read, so a slow search for "a" finishing after the one for "ab" replaced its results and left the list wrong until the next keystroke. The same in the playlist and collection picker | Fixed: both check again after the read. No automated test (needs a slow read racing a faster one) |
+| 2 | Low | **Sign-out left per-account preferences on the device.** The albums hidden from Recently Played, the welcome-card visit count and the generated-cover shuffle counts stayed in UserDefaults after the databases and files were deleted | Fixed: removed at sign-out for that account only. Tested (`SignOutPreferencesTests`) |
+| 3 | Low | **Start Radio could begin music after sign-out.** The Instant Mix request outlived sign-out (nothing cancelled it), and its result went straight to the player, which had already been stopped | Fixed: the result is dropped once the library store is shutting down. No automated test |
+
+Accepted notes:
+- Playlist editing (reorder, remove) shows the change at once and sends it to the server; if the server refuses, the sheet keeps the local order until it's reopened and the error alert says why.
+- Typed search text goes to Apple's directory under the All and Podcasts filters (documented on `SearchView`; Music never sends it).
+- The cover picker reads the whole chosen photo into memory before ImageIO makes the thumbnail; photos from the library are user-chosen and bounded by the device.
+
+Checked and clean: every server edit goes through `requiresServer()` and reports failures through `LibraryActions.editFailed`; destructive actions (delete playlist, collection, remove all downloads, sign out) ask first; the `wavetile://` handler only navigates; the scrubber and chapter list can't be given non-finite times (player duration is checked, chapters are range-checked in pass 3); the generated cover uses wrapping arithmetic and bounded indexes; the avatar and artwork go through the cookie-less image pipeline, which is emptied at sign-out; links in the UI are the privacy policy only; names and text from the server are shown as plain `Text` (no markdown or links).
+
+Validation: package tests 214 tests, 305 runs, 0 failures, no runtime warnings (`build/Logs/Test/Test-WavetileKit-Package-2026.11.09_19-01-55--0700.xcresult`). New: `SignOutPreferencesTests` (2 tests).
+
+Not checked: UI tests and the accessibility audit (not rerun since before pass 0), VoiceOver and Dynamic Type on a device, the custom navigation-bar code (`CustomBarItem`, `TintedSystemBack`) beyond reading it, and `Features/Podcasts` views (reviewed with the feed passes).

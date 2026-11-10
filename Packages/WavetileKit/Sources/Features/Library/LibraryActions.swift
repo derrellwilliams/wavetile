@@ -70,6 +70,8 @@ final class LibraryActions {
                 var queue = try await store.api.instantMix(itemID: itemID).compactMap { mix in
                     mix.album.map { QueuedTrack(mix.track, album: $0) }
                 }
+                // Signed out while the request ran: don't start music for an account that's gone.
+                guard !store.shuttingDown else { return }
                 // Instant Mix can pull from outside the synced music library; keep only songs here
                 // (unless the first sync hasn't finished, when there's nothing to check against).
                 if (try? store.database.isEmpty()) == false, let synced = try? store.database.trackIDs(in: queue.map(\.trackID)) {

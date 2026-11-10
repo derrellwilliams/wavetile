@@ -62,14 +62,24 @@ final class HomeModel {
     @ObservationIgnored private var countedWelcomeVisit = false
     private static let welcomeVisitLimit = 1
 
+    private static func hiddenRecentsKey(_ userID: String) -> String { "hiddenRecentlyPlayed.\(userID)" }
+    private static func welcomeVisitsKey(_ userID: String) -> String { "welcomeVisits.\(userID)" }
+
+    /// Sign-out: which albums the account hid and how often it saw the welcome card are its own
+    /// data, so they leave the device with the rest.
+    static func clearStored(userID: String) {
+        UserDefaults.standard.removeObject(forKey: hiddenRecentsKey(userID))
+        UserDefaults.standard.removeObject(forKey: welcomeVisitsKey(userID))
+    }
+
     /// Shelves are computed from the local database synchronously, so Home is populated on the
     /// first frame (and offline); `load()` then refreshes them from the server.
     init(library: LibraryClient, database: LibraryDatabase? = nil, userID: String = "") {
         self.library = library
         self.database = database
-        hiddenRecentsKey = "hiddenRecentlyPlayed.\(userID)"
+        hiddenRecentsKey = Self.hiddenRecentsKey(userID)
         hiddenRecents = Set(UserDefaults.standard.stringArray(forKey: hiddenRecentsKey) ?? [])
-        welcomeVisitsKey = "welcomeVisits.\(userID)"
+        welcomeVisitsKey = Self.welcomeVisitsKey(userID)
         welcomeVisits = UserDefaults.standard.integer(forKey: welcomeVisitsKey)
         loadLocal()
     }

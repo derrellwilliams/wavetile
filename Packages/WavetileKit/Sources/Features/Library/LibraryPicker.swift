@@ -124,7 +124,8 @@ struct LibraryPicker: View {
         let query = text.trimmingCharacters(in: .whitespaces)
         guard !query.isEmpty else { results = nil; return }
         try? await Task.sleep(for: .milliseconds(150))
-        guard !Task.isCancelled, let found = try? await store.database.search(query, limit: 200) else { return }
+        guard !Task.isCancelled, let found = try? await store.database.search(query, limit: 200),
+              !Task.isCancelled else { return }
         results = isSongs ? found.tracks.map(item) : found.albums.map(item)
     }
 
