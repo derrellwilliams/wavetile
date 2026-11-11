@@ -14,7 +14,7 @@
 ## Features
 - Sign in with a server address or Jellyfin Quick Connect; token stored in the iOS Keychain
 - Full library sync to the device: instant browsing, search and sorting, even offline
-- Home feed: Recently Played, Most Played, Recently Added, From Your Library, Artist Spotlight
+- Home feed: Recently Played, Most Played, Latest Podcast Episodes (if podcasts are on), Playlists & Collections, Recently Added, Artist Spotlight
 - Gapless playback, shuffle, repeat, sleep timer, AirPlay, Lock Screen and Control Center controls
 - Start Radio: Jellyfin Instant Mix from any song, album or artist
 - Background downloads of albums and playlists as 256 kbps MP3 or the original file (e.g. FLAC), with a Live Activity

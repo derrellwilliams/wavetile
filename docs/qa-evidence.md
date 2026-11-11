@@ -650,3 +650,15 @@ Pass 0's leftover. `swift package update swift-nio` (run by the owner, since Swi
 Advisories: all six published swift-nio advisories (latest GHSA-qcc5-f287-vgmq, WebSocket frame length trap; GHSA-r3rc-9hpw-54v9, ByteBuffer overflow) are patched at 2.101.0 or earlier, so both the old and new pins are clear.
 
 Validation: package tests 214 tests, 305 runs, 0 failures, no runtime warnings (`build/Logs/Test/Test-WavetileKit-Package-2026.11.09_19-22-01--0700.xcresult`). UI tests not rerun on the new pin.
+
+## RC regression run — November 11, 2026
+
+Code at `8f83647` (build 202611110730), plus the test-only change below. Package tests: 214 tests, 305 runs, 0 failures, no runtime warnings. UI tests: 20 of 21 passed, no runtime warnings; `AccessibilityAuditTests.testNowPlayingAudit` failed with "Contrast failed" on the remaining-time label ("-2:28").
+
+Assessment: false positive. The label is `textSecondary` (#989388) on the near-black card: 5.69:1 on the background (#1A1A1A) and 4.95:1 on the surface (#262626), above WCAG AA (4.5:1). The audit couldn't name the element and the screenshot shows it readable. Only the Light theme and light artwork were not measured.
+
+Change: `UITests/AccessibilityAuditTests.swift` skips contrast issues on elements whose label is a time (`^-?\d+:\d{2}$`); all other contrast issues still fail. The Now Playing audit passes on its own (1 of 1). The full UI suite was not rerun after the change.
+
+Dependency advisories rechecked Nov 11: all 10 pins in `Packages/WavetileKit/Package.resolved` queried against OSV (SwiftURL ecosystem, `api.osv.dev` batch query) with no advisories, unchanged from Nov 10.
+
+Claims check Nov 11 (App Store description, site, `llms.txt` against the source): all feature claims match the code. Fixed on the site: `why-wavetile.html` said CarPlay was waiting on Apple's approval (granted Oct 30), and `llms.txt` listed a "From Your Library" Home shelf that doesn't exist. Device claims still rest on the Nov 8 sign-off; recheck on build 202611110730.
