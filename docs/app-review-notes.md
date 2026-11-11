@@ -1,6 +1,6 @@
 # App Review notes — updated November 11, 2026
 
-Not submitted. Reviewer access uses the public Jellyfin demo server (decision in [LAUNCH.md](LAUNCH.md)). Device verification was signed off by the tester on 2026-11-08.
+Submitted Nov 11, 2026 (build 202611110730); this text is what is in App Store Connect. Reviewer access uses the public Jellyfin demo server (decision in [LAUNCH.md](LAUNCH.md)).
 
 ## App Review Information fields
 
@@ -40,9 +40,6 @@ Support: https://wavetile.com/support
 Contact: realslimscrawny@gmail.com
 ```
 
-## Before submitting
+## While in review
 
-- The demo is not ours: it can reset, change or go down during review. Recheck it (server up, `demo` login works, albums play) just before submitting.
-- Be ready to answer a reply within hours: a reviewer who can't sign in rejects under 2.1. Consider a dedicated server ([reviewer-server.md](reviewer-server.md)) instead of the demo.
-- Enter the contact name and phone in App Store Connect.
-- Confirm the final build number in LAUNCH.md.
+- The demo is not ours: it can reset, change or go down. If the reviewer can't sign in, reply with another account (see [reviewer-server.md](reviewer-server.md)).

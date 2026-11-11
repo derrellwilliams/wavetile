@@ -7,7 +7,7 @@ Goal: when someone searches or asks an LLM for "a Jellyfin music app for iPhone"
 **Wording.** Use one line, word for word, in the App Store description and GitHub: *Wavetile: your Jellyfin music and your podcasts, in one app.* Spell the name **Wavetile**: one word, capital W only ("Wave tile" brings up flooring and acoustic panels).
 
 ## App Store (ASO)
-The prepared submission copy, fields and screenshot captions are maintained in [app-store-listing.md](app-store-listing.md), reviewed November 7. Use that document for entry; avoid maintaining a second copy here. Name remains Wavetile Music, with Jellyfin referenced as compatibility in the subtitle and description.
+The listing text lives in App Store Connect (the old `app-store-listing.md` was removed Nov 11; git history keeps it). Name remains Wavetile Music, with Jellyfin referenced as compatibility in the subtitle and description.
 
 Keyword rules: use comma-separated relevant terms within Apple's byte limit; avoid duplicating the app name or using competitor trademarks. Privacy answers live in [privacy-answers.md](privacy-answers.md) and remain conditional on service relationships and final archive review.
 

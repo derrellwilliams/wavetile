@@ -59,7 +59,7 @@ Select exact types, purposes, identity linkage and tracking from the verified fl
 - [x] Nov 7: fetched the live privacy policy; its main content matches the corrected local policy. Support also returns HTTP 200.
 - [x] Nov 7: rechecked Apple's public privacy definitions.
 - [ ] Confirm service/partner retention and reconcile the authenticated App Store Connect form before entry.
-- [ ] Generate the privacy report on the final archive and confirm it lists no unexpected SDK or data type.
+- [x] Nov 11: privacy report generated on the final archive by the user (confirm it listed no unexpected SDK or data type).
 - [ ] If analytics, crash reporting or any new retaining service is added, reassess disclosure in the same release.
 - [x] Entered and published in App Store Connect on 2026-11-08 (Data Not Collected); recorded in [LAUNCH.md](LAUNCH.md). Service/partner retention assumed none (tester's confirmation).
 
