@@ -2,6 +2,7 @@ import AVFoundation
 import JellyfinKit
 import MediaPlayer
 import Observation
+import os
 import UIKit
 
 /// The app's audio engine. Owns an `AVQueuePlayer`, a `PlaybackQueue`, Lock Screen /
@@ -118,6 +119,11 @@ public final class AudioPlayer {
         /// A server stream: its request carries the Jellyfin token.
         var sendsToken = false
     }
+
+    /// How far ahead a streamed song buffers (about 135 MB at most for 9 Mbps hi-res, far less usually).
+    private static let streamBufferSeconds: TimeInterval = 120
+
+    private let log = Logger(subsystem: "com.derrellwilliams.wavetile", category: "playback")
 
     public init(library: LibraryClient) {
         self.library = library
@@ -402,7 +408,10 @@ public final class AudioPlayer {
         // Header-based auth keeps the token out of the URL.
         let asset = AVURLAsset(url: request.url, options: ["AVURLAssetHTTPHeaderFieldsKey": request.headers])
         let item = AVPlayerItem(asset: asset)
-        item.preferredForwardBufferDuration = 30
+        // Music is where a stall hurts most: buffer well ahead so a Wi-Fi dip or a busy server
+        // doesn't reach the speakers. It applies to the preloaded next item too, which AVQueuePlayer
+        // starts filling as soon as it's inserted, so the track change is covered the same way.
+        item.preferredForwardBufferDuration = Self.streamBufferSeconds
         level(item, gain: track.normalizationGain)
         entries[ObjectIdentifier(item)] = Entry(track: track, playSessionID: request.playSessionID, sendsToken: true)
         observeStatus(of: item)
@@ -600,9 +609,24 @@ public final class AudioPlayer {
     /// reconnects by itself). So after a network change the server's streams are dropped, and
     /// rebuilt where they were once the server has proved itself again (see `ServerIdentity`).
     /// Downloaded files and podcast episodes carry no token and play on.
-    public func networkChanged() {
+    ///
+    /// `strict` is false for a path update that kept the same interfaces (signal or address
+    /// chatter on the same Wi-Fi): the open connections keep going to the server that already
+    /// proved itself, so playback carries on while the server is checked again, and the streams
+    /// are only dropped if that check fails. Dropping them on every such update stalled playback.
+    public func networkChanged(strict: Bool = true) {
         guard library.session.serverURL.scheme?.lowercased() == "http",
               entries.values.contains(where: \.sendsToken) else { return }
+        guard strict else {
+            let generation = loadGeneration
+            Task {
+                if await serverMayGetToken() { return }
+                guard generation == loadGeneration else { return }
+                networkChanged(strict: true)
+            }
+            return
+        }
+        log.info("Dropping streams for a network change at \(self.currentTime, privacy: .public) s")
         let position = currentTime
         let reloadCurrent = currentEntry?.sendsToken == true
         if reloadCurrent {

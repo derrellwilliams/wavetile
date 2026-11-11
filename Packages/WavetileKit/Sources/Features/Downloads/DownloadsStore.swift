@@ -43,8 +43,9 @@ final class Connectivity {
         }
     }
 
-    /// Called when the device changes networks, before the server is checked again.
-    @ObservationIgnored var onNetworkChange: (() async -> Void)?
+    /// Called when the device changes networks, before the server is checked again. `strict` is
+    /// false for an update that kept the same interfaces (see `AudioPlayer.networkChanged`).
+    @ObservationIgnored var onNetworkChange: ((_ strict: Bool) async -> Void)?
 
     /// Called when the app returns to the foreground, where no network change was seen.
     @ObservationIgnored var onForeground: (() async -> Void)?
@@ -55,6 +56,8 @@ final class Connectivity {
     @ObservationIgnored private var interfaces: [String] = []
     @ObservationIgnored private var checkTask: Task<Void, Never>?
     @ObservationIgnored private var retryTask: Task<Void, Never>?
+    /// Waits out a burst of same-interface updates so they cost one check, not one each.
+    @ObservationIgnored private var pathDebounce: Task<Void, Never>?
     @ObservationIgnored private var foregroundToken: NSObjectProtocol?
 
     init() {
@@ -76,6 +79,7 @@ final class Connectivity {
         monitor.cancel()
         checkTask?.cancel()
         retryTask?.cancel()
+        pathDebounce?.cancel()
     }
 
     /// Pings the server now and returns once `serverReachable` has the answer (a stream just
@@ -110,14 +114,28 @@ final class Connectivity {
         // on the same subnet), and Wi-Fi to Wi-Fi keeps the same interfaces, so any path update
         // means it proves itself again before it gets the token.
         let cleartext = server?.isCleartext == true
-        guard cleartext || online != hasNetwork || interfaces != self.interfaces else { return }
-        if cleartext {
-            ServerIdentity.shared.networkChanged()
-            if let onNetworkChange { Task { await onNetworkChange() } }
-        }
+        let changed = online != hasNetwork || interfaces != self.interfaces
+        guard cleartext || changed else { return }
         hasNetwork = online
         self.interfaces = interfaces
-        check()
+        pathDebounce?.cancel()
+        guard cleartext, !changed else {
+            if cleartext { announceNetworkChange(strict: true) }
+            check()
+            return
+        }
+        // Same interfaces: the player keeps its streams while the server proves itself again.
+        pathDebounce = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            self?.announceNetworkChange(strict: false)
+            self?.check()
+        }
+    }
+
+    private func announceNetworkChange(strict: Bool) {
+        ServerIdentity.shared.networkChanged()
+        if let onNetworkChange { Task { await onNetworkChange(strict) } }
     }
 
     /// Security: no path update arrives while the app is suspended, and the one for a network

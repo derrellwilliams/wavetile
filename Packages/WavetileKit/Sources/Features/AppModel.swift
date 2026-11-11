@@ -164,9 +164,9 @@ public final class AppModel {
             }
         }
         Connectivity.shared.server = .init(url: session.serverURL, id: session.serverID)
-        Connectivity.shared.onNetworkChange = { [weak downloads, weak player] in
+        Connectivity.shared.onNetworkChange = { [weak downloads, weak player] strict in
             await downloads?.networkChanged()
-            player?.networkChanged()
+            player?.networkChanged(strict: strict)
         }
         Connectivity.shared.onForeground = { [weak player] in player?.enteredForeground() }
         player.resumePosition = { [weak podcasts] track in podcasts?.resumePosition(for: track) }
