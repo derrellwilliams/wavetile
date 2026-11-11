@@ -29,7 +29,7 @@ Consolidated 2026-11-06 and reorganized 2026-11-07 (tiers below, evidence and se
 1. Wait for review. Keep the demo server working; watch email for questions or a rejection.
 2. If rejected or asked for more: answer in App Store Connect; a code fix needs a new build, a device check and a rerun of the affected tests.
 3. If approved: automatic release starts; then the Launch day list below.
-4. Still open (optional): re-check the age rating against podcast content; look at App Accessibility in App Store Connect.
+4. Still open (optional): look at App Accessibility in App Store Connect.
 
 ## Before submission
 
@@ -55,7 +55,7 @@ All submitted Nov 11. Outcome pending.
 - [x] Medium: screenshots. Checked for personal data; third-party art risk accepted.
 - [x] HTTP exceptions, background modes, CarPlay, Live Activities, "Jellyfin" wording: explained in the notes and listing.
 - [x] Privacy label vs archive report.
-- [ ] Low: podcast content vs age rating. Recheck.
+- [x] Low: podcast content vs age rating. Age rating was submitted with the version (13+).
 
 Apple references: [submission](https://developer.apple.com/help/app-store-connect/manage-submissions-to-app-review/submit-an-app), [review access](https://developer.apple.com/help/app-review/before-submitting-for-review/complete-review/), [privacy](https://developer.apple.com/app-store/app-privacy-details/), [review guidelines](https://developer.apple.com/app-store/review/guidelines/). Recheck current requirements when filling the submission.
 
