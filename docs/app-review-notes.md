@@ -1,4 +1,4 @@
-# App Review notes — updated November 8, 2026
+# App Review notes — updated November 11, 2026
 
 Not submitted. Reviewer access uses the public Jellyfin demo server (decision in [LAUNCH.md](LAUNCH.md)). Device verification was signed off by the tester on 2026-11-08.
 
@@ -26,6 +26,14 @@ Podcasts (optional, off by default): tap the top-right profile avatar and turn o
 
 Background audio plays with the screen locked. CarPlay is supported (sign in on the iPhone first).
 
+Network security: Jellyfin servers must use HTTPS, except servers on the user's local network or a Tailscale tailnet (ts.net), which are home setups that rarely have certificates. The app refuses a plain-HTTP server anywhere else at sign-in, so the access token never crosses the internet in cleartext. The media-only ATS exception (NSAllowsArbitraryLoadsInMedia) exists because some podcast publishers still serve episode audio over HTTP; no Jellyfin credentials are sent to podcast hosts.
+
+Background modes: "audio" keeps music and podcasts playing with the screen locked; "fetch" lets iOS wake the app to check followed podcasts for new episodes. The CarPlay Audio entitlement was granted by Apple on 2026-10-30. Live Activities are used only to show download progress.
+
+Podcasts are optional and off by default. Show search uses Apple's public iTunes Search API; episodes stream from each publisher's own feed.
+
+If the demo server is unreachable, tell us in the review reply and we will provide another account at once. The app is a client only and does not work without a Jellyfin server.
+
 The app has no analytics, ads or tracking.
 Privacy: https://wavetile.com/privacy
 Support: https://wavetile.com/support
@@ -35,5 +43,6 @@ Contact: realslimscrawny@gmail.com
 ## Before submitting
 
 - The demo is not ours: it can reset, change or go down during review. Recheck it (server up, `demo` login works, albums play) just before submitting.
+- Be ready to answer a reply within hours: a reviewer who can't sign in rejects under 2.1. Consider a dedicated server ([reviewer-server.md](reviewer-server.md)) instead of the demo.
 - Enter the contact name and phone in App Store Connect.
 - Confirm the final build number in LAUNCH.md.
