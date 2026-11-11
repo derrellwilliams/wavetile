@@ -103,17 +103,29 @@ final class Connectivity {
             stale += 1
             reachable = await ServerIdentity.shared.probe(server.url)
         }
-        guard !Task.isCancelled, server == self.server, hasNetwork, let reachable else { return }
-        serverReachable = reachable
+        guard !Task.isCancelled, server == self.server, hasNetwork else { return }
+        // Still voided after three asks (path updates keep landing): look again soon. Returning
+        // here would end the retry chain and leave the last answer standing until the next event.
+        guard let reachable else { scheduleRetry(attempt: attempt + 1); return }
+        if reachable {
+            serverReachable = true
+            retryTask?.cancel()
+            return
+        }
+        // One miss after a good answer is often Wi-Fi still waking after foreground, not an
+        // outage: look again in 1 s before the "Can't reach your server" notice appears.
+        if attempt > 0 || !serverReachable { serverReachable = false }
+        scheduleRetry(attempt: attempt + 1)
+    }
+
+    /// Looks again after 1, 2, 4 and 8 s, then every 15 s, so the library comes back on its own.
+    private func scheduleRetry(attempt: Int) {
         retryTask?.cancel()
-        guard !reachable else { return }
-        // The first misses are often Wi-Fi still waking after foreground: look again in 3 s, then
-        // every 30 s so the library comes back on its own.
-        let delay: Duration = attempt < 2 ? .seconds(3) : .seconds(30)
+        let delay: Duration = attempt <= 4 ? .seconds(1 << (attempt - 1)) : .seconds(15)
         retryTask = Task { [weak self] in
             try? await Task.sleep(for: delay)
             guard !Task.isCancelled else { return }
-            await self?.recheck(attempt: attempt + 1)
+            await self?.recheck(attempt: attempt)
         }
     }
 
@@ -127,7 +139,9 @@ final class Connectivity {
         // means it proves itself again before it gets the token.
         let cleartext = server?.isCleartext == true
         let changed = online != hasNetwork || interfaces != self.interfaces
-        guard cleartext || changed else { return }
+        // While the server is out of reach, any update is a reason to look again: Wi-Fi settling
+        // often shows up as same-interface chatter.
+        guard cleartext || changed || !serverReachable else { return }
         hasNetwork = online
         self.interfaces = interfaces
 
@@ -143,7 +157,7 @@ final class Connectivity {
                 try? await Task.sleep(for: Self.sameInterfaceDelay)
                 guard !Task.isCancelled, let self else { return }
                 pathDebounce = nil
-                announceNetworkChange(strict: false)
+                if server?.isCleartext == true { announceNetworkChange(strict: false) }
                 check()
             }
         }
