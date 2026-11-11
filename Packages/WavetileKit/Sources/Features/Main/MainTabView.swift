@@ -728,9 +728,11 @@ extension EnvironmentValues {
 extension View {
     /// A tap on the already-selected tab (`reselects` counts them), one step per tap, never two
     /// at once: from a pushed screen, back to the tab's root; at the root but scrolled down, to
-    /// the top; at the top, `refresh` (if the tab has one). Binds `scrollPosition` to the tab's
-    /// scroll view and tracks whether it is at the top.
-    func onTabReselect(_ reselects: Int, path: Binding<NavigationPath>, scrollPosition: Binding<ScrollPosition>, refresh: @escaping () -> Void = {}) -> some View {
+    /// the top; at the top, `refresh`. Binds `scrollPosition` to the tab's scroll view and tracks
+    /// whether it is at the top. Attach it to the scroll view (Search: to the container of its
+    /// lists). A tab with no `refresh` scrolls on every tap, so a stale at-top value (a scroll
+    /// view swapped out) can't swallow one.
+    func onTabReselect(_ reselects: Int, path: Binding<NavigationPath>, scrollPosition: Binding<ScrollPosition>, refresh: (() -> Void)? = nil) -> some View {
         modifier(TabReselect(reselects: reselects, path: path, scrollPosition: scrollPosition, refresh: refresh))
     }
 
@@ -847,7 +849,7 @@ private struct TabReselect: ViewModifier {
     let reselects: Int
     @Binding var path: NavigationPath
     @Binding var scrollPosition: ScrollPosition
-    let refresh: () -> Void
+    let refresh: (() -> Void)?
     @State private var isAtTop = true
 
     func body(content: Content) -> some View {
@@ -855,17 +857,17 @@ private struct TabReselect: ViewModifier {
             .scrollPosition($scrollPosition)
             .onScrollGeometryChange(for: Bool.self) { geometry in
                 // Pulled past the top (a refresh in progress) counts as the top.
-                geometry.contentOffset.y + geometry.contentInsets.top <= 1
+                geometry.contentOffset.y + geometry.contentInsets.top <= 2
             } action: { _, atTop in
                 isAtTop = atTop
             }
             .onChange(of: reselects) {
                 if !path.isEmpty {
                     path = NavigationPath()
-                } else if !isAtTop {
-                    withAnimation(theme.motion.smooth) { scrollPosition.scrollTo(edge: .top) }
-                } else {
+                } else if let refresh, isAtTop {
                     refresh()
+                } else {
+                    withAnimation(theme.motion.smooth) { scrollPosition.scrollTo(edge: .top) }
                 }
             }
     }
