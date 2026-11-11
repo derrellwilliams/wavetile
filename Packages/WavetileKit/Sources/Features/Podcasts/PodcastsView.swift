@@ -20,6 +20,8 @@ struct PodcastsView: View {
     /// Owned by the main tab view, so the player can open an episode or show here.
     @Binding var path: NavigationPath
     @State private var refreshRequests = 0
+    /// Tapping the tab again at its root scrolls back to the top.
+    @State private var scrollPosition = ScrollPosition(edge: .top)
     @Namespace private var zoom
     @State private var showSettings = false
     /// `-openLatestEpisode` fires once per launch, not on every refresh of the list.
@@ -66,6 +68,7 @@ struct PodcastsView: View {
             }
             .padding(.vertical, theme.spacing.lg)
         }
+        .scrollPosition($scrollPosition)
         .themedBackground()
         // The offline notice (and dimming) slide in and out.
         .animatesConnectivity()
@@ -76,7 +79,7 @@ struct PodcastsView: View {
             await podcasts.refreshAll()
             await podcasts.refreshRecommendations()
         }
-        .onTabReselect(reselects, path: $path) { refreshRequests += 1 }
+        .onTabReselect(reselects, path: $path) { scrollToTop(); refreshRequests += 1 }
         // On the always-present scroll view: a task on a shelf that isn't shown never runs.
         .task { await observe(podcasts.database.continueListening()) { continueListening = $0 } }
         .task {
@@ -93,6 +96,10 @@ struct PodcastsView: View {
         .task { await podcasts.refreshRecommendations() }
         .sheet(isPresented: $showAddFeed) { AddFeedSheet() }
         .opmlImporter(isPresented: $showImporter, message: $importMessage)
+    }
+
+    private func scrollToTop() {
+        withAnimation(theme.motion.smooth) { scrollPosition.scrollTo(edge: .top) }
     }
 
     /// The first load appears as-is; later changes animate.
