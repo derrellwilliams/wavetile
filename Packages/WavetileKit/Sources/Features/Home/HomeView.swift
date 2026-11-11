@@ -98,7 +98,6 @@ struct HomeView: View {
                 }
                 .padding(.vertical, theme.spacing.lg)
             }
-            .scrollPosition($scrollPosition)
             .overlay { overlay }
             .themedBackground()
             // The offline notice, Downloaded row and dimming slide in and out.
@@ -122,9 +121,9 @@ struct HomeView: View {
             .task { await store.observe(store.database.collections()) { collections = $0; rebuildLibraryItems() } }
             .task(id: podcasts.isEnabled) { await observePodcasts(podcasts.database.upNextShelf()) { podcastUpNext = $0 } }
             .markRefreshable(trigger: refreshRequests) { await refresh() }
-            // Tapping Home again from a pushed screen goes back to Home; at Home, to the top,
-            // pulled down and refreshed.
-            .onTabReselect(reselects, path: $path) { refreshRequests += 1 }
+            // Tapping Home again from a pushed screen goes back to Home; at Home, scrolled down, to the
+            // top; at the top, pulled down and refreshed.
+            .onTabReselect(reselects, path: $path, scrollPosition: $scrollPosition) { refreshRequests += 1 }
             .onChange(of: store.isSyncing) { _, syncing in
                 guard !syncing, !isRefreshing else { return }
                 Task { await model.librarySynced() }

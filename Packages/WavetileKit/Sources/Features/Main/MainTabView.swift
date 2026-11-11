@@ -726,12 +726,12 @@ extension EnvironmentValues {
 }
 
 extension View {
-    /// A tap on the already-selected tab (`reselects` counts them): from a pushed screen, back to
-    /// the tab's root; at the root, `atRoot` (refresh, if the tab has one).
-    func onTabReselect(_ reselects: Int, path: Binding<NavigationPath>, atRoot: @escaping () -> Void = {}) -> some View {
-        onChange(of: reselects) {
-            if path.wrappedValue.isEmpty { atRoot() } else { path.wrappedValue = NavigationPath() }
-        }
+    /// A tap on the already-selected tab (`reselects` counts them), one step per tap, never two
+    /// at once: from a pushed screen, back to the tab's root; at the root but scrolled down, to
+    /// the top; at the top, `refresh` (if the tab has one). Binds `scrollPosition` to the tab's
+    /// scroll view and tracks whether it is at the top.
+    func onTabReselect(_ reselects: Int, path: Binding<NavigationPath>, scrollPosition: Binding<ScrollPosition>, refresh: @escaping () -> Void = {}) -> some View {
+        modifier(TabReselect(reselects: reselects, path: path, scrollPosition: scrollPosition, refresh: refresh))
     }
 
     /// Chrome for a tab's root screen, applied to the content *inside* its `NavigationStack`:
@@ -839,4 +839,34 @@ enum DebugFlags {
     static let openArtist = false
     static let openSection: LibrarySection? = nil
     #endif
+}
+
+/// See `View.onTabReselect`.
+private struct TabReselect: ViewModifier {
+    @Environment(\.theme) private var theme
+    let reselects: Int
+    @Binding var path: NavigationPath
+    @Binding var scrollPosition: ScrollPosition
+    let refresh: () -> Void
+    @State private var isAtTop = true
+
+    func body(content: Content) -> some View {
+        content
+            .scrollPosition($scrollPosition)
+            .onScrollGeometryChange(for: Bool.self) { geometry in
+                // Pulled past the top (a refresh in progress) counts as the top.
+                geometry.contentOffset.y + geometry.contentInsets.top <= 1
+            } action: { _, atTop in
+                isAtTop = atTop
+            }
+            .onChange(of: reselects) {
+                if !path.isEmpty {
+                    path = NavigationPath()
+                } else if !isAtTop {
+                    withAnimation(theme.motion.smooth) { scrollPosition.scrollTo(edge: .top) }
+                } else {
+                    refresh()
+                }
+            }
+    }
 }

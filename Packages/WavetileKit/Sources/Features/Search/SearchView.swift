@@ -33,7 +33,7 @@ struct SearchView: View {
     @State private var appleShows: [DirectoryShow] = []
     let reselects: Int
     @State private var path = NavigationPath()
-    /// Tapping the tab again at its root scrolls back to the top.
+    /// Driven by `onTabReselect`: a tab tap scrolls to the top.
     @State private var scrollPosition = ScrollPosition(edge: .top)
     @State private var recents = RecentSearches()
 
@@ -46,7 +46,6 @@ struct SearchView: View {
                 case .music: musicResults
                 }
             }
-            .scrollPosition($scrollPosition)
             // The title, then the filter (in place of the system scope bar), pinned above the results.
             .safeAreaInset(edge: .top, spacing: 0) {
                 VStack(alignment: .leading, spacing: 0) {
@@ -60,7 +59,7 @@ struct SearchView: View {
                 .background(theme.palette.background)
             }
             .themedBackground()
-            .onTabReselect(reselects, path: $path) { scrollToTop() }
+            .onTabReselect(reselects, path: $path, scrollPosition: $scrollPosition)
             // The offline notice (and dimming) slide in and out.
             .animatesConnectivity()
             // iOS hides the bar's large title while the field is active, and this tab activates it
@@ -97,10 +96,6 @@ struct SearchView: View {
         }
         .task(id: "\(scope)|\(text)") { await searchApple() }
         .enableInjection()
-    }
-
-    private func scrollToTop() {
-        withAnimation(theme.motion.smooth) { scrollPosition.scrollTo(edge: .top) }
     }
 
     /// All filter only: Apple's shows that match the query, minus ones already followed.

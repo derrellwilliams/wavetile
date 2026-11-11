@@ -16,7 +16,7 @@ struct DownloadedView: View {
     @Namespace private var zoom
     let reselects: Int
     @State private var path = NavigationPath()
-    /// Tapping the tab again at its root scrolls back to the top.
+    /// Driven by `onTabReselect`: a tab tap scrolls to the top.
     @State private var scrollPosition = ScrollPosition(edge: .top)
     @State private var statusCollection: DownloadCollectionRecord?
     @State private var collections: [DownloadedCollection] = []
@@ -30,10 +30,6 @@ struct DownloadedView: View {
 
     private var showsPodcasts: Bool { podcasts.isEnabled && filter == .podcasts }
 
-    private func scrollToTop() {
-        withAnimation(theme.motion.smooth) { scrollPosition.scrollTo(edge: .top) }
-    }
-
     var body: some View {
         NavigationStack(path: $path) {
             // One scroll view for both filters: swapping whole scroll views made the large title
@@ -46,10 +42,9 @@ struct DownloadedView: View {
                 }
                 .animatesConnectivity()
             }
-            .scrollPosition($scrollPosition)
             .themedBackground()
             .navigationTitle("Downloads")
-            .onTabReselect(reselects, path: $path) { scrollToTop() }
+            .onTabReselect(reselects, path: $path, scrollPosition: $scrollPosition)
             .sheet(item: $statusCollection) { DownloadStatusSheet(collectionID: $0.id) }
             .confirmationDialog(showsPodcasts ? "Remove all downloaded episodes?" : "Remove all downloaded music?", isPresented: $confirmRemoveAll, titleVisibility: .visible) {
                 Button("Remove All", role: .destructive) {

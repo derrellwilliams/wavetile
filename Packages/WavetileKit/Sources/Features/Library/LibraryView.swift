@@ -12,15 +12,11 @@ struct LibraryView: View {
     let reselects: Int
     @State private var path = NavigationPath()
     @State private var refreshRequests = 0
-    /// Tapping the tab again at its root scrolls back to the top.
+    /// Driven by `onTabReselect`: a tab tap scrolls to the top, or at the top refreshes.
     @State private var scrollPosition = ScrollPosition(edge: .top)
     @State private var recentlyAdded: [AlbumRecord] = []
     /// `-openSection` fires once per launch.
     @State private var didOpenSection = false
-
-    private func scrollToTop() {
-        withAnimation(theme.motion.smooth) { scrollPosition.scrollTo(edge: .top) }
-    }
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -63,12 +59,11 @@ struct LibraryView: View {
                 .animation(theme.motion.smooth, value: store.isSyncing)
                 .animation(theme.motion.smooth, value: store.syncError)
             }
-            .scrollPosition($scrollPosition)
             .themedBackground()
             // The offline notice (and dimming) slide in and out.
             .animatesConnectivity()
             .markRefreshable(trigger: refreshRequests) { await store.syncNow() }
-            .onTabReselect(reselects, path: $path) { scrollToTop(); refreshRequests += 1 }
+            .onTabReselect(reselects, path: $path, scrollPosition: $scrollPosition) { refreshRequests += 1 }
             .navigationTitle("Music")
             .tabRootChrome()
             .libraryDestinations(zoom: zoom) { path.append($0) }
