@@ -157,6 +157,7 @@ public final class AppModel {
                 ? podcasts?.localFile(episodeID: track.trackID) != nil
                 : downloads?.isDownloaded(track.trackID) == true
         }
+        player.isMeteredNetwork = { Connectivity.shared.isMetered }
         player.onConnectionError = { track in
             if !track.isEpisode {
                 await Connectivity.shared.recheck()

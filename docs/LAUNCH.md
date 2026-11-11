@@ -71,6 +71,8 @@ Project goals, not Apple requirements. Each has a "done when" so it can't run fo
 
 ### QA-2 / QA-3 remaining
 
+- **Accepted residual risk (user, 2026-11-10): token on plain-HTTP servers after a same-subnet Wi-Fi hop.** Same-interface path updates no longer drop the playing stream; it keeps its open connection while the server is re-verified (about 0.5 s plus one probe). If the listener hopped from home Wi-Fi to another network using the same address range, and someone there runs a look-alike server at the old address, that server could receive the Jellyfin session token (a revocable session, not the password) in that window. Done when: not planned; serving Jellyfin over HTTPS removes it. Code: `Connectivity.pathChanged`, `AudioPlayer.networkChanged(strict:)`.
+
 - [x] **Engineering:** run the package and UI tests on the Nov 7 edits. Done Nov 7: package 150/150, UI 17/17 (Claude can run `xcodebuild` as a plain command; see qa-evidence.md).
 - [x] **Engineering:** `Environment<Theme/Bool>` warning fixed Nov 7. The cause was the back-chevron renderer reading a bare `TintedBarIcon`'s environment (it also used the default theme); UI run now shows zero runtime warnings.
 - [x] **Engineering:** note the CarPlay review items for the device pass (QA-6). Done Nov 7; device pass signed off 2026-11-08.

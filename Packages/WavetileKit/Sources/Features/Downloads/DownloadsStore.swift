@@ -25,6 +25,8 @@ final class Connectivity {
     }
 
     private(set) var hasNetwork = true
+    /// The current path costs money or is limited (cellular, hotspot, Low Data Mode): streams buffer less.
+    private(set) var isMetered = false
     /// Whether the server answered its last check. Optimistic until a check says otherwise, so
     /// launch doesn't dim the library while the first check runs.
     private(set) var serverReachable = true
@@ -35,6 +37,8 @@ final class Connectivity {
     var server: Server? {
         didSet {
             guard server != oldValue else { return }
+            pathDebounce?.cancel()
+            pathDebounce = nil
             if let server { ServerIdentity.shared.register(server.url, serverID: server.id) }
             // An HTTP server gets no requests until it proves itself (`ServerIdentity`), so it starts
             // offline rather than offering streams that can't start yet. On the LAN that's milliseconds.
@@ -64,7 +68,11 @@ final class Connectivity {
         monitor.pathUpdateHandler = { [weak self] path in
             let online = path.status == .satisfied
             let interfaces = path.availableInterfaces.map(\.name)
-            Task { @MainActor in self?.pathChanged(online: online, interfaces: interfaces) }
+            let metered = path.isExpensive || path.isConstrained
+            Task { @MainActor in
+                self?.isMetered = metered
+                self?.pathChanged(online: online, interfaces: interfaces)
+            }
         }
         monitor.start(queue: DispatchQueue(label: "com.derrellwilliams.wavetile.connectivity"))
         // Coming back to the app is when a listener has likely moved (left home, arrived back).
@@ -109,6 +117,10 @@ final class Connectivity {
         }
     }
 
+    /// How long a burst of same-interface updates is collected before the server is checked. A
+    /// fixed deadline from the first update, so steady chatter can't postpone the check.
+    private static let sameInterfaceDelay: Duration = .milliseconds(500)
+
     private func pathChanged(online: Bool, interfaces: [String]) {
         // Security: an HTTP server's address can be another machine on the new network (café Wi-Fi
         // on the same subnet), and Wi-Fi to Wi-Fi keeps the same interfaces, so any path update
@@ -118,18 +130,22 @@ final class Connectivity {
         guard cleartext || changed else { return }
         hasNetwork = online
         self.interfaces = interfaces
-        pathDebounce?.cancel()
-        guard cleartext, !changed else {
+
+        if changed {
+            // A real change: no waiting, and any pending same-interface check is superseded.
+            pathDebounce?.cancel()
+            pathDebounce = nil
             if cleartext { announceNetworkChange(strict: true) }
             check()
-            return
-        }
-        // Same interfaces: the player keeps its streams while the server proves itself again.
-        pathDebounce = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(2))
-            guard !Task.isCancelled else { return }
-            self?.announceNetworkChange(strict: false)
-            self?.check()
+        } else if pathDebounce == nil {
+            // Same interfaces: the player keeps its streams while the server proves itself again.
+            pathDebounce = Task { [weak self] in
+                try? await Task.sleep(for: Self.sameInterfaceDelay)
+                guard !Task.isCancelled, let self else { return }
+                pathDebounce = nil
+                announceNetworkChange(strict: false)
+                check()
+            }
         }
     }
 
@@ -142,6 +158,9 @@ final class Connectivity {
     /// joined meanwhile can land after the first requests. An HTTP server proves itself again
     /// before any of them carries the token.
     private func enteredForeground() {
+        // This check covers whatever a pending same-interface one would have done.
+        pathDebounce?.cancel()
+        pathDebounce = nil
         if server?.isCleartext == true {
             ServerIdentity.shared.networkChanged()
             if let onForeground { Task { await onForeground() } }

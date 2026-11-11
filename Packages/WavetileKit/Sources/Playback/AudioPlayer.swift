@@ -83,6 +83,8 @@ public final class AudioPlayer {
     @ObservationIgnored public var isOnDevice: ((QueuedTrack) -> Bool)?
     /// A stream failed to connect: rechecks whether its source is reachable, returning once
     /// `canStream` has the answer.
+    /// Whether the network costs money or is limited (cellular, Low Data Mode): streams buffer less.
+    @ObservationIgnored public var isMeteredNetwork: (() -> Bool)?
     @ObservationIgnored public var onConnectionError: ((QueuedTrack) async -> Void)?
     public var hasQueue: Bool { !queue.isEmpty }
 
@@ -120,9 +122,13 @@ public final class AudioPlayer {
         var sendsToken = false
     }
 
-    /// How far ahead a streamed song buffers (about 135 MB at most for 9 Mbps hi-res, far less usually).
+    /// How far ahead a streamed song buffers on an unmetered network (about 135 MB at most for
+    /// 9 Mbps hi-res, far less usually), and on a metered one, where skipped tracks waste data.
     private static let streamBufferSeconds: TimeInterval = 120
+    private static let meteredStreamBufferSeconds: TimeInterval = 30
 
+    /// The background server check of a same-interface network update; one at a time is enough.
+    @ObservationIgnored private var verifyTask: Task<Void, Never>?
     private let log = Logger(subsystem: "com.derrellwilliams.wavetile", category: "playback")
 
     public init(library: LibraryClient) {
@@ -411,7 +417,7 @@ public final class AudioPlayer {
         // Music is where a stall hurts most: buffer well ahead so a Wi-Fi dip or a busy server
         // doesn't reach the speakers. It applies to the preloaded next item too, which AVQueuePlayer
         // starts filling as soon as it's inserted, so the track change is covered the same way.
-        item.preferredForwardBufferDuration = Self.streamBufferSeconds
+        item.preferredForwardBufferDuration = isMeteredNetwork?() == true ? Self.meteredStreamBufferSeconds : Self.streamBufferSeconds
         level(item, gain: track.normalizationGain)
         entries[ObjectIdentifier(item)] = Entry(track: track, playSessionID: request.playSessionID, sendsToken: true)
         observeStatus(of: item)
@@ -618,14 +624,18 @@ public final class AudioPlayer {
         guard library.session.serverURL.scheme?.lowercased() == "http",
               entries.values.contains(where: \.sendsToken) else { return }
         guard strict else {
+            guard verifyTask == nil else { return }
             let generation = loadGeneration
-            Task {
+            verifyTask = Task {
+                defer { verifyTask = nil }
                 if await serverMayGetToken() { return }
-                guard generation == loadGeneration else { return }
+                guard !Task.isCancelled, generation == loadGeneration else { return }
                 networkChanged(strict: true)
             }
             return
         }
+        verifyTask?.cancel()
+        verifyTask = nil
         log.info("Dropping streams for a network change at \(self.currentTime, privacy: .public) s")
         let position = currentTime
         let reloadCurrent = currentEntry?.sendsToken == true
