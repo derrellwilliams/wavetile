@@ -2,7 +2,7 @@
 
 **Wavetile is a native iPhone client for Jellyfin with a podcast player built in.** 
 
-**Public beta:** [join on TestFlight](https://testflight.apple.com/join/pk9dyfMq)
+**Download:** [Wavetile Music on the App Store](https://apps.apple.com/app/wavetile-music/id6826722664)
 
 You need a Jellyfin server with a music library. Wavetile collects no data: no account, no analytics, no tracking ([privacy policy](https://wavetile.com/privacy)). Bug reports and feature ideas are welcome in [Issues](https://github.com/derrellwilliams/wavetile/issues).
 

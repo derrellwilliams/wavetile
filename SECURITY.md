@@ -9,11 +9,11 @@ Please report security problems privately, not in a public issue.
 
 Include the app version and build (Settings shows both), your iOS version, the steps to reproduce, and what an attacker could gain. Please don't include real server addresses, passwords or access tokens.
 
-You should get a reply within a week. Wavetile is maintained by one person, so fixes ship in the next App Store or TestFlight build; please allow time for that before publishing details.
+You should get a reply within a week. Wavetile is maintained by one person, so fixes ship in the next App Store release; please allow time for that before publishing details.
 
 ## Supported versions
 
-Only the latest App Store release and the current TestFlight build receive fixes.
+Only the latest App Store release receives fixes.
 
 ## Scope
 
