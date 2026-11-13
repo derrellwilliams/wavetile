@@ -33,8 +33,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const track = screens.querySelector(".marquee");
     if (!track || still) return;
     track.style.animation = "none"; // the CSS loop is the no-JS fallback
+    if (!fine) return animate(screens, touchMarqueeStep(screens, track));
     let wake = () => {};
-    const active = fine ? pointerOver(screens, () => wake()) : () => true;
+    const active = pointerOver(screens, () => wake());
     wake = animate(screens, marqueeStep(track, active));
   });
 });
@@ -140,3 +141,63 @@ document.addEventListener("DOMContentLoaded", () => {
   // The backdrop is part of the dialog, so a click whose target is the dialog itself is outside the card.
   dialog.addEventListener("click", (e) => { if (e.target === dialog) dialog.close(); });
 });
+
+// Marquee on touch screens: drifts slowly on its own, and a touch takes over. A tap holds it, a
+// swipe drags it (it carries on with the finger's momentum), and it drifts again 3 s after the
+// last touch. Position is in px (the track is two identical sets, so it wraps at half its width)
+// and moves with translate3d, which stays on the GPU. Vertical swipes still scroll the page
+// (`touch-action: pan-y` in the CSS).
+function touchMarqueeStep(host, track) {
+  const drift = 12, idle = 3000, friction = 3.5; // px/s, ms, momentum decay per second
+  let x = 0, set = 0, v = 0, speed = 0, resumeAt = 0;
+  let id = null, startX = 0, startY = 0, lastX = 0, lastT = 0, dragging = false;
+  const measure = () => { set = track.offsetWidth / 2; };
+  measure();
+  if ("ResizeObserver" in window) new ResizeObserver(measure).observe(track); else addEventListener("resize", measure);
+
+  host.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "mouse" || id !== null) return;
+    id = e.pointerId; startX = lastX = e.clientX; startY = e.clientY; lastT = e.timeStamp;
+    v = 0; speed = 0; dragging = false; resumeAt = Infinity;
+  });
+  host.addEventListener("pointermove", (e) => {
+    if (e.pointerId !== id) return;
+    if (!dragging) {
+      const dx = e.clientX - startX, dy = e.clientY - startY;
+      if (Math.abs(dx) < 6 || Math.abs(dx) < Math.abs(dy)) return;
+      dragging = true; lastX = e.clientX; lastT = e.timeStamp;
+      host.setPointerCapture(id);
+      return;
+    }
+    const dt = Math.max(0.001, (e.timeStamp - lastT) / 1000);
+    const dx = e.clientX - lastX;
+    x -= dx;
+    v = Math.max(-3000, Math.min(3000, v * 0.6 + (-dx / dt) * 0.4));
+    lastX = e.clientX; lastT = e.timeStamp;
+  });
+  const release = (e) => {
+    if (e.pointerId !== id) return;
+    // A cancel without a drag is the browser taking a vertical scroll: no reason to pause.
+    resumeAt = performance.now() + (e.type === "pointercancel" && !dragging ? 0 : idle);
+    // A finger that stopped before lifting leaves no momentum.
+    if (e.timeStamp - lastT > 80) v = 0;
+    id = null; dragging = false;
+  };
+  host.addEventListener("pointerup", release);
+  host.addEventListener("pointercancel", release);
+
+  return (dt) => {
+    if (set > 0) {
+      if (id === null) {
+        if (Math.abs(v) > 8) { x += v * dt; v *= Math.exp(-friction * dt); } else v = 0;
+        if (v === 0 && performance.now() >= resumeAt) {
+          speed = Math.min(1, speed + dt / 0.6);
+          x += smooth(speed) * drift * dt;
+        }
+      }
+      x = ((x % set) + set) % set;
+      track.style.transform = `translate3d(${(-x).toFixed(2)}px,0,0)`;
+    }
+    return true;
+  };
+}
