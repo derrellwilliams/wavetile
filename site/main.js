@@ -119,3 +119,24 @@ function marqueeStep(track, active) {
     return on || speed > 0;
   };
 }
+
+// QR dialog: the QR button (desktop only; a phone just taps Download) opens a modal <dialog>
+// that grows out of the button. Closes on the X, Esc, or a click on the backdrop.
+document.addEventListener("DOMContentLoaded", () => {
+  const dialog = document.querySelector("dialog.qr");
+  const open = document.querySelector("[data-qr-open]");
+  if (!dialog || !open || typeof dialog.showModal !== "function" || !fine) return;
+  open.hidden = false;
+  open.addEventListener("click", () => {
+    dialog.showModal();
+    // The dialog is centered, so its box follows from its size; aim the grow at the button's center.
+    const b = open.getBoundingClientRect();
+    const x = b.left + b.width / 2 - (innerWidth - dialog.offsetWidth) / 2;
+    const y = b.top + b.height / 2 - (innerHeight - dialog.offsetHeight) / 2;
+    dialog.style.setProperty("--ox", `${x.toFixed(1)}px`);
+    dialog.style.setProperty("--oy", `${y.toFixed(1)}px`);
+  });
+  dialog.querySelector("[data-qr-close]").addEventListener("click", () => dialog.close());
+  // The backdrop is part of the dialog, so a click whose target is the dialog itself is outside the card.
+  dialog.addEventListener("click", (e) => { if (e.target === dialog) dialog.close(); });
+});

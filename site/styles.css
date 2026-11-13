@@ -129,10 +129,66 @@ h1, h2, p { margin: 0; }
 }
 /* The hero comes in as one group: cube, line, then button, 60ms apart. */
 .js .hero .headline.reveal { transition-delay: 60ms; }
-.js .hero .button.reveal { transition-delay: 120ms, 120ms, 0ms, 0ms; }
+.js .hero .actions.reveal { transition-delay: 120ms; }
+/* The download button, with the QR button beside it. */
+.actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .button {
   display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 18px; border-radius: 8px;
   background: var(--tint-rest); font: 400 14px/1 var(--text); color: var(--ink); text-decoration: none;
+}
+button.button { appearance: none; border: 0; cursor: pointer; }
+.button[hidden] { display: none; }
+/* Icon-only square button, same height as the text button. */
+.button--icon { justify-content: center; width: 40px; padding: 0; }
+
+/* QR dialog: a native modal <dialog> (focus trap, Esc, inert page come free). It grows out of the
+   QR button (main.js sets the origin) and fades in with the backdrop blurring up behind it. It
+   leaves faster than it arrives. Browsers without @starting-style just show and hide it. */
+.qr {
+  --in: 280ms; --out: 160ms;
+  width: min(320px, calc(100vw - 32px)); padding: 0; border: 0; border-radius: var(--radius);
+  background: var(--surface); color: var(--ink);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08), 0 40px 80px -24px rgb(0 0 0 / 0.8);
+  opacity: 0; scale: 0.88;
+  transform-origin: var(--ox, 50%) var(--oy, 50%);
+  transition: opacity var(--out) var(--ease-out), scale var(--out) var(--ease-out),
+    overlay var(--out) allow-discrete, display var(--out) allow-discrete;
+}
+.qr[open] {
+  opacity: 1; scale: 1;
+  transition: opacity var(--in) var(--ease-out), scale var(--in) var(--ease-out),
+    overlay var(--in) allow-discrete, display var(--in) allow-discrete;
+}
+@starting-style { .qr[open] { opacity: 0; scale: 0.88; } }
+.qr::backdrop {
+  background: rgb(0 0 0 / 0); -webkit-backdrop-filter: blur(0); backdrop-filter: blur(0);
+  transition: background-color var(--out) var(--ease-out), backdrop-filter var(--out) var(--ease-out),
+    -webkit-backdrop-filter var(--out) var(--ease-out), overlay var(--out) allow-discrete, display var(--out) allow-discrete;
+}
+.qr[open]::backdrop {
+  background: rgb(0 0 0 / 0.5); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  transition-duration: var(--in);
+}
+@starting-style { .qr[open]::backdrop { background: rgb(0 0 0 / 0); -webkit-backdrop-filter: blur(0); backdrop-filter: blur(0); } }
+.qr__body { position: relative; display: grid; justify-items: center; gap: 6px; padding: 40px 28px 32px; text-align: center; }
+/* A light card with a quiet zone, so the code scans on the dark page. Modules land on whole pixels. */
+.qr__code { width: 222px; height: 222px; padding: 12px; box-sizing: content-box; margin-bottom: 18px; border-radius: 12px; background: #F2F2F2; }
+.qr h2 { margin: 0; font-weight: 400; font-size: 18px; line-height: 1.25; }
+.qr p { font-size: 14px; line-height: 1.4; color: var(--ink-2); text-wrap: balance; }
+.qr__close {
+  position: absolute; top: 8px; right: 8px; display: grid; place-items: center; width: 40px; height: 40px;
+  padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--ink-2); cursor: pointer;
+  transition: color var(--hover) var(--ease), background-color var(--hover) var(--ease), scale var(--press) var(--ease-out);
+}
+.qr__close .icon { width: 16px; height: 16px; }
+.qr__close:focus-visible { color: var(--ink); background: var(--tint); }
+.qr__close:active { scale: 0.97; color: var(--ink); background: var(--tint-pressed); }
+@media (hover: hover) and (pointer: fine) { .qr__close:hover { color: var(--ink); background: var(--tint); } }
+@media (prefers-reduced-motion: reduce) {
+  .qr { scale: none; transition-property: opacity, overlay, display; }
+  .qr[open] { scale: none; }
+  @starting-style { .qr[open] { scale: none; } }
+  .qr__close:active { scale: none; }
 }
 
 /* Screens: a slow marquee that loops. Spacing is margin on each image (not gap), so one
@@ -187,27 +243,27 @@ h1, h2, p { margin: 0; }
 .icon[data-icon="cloud-slash"] { --icon: url("/assets/icons/cloud-slash.svg?v=2"); }
 .icon[data-icon="lock"] { --icon: url("/assets/icons/lock.svg?v=2"); }
 .icon[data-icon="arrow-right"] { --icon: url("/assets/icons/arrow-right.svg?v=2"); }
+.icon[data-icon="qr-code"] { --icon: url("/assets/icons/qr-code.svg"); }
+.icon[data-icon="x"] { --icon: url("/assets/icons/x.svg"); }
 .button .icon { width: 16px; height: 16px; }
 /* Hover: the wash deepens like the nav's, and the arrow nudges toward where it leads. */
 .button { transition: background-color var(--hover) var(--ease), scale var(--press) var(--ease-out); }
-/* The hero button also fades in on scroll; keep both transitions. */
-.js .button.reveal { transition: opacity var(--reveal) var(--ease-out), translate var(--reveal) var(--ease-out), background-color var(--hover) var(--ease), scale var(--press) var(--ease-out); }
 .button .icon { transition: translate 200ms var(--ease-out); }
-a.button:focus-visible { background: var(--tint); }
+.button:focus-visible { background: var(--tint); }
 a.button:focus-visible .icon { translate: 3px 0; }
 /* Hover only with a real pointer, so a tap on a phone doesn't leave the hover look stuck. */
 @media (hover: hover) and (pointer: fine) {
-  a.button:hover { background: var(--tint); }
+  .button:hover { background: var(--tint); }
   a.button:hover .icon { translate: 3px 0; }
   .top__nav a:hover { color: var(--ink); background: var(--tint); }
 }
 /* Pressed: a subtle press-in (0.97) that eases back out on release. */
-a.button:active { scale: 0.97; background: var(--tint-pressed); }
+.button:active { scale: 0.97; background: var(--tint-pressed); }
 .top__nav a:focus-visible { color: var(--ink); background: var(--tint); }
 .top__nav a:active { scale: 0.97; color: var(--ink); background: var(--tint-pressed); }
 @media (prefers-reduced-motion: reduce) {
   .button .icon { transition: none; }
-  a.button:active, .top__nav a:active { scale: none; }
+  .button:active, .top__nav a:active { scale: none; }
 }
 @media (max-width: 900px) { .features { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 520px) { .features { grid-template-columns: 1fr; } }

@@ -85,8 +85,11 @@
     <!-- The turning cube at 24px, with the arrow icon's 1.5px stroke (Phosphor Bold at 16px). -->
     <svg class="hero__cube reveal" viewBox="0 0 100 100" width="24" height="24" fill="none" stroke="currentColor" stroke-width="6.25" aria-hidden="true"><rect x="10" y="10" width="80" height="80" rx="8"/><path data-cube d="M50 50L50 12M50 50L88 50M50 50L12 88"/><circle cx="50" cy="50" r="3.125" fill="currentColor" stroke="none"/></svg>
     <h1 class="headline reveal">Your Jellyfin music and your podcasts, in one app.</h1>
-    <!-- At launch: make this a link to the App Store listing. -->
-    <a class="button reveal" href="https://apps.apple.com/app/wavetile-music/id6826722664">Download on the App Store<span class="icon" data-icon="arrow-right" aria-hidden="true"></span></a>
+    <div class="actions reveal">
+      <a class="button" href="https://apps.apple.com/app/wavetile-music/id6826722664">Download on the App Store<span class="icon" data-icon="arrow-right" aria-hidden="true"></span></a>
+      <!-- Desktop only (a phone just taps Download); main.js unhides it and opens the dialog. -->
+      <button class="button button--icon" type="button" data-qr-open hidden aria-haspopup="dialog" aria-label="Show QR code for your phone" title="Scan with your phone"><span class="icon" data-icon="qr-code" aria-hidden="true"></span></button>
+    </div>
   </section>
 
   <section class="screens" aria-label="Screens">
@@ -134,6 +137,15 @@
     </div>
   </section>
 </main>
+
+<dialog class="qr" aria-labelledby="qr-title">
+  <div class="qr__body">
+    <button class="qr__close" type="button" data-qr-close aria-label="Close"><span class="icon" data-icon="x" aria-hidden="true"></span></button>
+    <img class="qr__code" src="/assets/qr-app-store.svg" width="222" height="222" alt="QR code for Wavetile Music on the App Store">
+    <h2 id="qr-title">Get it on your iPhone</h2>
+    <p>Point your iPhone camera at the code to open the App Store.</p>
+  </div>
+</dialog>
 
 <footer class="footer">
   <span class="footer__mark" data-mark aria-hidden="true"></span>
