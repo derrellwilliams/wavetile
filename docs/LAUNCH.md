@@ -31,93 +31,25 @@ Consolidated 2026-11-06 and reorganized 2026-11-07 (tiers below, evidence and se
 3. Keep the demo server working until the review fallback is no longer needed.
 4. Still open (optional): look at App Accessibility in App Store Connect.
 
-## Before submission
+## Shipped in 1.0
 
-Release gates. Finish each or record an explicit deferral with rationale. Original QA numbers are kept so older conversations still map. Owner "Engineering" is coding work; "User" here is account and release decisions. Device execution was signed off by the tester on 2026-11-08.
+The pre-submission gates are closed; the per-item detail (QA-1 to QA-8, the eight targeted reviews R1-01 to R8-01, rejection risks) is in [qa-evidence.md](qa-evidence.md) and git history (this file before 2026-11-12).
 
-### P0 — Apple submission blockers
+- **Submission (P0):** reviewer access, privacy, listing, 7 screenshots (third-party art risk accepted), age rating 13+, export compliance, free in all territories, review notes, RC build 202611110730 device-checked, submitted Nov 11, approved Nov 12.
+- **Quality gates (P1):** sanitizers, Release Analyze, migration and odd-server-data tests, security and code reviews with fixes, device checks signed off 2026-11-08 and again Nov 11. QA-2/QA-3 and QA-8 stay "partial": further resource-exhaustion testing and a second-opinion review are optional.
+- **Accepted residual risk (user, 2026-11-10): token on plain-HTTP servers after a same-subnet Wi-Fi hop.** Same-interface path updates no longer drop the playing stream; it keeps its open connection while the server is re-verified (about 0.5 s plus one probe). If the listener hopped from home Wi-Fi to another network using the same address range, and someone there runs a look-alike server at the old address, that server could receive the Jellyfin session token (a revocable session, not the password) in that window. Not planned; serving Jellyfin over HTTPS removes it. Code: `Connectivity.pathChanged`, `AudioPlayer.networkChanged(strict:)`.
 
-All submitted Nov 11. Approved Nov 12.
+### Still open from QA
 
-- [x] **Reviewer access.** Public demo (`demo`, blank password); notes include a fallback if it is down. Keep it up until review ends.
-- [x] **Privacy.** Data Not Collected, policy URL set; archive privacy report generated Nov 11. Reassess if analytics or any retaining service is added.
-- [x] **Listing.** Name, subtitle, description (with the "not affiliated with Jellyfin" line), keywords, URLs and copyright entered. Claims checked against the code and site Nov 11.
-- [x] **Screenshots.** 7 uploaded, kept as is: no user data or addresses. They show third-party album art and artists; the guideline 5.2 risk is accepted.
-- [x] **Compliance.** Age rating done Nov 8 (13+); content rights Yes; export compliance `ITSAppUsesNonExemptEncryption=false`.
-- [x] **Commercial.** Free, all territories, agreements active, automatic release.
-- [x] **Review notes.** Updated Nov 11 ([app-review-notes.md](app-review-notes.md)): HTTP exceptions, background modes, CarPlay, demo fallback.
-- [x] **RC.** Build 202611110730 from `8f83647`, tests rerun Nov 11, device-checked by the user, attached.
-- [x] **Submit.** Nov 11 ~1:39 PM MST. Outcome: approved Nov 12.
-
-**Rejection risks (Nov 11 review)**
-- [x] High: reviewer access on the public demo. Mitigated by the fallback line; keep it up.
-- [x] Medium: unverified RC. Device-checked.
-- [x] Medium: screenshots. Checked for personal data; third-party art risk accepted.
-- [x] HTTP exceptions, background modes, CarPlay, Live Activities, "Jellyfin" wording: explained in the notes and listing.
-- [x] Privacy label vs archive report.
-- [x] Low: podcast content vs age rating. Age rating was submitted with the version (13+).
-
-Apple references: [submission](https://developer.apple.com/help/app-store-connect/manage-submissions-to-app-review/submit-an-app), [review access](https://developer.apple.com/help/app-review/before-submitting-for-review/complete-review/), [privacy](https://developer.apple.com/app-store/app-privacy-details/), [review guidelines](https://developer.apple.com/app-store/review/guidelines/). Recheck current requirements when filling the submission.
-
-### P1 — Quality gates
-
-Project goals, not Apple requirements. Each has a "done when" so it can't run forever; anything beyond it is recorded as accepted residual risk.
-
-| ID | Status | Owner | Done when |
-|---|---|---|---|
-| QA-3 | Partial, Nov 7 | Engineering | Security review. Fixed: API/OPML bounds, Keychain retry, background-download redirect containment, policy wording. Engineering follow-up below; device sign-off done 2026-11-08 (tester). Further resource-exhaustion testing is accepted residual risk |
-| QA-2 | Partial, Nov 7 | Engineering | Code review of Playback, Downloads, Persistence/Sync, Podcasts, JellyfinKit and CarPlay. Fixed: an endless skip loop, unbounded server-sync decoding, an empty-feed prune (details in qa-evidence.md). Engineering follow-up below; device sign-off done 2026-11-08 (tester). A second-opinion review (was QA-10) is optional |
-| QA-8 | Partial | Engineering + User | Remaining items are P0 (privacy answers, reviewer access, final archive privacy report) and the device sign-off (done 2026-11-08). Corrected live policy verified Nov 7. Privacy slice Nov 6 and Release/config slice Nov 7 are done |
-| QA-6 | Signed off 2026-11-08 (tester) | Engineering support | Device checks signed off in bulk on build 202611072135; investigate any later reported failures |
-| QA-4 | Done Nov 7 | Engineering | Database migration tests and unusual-server-data tests added and passing: 28 new tests, full package scheme 150/150 (196 runs), UI 17/17 (qa-evidence.md). They also led to fixes for blank names, bad durations and a sort-key edge case. Download manager/engine and AudioPlayer engine tests are P2 |
-| QA-5 | Done Nov 7 | Engineering | Release simulator Analyze passed at `4060f29`: 0 analyzer findings/errors, 11 compiler warnings triaged with dispositions in qa-evidence.md. Warnings remain; no release blocker established |
-| QA-7 | Ongoing | User | Organizer/TestFlight crash reports inspected during beta and before submission; record build, period and unresolved crashes |
-| QA-1 | Done Nov 5 | Engineering | Sanitizer runs complete. Retest affected paths after later fixes |
-
-### QA-2 / QA-3 remaining
-
-- **Accepted residual risk (user, 2026-11-10): token on plain-HTTP servers after a same-subnet Wi-Fi hop.** Same-interface path updates no longer drop the playing stream; it keeps its open connection while the server is re-verified (about 0.5 s plus one probe). If the listener hopped from home Wi-Fi to another network using the same address range, and someone there runs a look-alike server at the old address, that server could receive the Jellyfin session token (a revocable session, not the password) in that window. Done when: not planned; serving Jellyfin over HTTPS removes it. Code: `Connectivity.pathChanged`, `AudioPlayer.networkChanged(strict:)`.
-
-- [x] **Engineering:** run the package and UI tests on the Nov 7 edits. Done Nov 7: package 150/150, UI 17/17 (Claude can run `xcodebuild` as a plain command; see qa-evidence.md).
-- [x] **Engineering:** `Environment<Theme/Bool>` warning fixed Nov 7. The cause was the back-chevron renderer reading a bare `TintedBarIcon`'s environment (it also used the default theme); UI run now shows zero runtime warnings.
-- [x] **Engineering:** note the CarPlay review items for the device pass (QA-6). Done Nov 7; device pass signed off 2026-11-08.
-- [x] **Engineering:** Nov 7 current-pin advisory recheck: 20 OSV queries returned no matches; recent upstream NIO fix thresholds checked. Details and coverage limits in qa-evidence.md.
-- [ ] **Engineering:** recheck dependency advisories and the actual dependency inventory on the final archive.
-
-### Targeted pre-release reviews — added November 7, 2026
-
-As of Nov 7, the initial source reviews and fixes for all eight source reviews and their fixes are complete. Sections 1–8 still require device verification before they can close (UI tests were rerun Nov 7 and pass); section 3's stubbed-server sync tests with seeded downloads were added Nov 8 (6 tests, passing). This extends QA-2/QA-3; earlier reviews remain historical evidence, not completion of this pass. Track findings and verification in [qa-evidence.md](qa-evidence.md); real-device execution was signed off 2026-11-08.
-
-| Order | Scope | Status |
-|---|---|---|
-| 1 | Authentication/networking: credentials, redirects, transport, restore, logout and server switching | Initial source review and R1-01/R1-02 fixes Nov 7; device evidence outstanding |
-| 2 | Playback/queue: concurrency, transitions, interruptions, background operation and restoration | Initial source review and R2-01/R2-02 fixes Nov 7; device evidence outstanding |
-| 3 | Persistence/library sync: migrations, partial sync, stale records and account isolation | Source review and R3-01–R3-05 fixes Nov 7 (package 161/161); stubbed-server sync tests with seeded downloads added Nov 8 (6 tests, passing), UI rerun done Nov 8; account-ID filename limitation goes to section 8 |
-| 4 | Downloads/offline: interruption, missing files, cleanup and fallback | Source review and R4-01–R4-03 fixes Nov 7 (package 163/163); deferrals recorded in qa-evidence.md; device checks outstanding |
-| 5 | Podcasts: malformed feeds, subscription sync, progress and external URLs | Source review and R5-01–R5-05 fixes Nov 7 (package 173/173); deferrals recorded in qa-evidence.md; device checks outstanding |
-| 6 | System integrations: CarPlay, Siri, widgets, Live Activities and shared state | Source review and R6-01–R6-05 fixes Nov 7 (package 175/175, app target builds); deferrals recorded in qa-evidence.md; device checks outstanding |
-| 7 | Screens/release configuration: errors, accessibility, navigation, debug behavior and entitlements | Source review Nov 7: no defects in configuration, debug flags, entitlements or error surfaces; UI audit 17/17; device accessibility and navigation checks outstanding |
-| 8 | Cross-subsystem scenarios: server switch during download, network loss during playback, termination during sync and upgrade with existing data | Traced Nov 7; R8-01 fixed (stand-in database could delete finished downloads); kill-mid-sync/sign-out and upgrade device checks outstanding |
-
-Each pass traces user flows through dependencies and records findings with source locations, severity, impact and reproduction/verification steps. Fix release blockers and add meaningful regression coverage; record optional refactors separately. A pass closes only when findings are fixed and verified or explicitly deferred with rationale. Source review does not replace device sign-off.
-
-- [x] **R1-01 (high):** blocked cross-origin redirects when the original or destination URL contains credential query parameters/userinfo; regression coverage added Nov 7. See qa-evidence.md.
-- [x] **R1-02 (medium):** added a persistent reauthentication action on authenticated API 401s, media-failure credential checks, and in-place credential replacement for the same account. Automated recovery/data-preservation coverage added Nov 7; final-device interaction check signed off 2026-11-08.
-- [x] **R2-01 (high):** delayed failure recovery now checks the current player item and playback intent generation. Device verification remains open; see qa-evidence.md.
-- [x] **R2-02 (medium):** preserve Up Next reordering across shuffle toggles, including edits while shuffled. See qa-evidence.md.
-- [x] **R3-01–R3-05 (high/medium):** incomplete or unvalidated library reads no longer replace, prune or delete cached data or server collections; incomplete sync fails before `lastCompleted`; sign-out cancels sync and closes the database before deleting it (a close failure keeps the session and shows an alert). Details in qa-evidence.md. UI rerun after the Settings alert and stubbed-server sync tests with seeded downloads done Nov 8.
-- [x] **R4-01–R4-03 (high/medium/low):** a failed database read no longer removes a download; empty or non-audio responses are failed instead of saved as done; finished downloads whose file is gone are queued again. Deferrals (orphan-file sweep, disk-full check, duplicate Live Activity and others) are listed in qa-evidence.md.
-- [x] **R5-01–R5-05 (high/medium/low):** a damaged Jellyfin copy of the subscription list no longer unfollows every show; a feed that breaks partway no longer prunes episodes or renames the show; non-audio episode downloads fail instead of saving; removed or missing episode download files are cleaned up or queued again. Deferrals (sync clock skew, GUID-less episodes, sub-30-second episodes and others) are listed in qa-evidence.md.
-- [x] **R6-01–R6-05 (high/medium/low):** sign-out now stops and closes the podcast database before deleting it; Siri's vocabulary updates after syncs and sign-in/out; download Live Activities are ended at sign-out and orphaned ones cleaned up at launch (one per collection); widgets can't be repopulated after sign-out; an odd album ID can't crash the widget. Deferrals (Lock Screen access by design, CarPlay offline feedback and refresh under steady writes) are in qa-evidence.md.
-- [x] **R8-01 (medium):** when a library or podcast database can't open, the temporary stand-in no longer gets download managers, so finished background downloads aren't deleted against it; the fallback is logged. Sections 7 and 8 otherwise produced no defects; deferrals (account-ID file names for cloned servers, silent fallback banner, interrupted sign-out order, manual refresh killed mid-sync) are in qa-evidence.md.
-- [ ] Before closing section 1, complete the media-redirect, Keychain and reauthentication device checks (signed off 2026-11-08). Review server-switch cancellation and data isolation in sections 3, 4 and 8.
-- [ ] Before closing section 2, complete the delayed failure/retry and playback, interruption, routing and CarPlay device checks (signed off 2026-11-08). Decide whether revisiting previously played tracks on shuffle and queue restoration after relaunch meet the intended release behavior (see qa-evidence.md).
+- [ ] Recheck dependency advisories and the dependency inventory (last: 10 pins, no OSV advisories, Nov 11).
+- [ ] Device checks for sections 1 and 2 of the targeted reviews (redirect/Keychain/reauth; failure retry, interruption, routing, CarPlay) were signed off in bulk 2026-11-08; revisit shuffle-history and queue restoration behavior (see qa-evidence.md).
+- [ ] QA-7: keep checking Organizer crash reports; record build, period and unresolved crashes.
 
 ### P2 — Deferred (explicit)
 
 - QA-9: GitHub Actions package-test CI. Revisit after first submission.
-- SwiftLint rule set (the Analyze half of QA-5 stays in P1).
-- Download manager/engine and AudioPlayer engine tests (migration tests stay in QA-4).
+- SwiftLint rule set.
+- Download manager/engine and AudioPlayer engine tests.
 - Offline-play reporting to Jellyfin, incremental library sync, multi-account support, collection rename (see the backlog in qa-evidence.md).
 
 ## Launch preparation — can run alongside QA
@@ -126,7 +58,7 @@ Supports a good launch; none of it blocks App Review.
 
 - [x] Domain bought, auto-renew on; site live with Home, guides, Privacy, Support, llms.txt, JSON-LD, sitemap (Oct 29).
 - [x] AI crawlers allowed in robots.txt; Cloudflare DNS only (Oct 29).
-- [x] Public beta link enabled and linked on site (Oct 29).
+- [x] Public beta ran Oct 29 to Nov 12 (retired at launch).
 - [x] GitHub homepage/topics, MPL-2.0 license, user-facing README (Oct 29).
 - [ ] Domain hardening: transfer lock, DNSSEC, Cloudflare 2FA (User; quick win above).
 - [ ] Verify Google Search Console and Bing Webmaster Tools; submit the sitemap.
