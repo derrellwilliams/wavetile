@@ -151,9 +151,15 @@ function touchMarqueeStep(host, track) {
   const drift = 12, idle = 3000, friction = 3.5; // px/s, ms, momentum decay per second
   let x = 0, set = 0, v = 0, speed = 0, resumeAt = 0;
   let id = null, startX = 0, startY = 0, lastX = 0, lastT = 0, dragging = false;
-  const measure = () => { set = track.offsetWidth / 2; };
+  // The second set only has to fill the screen at the wrap point, so trim it to that many phones (sized for the long side of the screen, so rotating is safe).
+  // The moving layer is a bitmap at device resolution; all 14 phones was ~80 MB on a 3x iPhone,
+  // which iOS can drop (the strip goes blank on a hard swipe).
+  const phones = [...track.querySelectorAll(".device")], count = phones.length / 2;
+  const measure = () => { set = phones[count].getBoundingClientRect().left - phones[0].getBoundingClientRect().left; };
+  const step = phones[1].getBoundingClientRect().left - phones[0].getBoundingClientRect().left;
+  phones.slice(count + Math.min(count - 1, Math.ceil(Math.max(screen.width, screen.height) / step) + 1)).forEach((d) => d.remove());
   measure();
-  if ("ResizeObserver" in window) new ResizeObserver(measure).observe(track); else addEventListener("resize", measure);
+  addEventListener("resize", measure);
 
   host.addEventListener("pointerdown", (e) => {
     if (e.pointerType === "mouse" || id !== null) return;
@@ -172,7 +178,7 @@ function touchMarqueeStep(host, track) {
     const dt = Math.max(0.001, (e.timeStamp - lastT) / 1000);
     const dx = e.clientX - lastX;
     x -= dx;
-    v = Math.max(-3000, Math.min(3000, v * 0.6 + (-dx / dt) * 0.4));
+    v = Math.max(-2000, Math.min(2000, v * 0.6 + (-dx / dt) * 0.4));
     lastX = e.clientX; lastT = e.timeStamp;
   });
   const release = (e) => {
