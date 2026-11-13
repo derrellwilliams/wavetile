@@ -43,7 +43,7 @@ final class Connectivity {
             // An HTTP server gets no requests until it proves itself (`ServerIdentity`), so it starts
             // offline rather than offering streams that can't start yet. On the LAN that's milliseconds.
             serverReachable = server?.isCleartext != true
-            check(grace: false)
+            check()
         }
     }
 
@@ -67,7 +67,22 @@ final class Connectivity {
     @ObservationIgnored private var pathDebounce: Task<Void, Never>?
     @ObservationIgnored private var foregroundToken: NSObjectProtocol?
 
-    init() {
+    @ObservationIgnored private let probe: (URL) async -> Bool?
+    @ObservationIgnored private let wait: (Duration) async throws -> Void
+
+    /// The injected probe and clock let connectivity transitions be tested without a live network.
+    init(
+        server: Server? = nil,
+        monitorsNetwork: Bool = true,
+        probe: @escaping (URL) async -> Bool? = { await ServerIdentity.shared.probe($0) },
+        wait: @escaping (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
+    ) {
+        self.server = server
+        self.probe = probe
+        self.wait = wait
+        if let server { ServerIdentity.shared.register(server.url, serverID: server.id) }
+        serverReachable = server?.isCleartext != true
+        guard monitorsNetwork else { return }
         monitor.pathUpdateHandler = { [weak self] path in
             let online = path.status == .satisfied
             let interfaces = path.availableInterfaces.map(\.name)
@@ -93,50 +108,54 @@ final class Connectivity {
         pathDebounce?.cancel()
     }
 
-    /// Pings the server now and returns once `serverReachable` has the answer (a stream just
-    /// failed to connect: one bad stream shouldn't dim the library on its own).
-    func recheck() async { await recheck(attempt: 0, grace: false) }
+    /// Confirms a failed stream against the server. All callers share the current check, so
+    /// overlapping stream errors can't overwrite a newer answer or cancel its recovery retry.
+    func recheck() async {
+        if checkTask == nil { check() }
+        await checkTask?.value
+    }
 
-    /// `grace` gives the first miss after a good answer one quiet retry before the server counts as
-    /// unreachable (Wi-Fi still waking after foreground). A real network change or a failed stream
-    /// has no grace: the miss is believed at once.
-    private func recheck(attempt: Int, grace: Bool) async {
+    /// One failed probe is not an outage. Keep the last good answer until a second probe fails,
+    /// even after a network change; HTTP identity checks still independently gate every token.
+    private func recheck(attempt: Int) async {
         guard hasNetwork, let server else { return }
         lastProbe = .now
-        var reachable = await ServerIdentity.shared.probe(server.url)
+        var reachable = await probe(server.url)
         // A network change mid-check (Wi-Fi waking, roaming) voids the answer: ask again.
         var stale = 0
         while reachable == nil, stale < 3, !Task.isCancelled {
             stale += 1
-            reachable = await ServerIdentity.shared.probe(server.url)
+            reachable = await probe(server.url)
         }
         guard !Task.isCancelled, server == self.server, hasNetwork else { return }
         // Still voided after three asks (path updates keep landing): look again soon, as if this
         // one hadn't happened. Returning would end the retry chain and leave the last answer standing.
-        guard let reachable else { scheduleRetry(attempt: attempt, grace: grace); return }
+        guard let reachable else { scheduleRetry(attempt: attempt); return }
         if reachable {
             serverReachable = true
             // May be this very retry's task: it has nothing left to await, so cancelling it is harmless.
             retryTask?.cancel()
             return
         }
-        if grace, attempt == 0, serverReachable {
-            scheduleRetry(attempt: 1, grace: false)
-        } else {
-            serverReachable = false
-            scheduleRetry(attempt: attempt + 1, grace: false)
+        if attempt == 0, serverReachable {
+            do { try await wait(.seconds(1)) } catch { return }
+            guard !Task.isCancelled, server == self.server, hasNetwork else { return }
+            await recheck(attempt: 1)
+            return
         }
+        serverReachable = false
+        scheduleRetry(attempt: attempt + 1)
     }
 
-    /// Looks again after 1, 2, 4 and 8 s, then every 15 s, so the library comes back on its own.
-    private func scheduleRetry(attempt: Int, grace: Bool) {
+    /// Looks again within 1, 2, 4, then 5 s, so recovered servers promptly restore the library.
+    private func scheduleRetry(attempt: Int) {
         retryTask?.cancel()
         retryAttempt = attempt
-        let delay: Duration = attempt <= 4 ? .seconds(1 << max(attempt - 1, 0)) : .seconds(15)
+        let delay: Duration = attempt > 3 ? .seconds(5) : .seconds(1 << max(attempt - 1, 0))
         retryTask = Task { [weak self] in
-            try? await Task.sleep(for: delay)
+            do { try await self?.wait(delay) } catch { return }
             guard !Task.isCancelled else { return }
-            await self?.recheck(attempt: attempt, grace: grace)
+            self?.check(attempt: attempt)
         }
     }
 
@@ -146,14 +165,14 @@ final class Connectivity {
         guard ContinuousClock.now - lastProbe >= .seconds(2) else { return }
         retryTask?.cancel()
         let attempt = max(retryAttempt, 1)
-        retryTask = Task { [weak self] in await self?.recheck(attempt: attempt, grace: false) }
+        check(attempt: attempt)
     }
 
     /// How long a burst of same-interface updates is collected before the server is checked. A
     /// fixed deadline from the first update, so steady chatter can't postpone the check.
     private static let sameInterfaceDelay: Duration = .milliseconds(500)
 
-    private func pathChanged(online: Bool, interfaces: [String]) {
+    func pathChanged(online: Bool, interfaces: [String]) {
         // Security: an HTTP server's address can be another machine on the new network (café Wi-Fi
         // on the same subnet), and Wi-Fi to Wi-Fi keeps the same interfaces, so any path update
         // means it proves itself again before it gets the token.
@@ -171,7 +190,7 @@ final class Connectivity {
             pathDebounce?.cancel()
             pathDebounce = nil
             if cleartext { announceNetworkChange(strict: true) }
-            check(grace: false)
+            check()
         } else if !cleartext {
             // HTTPS, unreachable: no identity to re-prove, so keep the backoff and look sooner.
             retryNow()
@@ -182,7 +201,7 @@ final class Connectivity {
                 guard !Task.isCancelled, let self else { return }
                 pathDebounce = nil
                 announceNetworkChange(strict: false)
-                check(grace: true)
+                check()
             }
         }
     }
@@ -203,13 +222,16 @@ final class Connectivity {
             ServerIdentity.shared.networkChanged()
             if let onForeground { Task { await onForeground() } }
         }
-        check(grace: true)
+        check()
     }
 
-    private func check(grace: Bool) {
+    private func check(attempt: Int = 0) {
         checkTask?.cancel()
         retryTask?.cancel()
-        checkTask = Task { await recheck(attempt: 0, grace: grace) }
+        checkTask = Task {
+            await recheck(attempt: attempt)
+            if !Task.isCancelled { checkTask = nil }
+        }
     }
 }
 
