@@ -36,21 +36,26 @@ extension LibraryStore {
 
     func songMenu(for track: TrackRecord, source: String, play: @escaping () -> Void) -> SongMenu {
         SongMenu(play: play) { [self] in
-            // One album read serves both routes. The artist is the album artist: tracks don't
-            // store their own artist ID.
-            let record = albumRecord(for: track)
-            let album = track.albumID.map { albumID in
-                LibraryRoute.album(AlbumRoute(
-                    album: record?.summary ?? AlbumSummary(id: albumID, title: track.albumTitle, artist: track.albumArtistName),
-                    sourceID: "\(source)-track-\(track.id)"
-                ))
-            }
-            let artist = record.flatMap { record in record.artistID.map { LibraryRoute.artist(id: $0, name: record.artistName) } }
-            return (album, artist)
+            songRoutes(
+                albumID: track.albumID, albumTitle: track.albumTitle, albumArtist: track.albumArtistName,
+                sourceID: "\(source)-track-\(track.id)"
+            )
         }
     }
 
-    private func albumRecord(for track: TrackRecord) -> AlbumRecord? {
-        track.albumID.flatMap { try? database.album(id: $0) }
+    /// A song's album and artist pages, from one album read. The album falls back to the song's
+    /// own album fields when the mirror has no row for it; the artist is the album artist
+    /// (tracks don't store their own artist ID), so it needs the row.
+    func songRoutes(
+        albumID: String?, albumTitle: String, albumArtist: String, sourceID: String
+    ) -> (album: LibraryRoute?, artist: LibraryRoute?) {
+        guard let albumID else { return (nil, nil) }
+        let record = try? database.album(id: albumID)
+        let album = LibraryRoute.album(AlbumRoute(
+            album: record?.summary ?? AlbumSummary(id: albumID, title: albumTitle, artist: albumArtist),
+            sourceID: sourceID
+        ))
+        let artist = record.flatMap { record in record.artistID.map { LibraryRoute.artist(id: $0, name: record.artistName) } }
+        return (album, artist)
     }
 }

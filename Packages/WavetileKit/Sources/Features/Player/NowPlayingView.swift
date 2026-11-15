@@ -60,6 +60,8 @@ struct NowPlayingView: View {
         }
         .task(id: player.current?.trackID) { await loadChapters() }
         .onChange(of: player.current?.trackID, initial: true) { loadSongRoutes() }
+        // A sync can add the album or artist after the song started.
+        .onChange(of: store.isSyncing) { _, syncing in if !syncing { loadSongRoutes() } }
         .enableInjection()
     }
 
@@ -73,15 +75,19 @@ struct NowPlayingView: View {
         chapters = loaded
     }
 
-    /// The artist is the album artist: tracks don't store their own artist ID.
     private func loadSongRoutes() {
-        guard let track = player.current, !track.isEpisode, let albumID = track.albumID,
-              let album = try? store.database.album(id: albumID)
-        else { songRoutes = SongRoutes(); return }
-        songRoutes = SongRoutes(
-            artist: store.artistRoute(albumID: albumID),
-            album: .album(AlbumRoute(album: album.summary, sourceID: "player-\(albumID)"))
+        guard let track = player.current, !track.isEpisode else { songRoutes = SongRoutes(); return }
+        let routes = store.songRoutes(
+            albumID: track.albumID, albumTitle: track.albumTitle, albumArtist: track.artist,
+            sourceID: "player-\(track.trackID)"
         )
+        songRoutes = SongRoutes(trackID: track.trackID, artist: routes.artist, album: routes.album)
+    }
+
+    /// The routes for the playing song only: `onChange` runs after the next track's first frame,
+    /// which mustn't link to the previous song's pages.
+    private var currentRoutes: SongRoutes {
+        songRoutes.trackID == player.current?.trackID ? songRoutes : SongRoutes()
     }
 
     /// The artwork edge to edge, flush with the sheet's top (the sheet's corners round it), with
@@ -113,8 +119,9 @@ struct NowPlayingView: View {
         guard let track = player.current else { return "" }
         if track.isEpisode { return AttributedString(track.albumTitle) }
         var parts: [AttributedString] = []
-        if !track.artist.isEmpty { parts.append(Self.link(track.artist, songRoutes.artist == nil ? nil : SongRoutes.artistURL)) }
-        if !track.albumTitle.isEmpty { parts.append(Self.link(track.albumTitle, songRoutes.album == nil ? nil : SongRoutes.albumURL)) }
+        let routes = currentRoutes
+        if !track.artist.isEmpty { parts.append(Self.link(track.artist, routes.artist == nil ? nil : SongRoutes.artistURL)) }
+        if !track.albumTitle.isEmpty { parts.append(Self.link(track.albumTitle, routes.album == nil ? nil : SongRoutes.albumURL)) }
         return parts.enumerated().reduce(into: AttributedString()) { line, part in
             if part.offset > 0 { line += AttributedString(" • ") }
             line += part.element
@@ -151,10 +158,10 @@ struct NowPlayingView: View {
                             })
                             .accessibilityIdentifier("nowPlayingSubtitle")
                             .accessibilityActions {
-                                if let artist = songRoutes.artist {
+                                if let artist = currentRoutes.artist {
                                     Button("Go to Artist") { openLibraryRoute(artist) }
                                 }
-                                if let album = songRoutes.album {
+                                if let album = currentRoutes.album {
                                     Button("Go to Album") { openLibraryRoute(album) }
                                 }
                             }
@@ -197,8 +204,8 @@ struct NowPlayingView: View {
 
     private func openSongLink(_ url: URL) {
         switch url {
-        case SongRoutes.artistURL: if let artist = songRoutes.artist { openLibraryRoute(artist) }
-        case SongRoutes.albumURL: if let album = songRoutes.album { openLibraryRoute(album) }
+        case SongRoutes.artistURL: if let artist = currentRoutes.artist { openLibraryRoute(artist) }
+        case SongRoutes.albumURL: if let album = currentRoutes.album { openLibraryRoute(album) }
         default: break
         }
     }
@@ -714,6 +721,7 @@ extension [Chapter] {
 private struct SongRoutes {
     static let artistURL = URL(string: "wavetile-player:artist")!
     static let albumURL = URL(string: "wavetile-player:album")!
+    var trackID: String?
     var artist: LibraryRoute?
     var album: LibraryRoute?
 }

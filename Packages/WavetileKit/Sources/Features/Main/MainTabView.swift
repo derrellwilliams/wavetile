@@ -19,9 +19,10 @@ struct MainTabView: View {
     @State private var homePath = NavigationPath()
     @State private var musicPath = NavigationPath()
     @State private var podcastsPath = NavigationPath()
-    /// The last page the player opened, with its stack's depth right after, so opening the same
-    /// page again from the player doesn't stack a copy on top of it.
-    @State private var playerRoute: (route: AnyHashable, tab: AppTab, depth: Int)?
+    /// The last page the player opened and its tab's stack right after, so opening the same page
+    /// again from the player doesn't stack a copy on top of it. The whole stack is compared, not
+    /// its depth: a page the user opened at the same depth since is a different stack.
+    @State private var playerRoute: (route: AnyHashable, tab: AppTab, path: NavigationPath)?
     /// Bumped per tab when its tab is tapped while already selected: back to the root, then a refresh.
     @State private var reselects: [AppTab: Int] = [:]
     @State private var widgets: WidgetBridge
@@ -221,11 +222,7 @@ extension MainTabView {
         showNowPlaying = false
         showSettings = false
         let tab: AppTab = signedIn.podcasts.isEnabled ? .podcasts : .home
-        selection = tab
-        let depth = tab == .podcasts ? podcastsPath.count : homePath.count
-        if let last = playerRoute, last.route == AnyHashable(route), last.tab == tab, last.depth == depth { return }
-        if tab == .podcasts { podcastsPath.append(route) } else { homePath.append(route) }
-        playerRoute = (route, tab, depth + 1)
+        openFromPlayer(route, on: tab, path: tab == .podcasts ? $podcastsPath : $homePath)
     }
 
     /// From the player: closes it and opens an artist or album on the Music tab's stack, on top
@@ -233,11 +230,14 @@ extension MainTabView {
     fileprivate func openLibraryRoute(_ route: LibraryRoute) {
         showNowPlaying = false
         showSettings = false
-        selection = .music
-        let depth = musicPath.count
-        if let last = playerRoute, last.route == AnyHashable(route), last.tab == .music, last.depth == depth { return }
-        musicPath.append(route)
-        playerRoute = (route, .music, depth + 1)
+        openFromPlayer(route, on: .music, path: $musicPath)
+    }
+
+    private func openFromPlayer<Route: Hashable>(_ route: Route, on tab: AppTab, path: Binding<NavigationPath>) {
+        selection = tab
+        if let last = playerRoute, last.route == AnyHashable(route), last.tab == tab, last.path == path.wrappedValue { return }
+        path.wrappedValue.append(route)
+        playerRoute = (route, tab, path.wrappedValue)
     }
 
     fileprivate func openPodcastSearch() {
