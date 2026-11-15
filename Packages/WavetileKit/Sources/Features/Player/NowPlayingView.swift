@@ -13,6 +13,7 @@ struct NowPlayingView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.openPodcastRoute) private var openPodcastRoute
+    @Environment(\.openLibraryRoute) private var openLibraryRoute
     @Environment(AudioPlayer.self) private var player
     @Environment(LibraryStore.self) private var store
     @Environment(PodcastsStore.self) private var podcasts
@@ -20,6 +21,8 @@ struct NowPlayingView: View {
     @State private var showChapters = false
     @State private var playPausePresses = 0
     @State private var chapters: [Chapter] = []
+    /// The playing song's artist and album pages, when the library has them.
+    @State private var songRoutes = SongRoutes()
     /// The content's natural height; the sheet is sized to it. Starts from the last height
     /// measured, so the sheet opens at its size instead of opening tall and jumping down.
     @State private var contentHeight: CGFloat = Self.lastHeight
@@ -56,6 +59,7 @@ struct NowPlayingView: View {
                 .presentationBackground(theme.palette.background)
         }
         .task(id: player.current?.trackID) { await loadChapters() }
+        .onChange(of: player.current?.trackID, initial: true) { loadSongRoutes() }
         .enableInjection()
     }
 
@@ -67,6 +71,17 @@ struct NowPlayingView: View {
         let loaded = await podcasts.chapters(for: item.episode)
         guard !Task.isCancelled else { return }
         chapters = loaded
+    }
+
+    /// The artist is the album artist: tracks don't store their own artist ID.
+    private func loadSongRoutes() {
+        guard let track = player.current, !track.isEpisode, let albumID = track.albumID,
+              let album = try? store.database.album(id: albumID)
+        else { songRoutes = SongRoutes(); return }
+        songRoutes = SongRoutes(
+            artist: store.artistRoute(albumID: albumID),
+            album: .album(AlbumRoute(album: album.summary, sourceID: "player-\(albumID)"))
+        )
     }
 
     /// The artwork edge to edge, flush with the sheet's top (the sheet's corners round it), with
@@ -91,12 +106,25 @@ struct NowPlayingView: View {
         .padding(.bottom, theme.spacing.lg)
     }
 
-    /// Two levels, as in other players: the title (22, main tan), then artist and album, or the
-    /// show for an episode (18, subtle).
-    private var subtitle: String {
+    /// Two levels, as in other players: the title (22, main tan), then "Artist • Album", or the
+    /// show for an episode (18, subtle). For a song, the artist and album are each a link to
+    /// their page (one Text, so the line truncates as a whole).
+    private var subtitle: AttributedString {
         guard let track = player.current else { return "" }
-        if track.isEpisode { return track.albumTitle }
-        return [track.artist, track.albumTitle].filter { !$0.isEmpty }.joined(separator: " — ")
+        if track.isEpisode { return AttributedString(track.albumTitle) }
+        var parts: [AttributedString] = []
+        if !track.artist.isEmpty { parts.append(Self.link(track.artist, songRoutes.artist == nil ? nil : SongRoutes.artistURL)) }
+        if !track.albumTitle.isEmpty { parts.append(Self.link(track.albumTitle, songRoutes.album == nil ? nil : SongRoutes.albumURL)) }
+        return parts.enumerated().reduce(into: AttributedString()) { line, part in
+            if part.offset > 0 { line += AttributedString(" • ") }
+            line += part.element
+        }
+    }
+
+    private static func link(_ text: String, _ url: URL?) -> AttributedString {
+        var string = AttributedString(text)
+        string.link = url
+        return string
     }
 
     private var info: some View {
@@ -115,7 +143,21 @@ struct NowPlayingView: View {
                             .transition(.opacity)
                     } else {
                         linked(Text(subtitle), to: .show)
+                            // Links draw in the tint; keep them the subtitle's color.
+                            .tint(theme.palette.textSecondary)
+                            .environment(\.openURL, OpenURLAction { url in
+                                openSongLink(url)
+                                return .handled
+                            })
                             .accessibilityIdentifier("nowPlayingSubtitle")
+                            .accessibilityActions {
+                                if let artist = songRoutes.artist {
+                                    Button("Go to Artist") { openLibraryRoute(artist) }
+                                }
+                                if let album = songRoutes.album {
+                                    Button("Go to Album") { openLibraryRoute(album) }
+                                }
+                            }
                     }
                 }
                 .font(theme.typography.lead)
@@ -150,6 +192,14 @@ struct NowPlayingView: View {
                 .accessibilityHint(destination == .episode ? "Opens the episode page" : "Opens the show page")
         } else {
             text
+        }
+    }
+
+    private func openSongLink(_ url: URL) {
+        switch url {
+        case SongRoutes.artistURL: if let artist = songRoutes.artist { openLibraryRoute(artist) }
+        case SongRoutes.albumURL: if let album = songRoutes.album { openLibraryRoute(album) }
+        default: break
         }
     }
 
@@ -658,4 +708,12 @@ extension [Chapter] {
     func current(at time: Double) -> Chapter? {
         last { $0.start <= time + 0.5 }
     }
+}
+
+/// The playing song's artist and album pages, and the in-text link URLs that stand for them.
+private struct SongRoutes {
+    static let artistURL = URL(string: "wavetile-player:artist")!
+    static let albumURL = URL(string: "wavetile-player:album")!
+    var artist: LibraryRoute?
+    var album: LibraryRoute?
 }

@@ -17,10 +17,11 @@ struct MainTabView: View {
     @State private var connectivity = Connectivity.shared
     @State private var actions = LibraryActions()
     @State private var homePath = NavigationPath()
+    @State private var musicPath = NavigationPath()
     @State private var podcastsPath = NavigationPath()
     /// The last page the player opened, with its stack's depth right after, so opening the same
     /// page again from the player doesn't stack a copy on top of it.
-    @State private var playerRoute: (route: PodcastRoute, tab: AppTab, depth: Int)?
+    @State private var playerRoute: (route: AnyHashable, tab: AppTab, depth: Int)?
     /// Bumped per tab when its tab is tapped while already selected: back to the root, then a refresh.
     @State private var reselects: [AppTab: Int] = [:]
     @State private var widgets: WidgetBridge
@@ -53,6 +54,7 @@ struct MainTabView: View {
                 .environment(\.openProfile) { showSettings = true }
                 .environment(\.openNowPlaying) { showNowPlaying = true }
                 .environment(\.openPodcastRoute, openPodcastRoute)
+                .environment(\.openLibraryRoute, openLibraryRoute)
                 .environment(\.openPodcastSearch, openPodcastSearch)
         } drawer: {
             SettingsDrawer(app: app, session: signedIn.session, isOpen: $showSettings)
@@ -90,7 +92,7 @@ struct MainTabView: View {
                 tabLabel("Home", icon: Image(uiImage: WavetileMark.uiImage(color: theme.palette.accent)))
             }
             Tab(value: .music) {
-                LibraryView(reselects: reselects[.music, default: 0])
+                LibraryView(reselects: reselects[.music, default: 0], path: $musicPath)
                     .environment(\.tabRootReporter, reporter(for: .music))
             } label: {
                 tabLabel("Music", glyph: .library)
@@ -221,9 +223,21 @@ extension MainTabView {
         let tab: AppTab = signedIn.podcasts.isEnabled ? .podcasts : .home
         selection = tab
         let depth = tab == .podcasts ? podcastsPath.count : homePath.count
-        if let last = playerRoute, last.route == route, last.tab == tab, last.depth == depth { return }
+        if let last = playerRoute, last.route == AnyHashable(route), last.tab == tab, last.depth == depth { return }
         if tab == .podcasts { podcastsPath.append(route) } else { homePath.append(route) }
         playerRoute = (route, tab, depth + 1)
+    }
+
+    /// From the player: closes it and opens an artist or album on the Music tab's stack, on top
+    /// of whatever is open there.
+    fileprivate func openLibraryRoute(_ route: LibraryRoute) {
+        showNowPlaying = false
+        showSettings = false
+        selection = .music
+        let depth = musicPath.count
+        if let last = playerRoute, last.route == AnyHashable(route), last.tab == .music, last.depth == depth { return }
+        musicPath.append(route)
+        playerRoute = (route, .music, depth + 1)
     }
 
     fileprivate func openPodcastSearch() {

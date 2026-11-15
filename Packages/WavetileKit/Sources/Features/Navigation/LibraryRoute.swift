@@ -37,6 +37,9 @@ extension EnvironmentValues {
     @Entry var zoomNamespace: Namespace.ID?
     /// Pushes a route on the current tab's stack (for menus and sheets, which can't hold a NavigationLink).
     @Entry var pushLibraryRoute: (LibraryRoute) -> Void = { _ in }
+    /// Closes the player and opens a library route on the Music tab's stack (the player sits
+    /// above the tabs).
+    @Entry var openLibraryRoute: (LibraryRoute) -> Void = { _ in }
 }
 
 extension View {

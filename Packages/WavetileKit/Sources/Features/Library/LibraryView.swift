@@ -10,7 +10,8 @@ struct LibraryView: View {
     @Environment(LibraryStore.self) private var store
     @Namespace private var zoom
     let reselects: Int
-    @State private var path = NavigationPath()
+    /// Owned by the tab view, so the player can open an artist or album here.
+    @Binding var path: NavigationPath
     @State private var refreshRequests = 0
     /// Driven by `onTabReselect`: a tab tap scrolls to the top, or at the top refreshes.
     @State private var scrollPosition = ScrollPosition(edge: .top)
