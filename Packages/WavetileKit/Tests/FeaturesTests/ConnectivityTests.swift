@@ -87,7 +87,7 @@ struct ConnectivityTests {
 
     @Test func aRealNetworkChangeAlsoConfirmsATransientMiss() async {
         let fixture = ConnectivityFixture([false, true])
-        fixture.connectivity.pathChanged(online: true, interfaces: ["en0"])
+        fixture.connectivity.pathChanged(online: true, interfaces: ["en0"], localRoute: true)
         await fixture.connectivity.recheck()
         #expect(fixture.connectivity.isOnline)
         #expect(fixture.probeCount == 2)
@@ -107,7 +107,7 @@ struct ConnectivityTests {
         try await fixture.waitUntil { secondStarted }
         #expect(fixture.connectivity.isOnline)
         #expect(fixture.probeCount == 1)
-        fixture.connectivity.pathChanged(online: false, interfaces: [])
+        fixture.connectivity.pathChanged(online: false, interfaces: [], localRoute: false)
         await first.value
         await second.value
         #expect(!fixture.connectivity.isOnline)
@@ -116,22 +116,57 @@ struct ConnectivityTests {
 
     @Test func losingTheNetworkImmediatelyMakesStreamingUnavailable() async {
         let fixture = ConnectivityFixture([true])
-        fixture.connectivity.pathChanged(online: false, interfaces: [])
+        fixture.connectivity.pathChanged(online: false, interfaces: [], localRoute: false)
         #expect(!fixture.connectivity.isOnline)
         await fixture.connectivity.recheck()
         #expect(fixture.probeCount == 0)
     }
 
-    @Test func turningWiFiOffMarksALocalServerUnreachableWithoutProbing() async throws {
+    @Test func turningWiFiOffMarksALocalServerUnreachableAtOnce() async throws {
         let fixture = ConnectivityFixture([true], url: "http://192.168.1.5:8096")
-        fixture.connectivity.pathChanged(online: true, interfaces: ["en0", "pdp_ip0"])
+        fixture.connectivity.pathChanged(online: true, interfaces: ["en0", "pdp_ip0"], localRoute: true)
         await fixture.connectivity.recheck()
         #expect(fixture.connectivity.isOnline)
+        fixture.holdsConfirmation = true
         fixture.connectivity.pathChanged(online: true, interfaces: ["pdp_ip0"], localRoute: false)
         try await fixture.waitUntil { !fixture.connectivity.serverReachable }
         #expect(fixture.connectivity.hasNetwork)
         #expect(!fixture.connectivity.isOnline)
-        #expect(fixture.probeCount == 1)
+        // The miss lands without the 1 s confirmation, and the next look waits the short backoff.
+        try await fixture.waitUntil { fixture.waits.count == 1 }
+        #expect(fixture.waits == [.seconds(1)])
+    }
+
+    @Test func aVPNThatReachesTheLocalServerKeepsItOnline() async throws {
+        let fixture = ConnectivityFixture([true, true], url: "http://192.168.1.5:8096")
+        fixture.connectivity.pathChanged(online: true, interfaces: ["pdp_ip0"], localRoute: false)
+        await fixture.connectivity.recheck()
+        #expect(fixture.connectivity.isOnline)
+        // Chatter on the same path no longer marks it offline before probing.
+        fixture.connectivity.pathChanged(online: true, interfaces: ["pdp_ip0"], localRoute: false)
+        try await fixture.waitUntil { fixture.probeCount == 2 }
+        #expect(fixture.connectivity.isOnline)
+    }
+
+    @Test func noRouteHomeBacksOffToThirtySeconds() async throws {
+        let fixture = ConnectivityFixture(Array(repeating: false, count: 6), immediateWaits: 5, url: "http://10.0.0.2")
+        fixture.connectivity.pathChanged(online: true, interfaces: ["pdp_ip0"], localRoute: false)
+        try await fixture.waitUntil { fixture.waits.count == 6 }
+        #expect(fixture.waits == [.seconds(1), .seconds(2), .seconds(4), .seconds(30), .seconds(30), .seconds(30)])
+    }
+
+    @Test func losingTheNetworkForgetsAnUnconfirmedMiss() async throws {
+        let fixture = ConnectivityFixture([false, false, true], immediateWaits: 2)
+        fixture.holdsConfirmation = true
+        let first = Task { await fixture.connectivity.recheck() }
+        try await fixture.waitUntil { fixture.waits.count == 1 }
+        fixture.connectivity.pathChanged(online: false, interfaces: [], localRoute: false)
+        await first.value
+        fixture.holdsConfirmation = false
+        fixture.connectivity.pathChanged(online: true, interfaces: ["en0"], localRoute: true)
+        // Back online, one miss gets its confirmation again instead of dimming at once.
+        try await fixture.waitUntil { fixture.probeCount == 3 }
+        #expect(fixture.connectivity.isOnline)
     }
 
     @Test func aRestartedCheckStillConfirmsAMiss() async throws {
@@ -140,7 +175,7 @@ struct ConnectivityTests {
         let first = Task { await fixture.connectivity.recheck() }
         try await fixture.waitUntil { fixture.waits.count == 1 }
         // A path update lands during the 1 s confirmation and restarts the check.
-        fixture.connectivity.pathChanged(online: true, interfaces: ["pdp_ip0"])
+        fixture.connectivity.pathChanged(online: true, interfaces: ["pdp_ip0"], localRoute: false)
         try await fixture.waitUntil { !fixture.connectivity.serverReachable }
         #expect(fixture.probeCount == 2)
         await first.value
@@ -150,6 +185,8 @@ struct ConnectivityTests {
         ("http://192.168.1.5:8096", true), ("http://10.0.0.2", true), ("http://172.20.1.1", true),
         ("http://nas.local:8096", true), ("http://[fd00::1]:8096", true), ("http://169.254.3.3", true),
         ("http://172.32.0.1", false), ("http://100.101.102.103", false), ("https://jellyfin.example.com", false),
+        ("https://192.168.1.5.example.com", false), ("http://[fd::1]:8096", false), ("http://010.0.0.1", false),
+        ("http://home.tail1234.ts.net", false), ("http://[fd7a:115c:a1e0::1]:8096", false),
     ])
     func localOnlyAddresses(url: String, localOnly: Bool) {
         #expect(Connectivity.Server(url: URL(string: url)!, id: "x").isLocalOnly == localOnly)

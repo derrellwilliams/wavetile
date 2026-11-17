@@ -23,29 +23,18 @@ final class Connectivity {
 
         var isCleartext: Bool { url.scheme?.lowercased() == "http" }
 
-        /// The address only exists on a local network (private or link-local IP, `.local` name),
-        /// so it needs Wi-Fi, Ethernet or a VPN to be reached; cellular alone never gets there.
+        /// The address only exists on a local network (private, link-local or loopback IP, `.local`
+        /// name), so cellular alone can't reach it. Tailscale addresses are left out: they go
+        /// through its tunnel from any network.
         var isLocalOnly: Bool {
-            guard let host = url.host(percentEncoded: false)?.lowercased()
-                .trimmingCharacters(in: CharacterSet(charactersIn: "[]")) else { return false }
-            if host.hasSuffix(".local") { return true }
-            if host.contains(":") {
-                return host.hasPrefix("fc") || host.hasPrefix("fd") || host.hasPrefix("fe8")
-                    || host.hasPrefix("fe9") || host.hasPrefix("fea") || host.hasPrefix("feb")
-            }
-            let octets = host.split(separator: ".").compactMap { UInt8($0) }
-            guard octets.count == 4 else { return false }
-            switch (octets[0], octets[1]) {
-            case (10, _), (192, 168), (169, 254): return true
-            case (172, 16...31): return true
-            default: return false
-            }
+            guard let address = try? ServerAddress(url.absoluteString), address.isLocalNetwork,
+                  let host = url.host()?.lowercased()
+            else { return false }
+            return !host.hasSuffix(".ts.net") && !host.hasPrefix("[fd7a:115c:a1e0:") && !host.hasPrefix("fd7a:115c:a1e0:")
         }
     }
 
     private(set) var hasNetwork = true
-    /// The path has Wi-Fi, Ethernet or a VPN, the routes a local-only server address can use.
-    private(set) var hasLocalRoute = true
     /// The current path costs money or is limited (cellular, hotspot, Low Data Mode): streams buffer less.
     private(set) var isMetered = false
     /// Whether the server answered its last check. Optimistic until a check says otherwise, so
@@ -87,6 +76,15 @@ final class Connectivity {
     /// A probe has failed since the last good answer. Kept across checks, so path updates that
     /// restart the check (common right after Wi-Fi drops) can't keep the confirmation from landing.
     @ObservationIgnored private var missPending = false
+    /// The current path runs over Wi-Fi, Ethernet or a full-tunnel VPN, the routes a local-only
+    /// server address can use.
+    @ObservationIgnored private var hasLocalRoute = true
+    /// The local-only server answered on this path anyway (a split-tunnel VPN routing the home
+    /// subnet). Cleared when the interfaces change.
+    @ObservationIgnored private var localRouteProven = false
+    /// The server can't be reached from this path, so it is shown offline at once and only
+    /// looked at slowly, in case a VPN routes it.
+    private var noRouteHome: Bool { server?.isLocalOnly == true && !hasLocalRoute && !localRouteProven }
     @ObservationIgnored private var lastProbe = ContinuousClock.now
     /// Waits out a burst of same-interface updates so they cost one check, not one each.
     @ObservationIgnored private var pathDebounce: Task<Void, Never>?
@@ -111,7 +109,9 @@ final class Connectivity {
         monitor.pathUpdateHandler = { [weak self] path in
             let online = path.status == .satisfied
             let interfaces = path.availableInterfaces.map(\.name)
-            let localRoute = path.availableInterfaces.contains { [.wifi, .wiredEthernet, .other].contains($0.type) }
+            // The interfaces the path uses, not every one listed: iOS can list tunnels (Wi-Fi
+            // Calling) while only cellular carries traffic.
+            let localRoute = [.wifi, .wiredEthernet, .other].contains { path.usesInterfaceType($0) }
             let metered = path.isExpensive || path.isConstrained
             Task { @MainActor in
                 self?.isMetered = metered
@@ -145,12 +145,11 @@ final class Connectivity {
     /// even after a network change; HTTP identity checks still independently gate every token.
     private func recheck(attempt: Int) async {
         guard hasNetwork, let server else { return }
-        // Cellular only and a LAN address: no probe can answer, so say so now. The path update
-        // that brings Wi-Fi (or a VPN) back starts the next check.
-        if server.isLocalOnly, !hasLocalRoute {
+        // Cellular only and a LAN address: the server is out of reach, so say so now rather than
+        // after the probes time out. Still look (slowly, see `scheduleRetry`), in case a VPN routes it.
+        if noRouteHome {
             serverReachable = false
-            retryTask?.cancel()
-            return
+            missPending = false
         }
         lastProbe = .now
         var reachable = await probe(server.url)
@@ -165,6 +164,7 @@ final class Connectivity {
         // one hadn't happened. Returning would end the retry chain and leave the last answer standing.
         guard let reachable else { scheduleRetry(attempt: attempt); return }
         if reachable {
+            if noRouteHome { localRouteProven = true }
             serverReachable = true
             missPending = false
             // May be this very retry's task: it has nothing left to await, so cancelling it is harmless.
@@ -183,10 +183,13 @@ final class Connectivity {
     }
 
     /// Looks again within 1, 2, 4, then 5 s, so recovered servers promptly restore the library.
+    /// A local-only server with no route home backs off to 30 s: Wi-Fi returning is a path
+    /// update, which checks at once, so this only covers a VPN that can reach it.
     private func scheduleRetry(attempt: Int) {
         retryTask?.cancel()
         retryAttempt = attempt
-        let delay: Duration = attempt > 3 ? .seconds(5) : .seconds(1 << max(attempt - 1, 0))
+        let cap: Duration = noRouteHome ? .seconds(30) : .seconds(5)
+        let delay: Duration = attempt > 3 ? cap : .seconds(1 << max(attempt - 1, 0))
         retryTask = Task { [weak self] in
             do { try await self?.wait(delay) } catch { return }
             guard !Task.isCancelled else { return }
@@ -207,7 +210,7 @@ final class Connectivity {
     /// fixed deadline from the first update, so steady chatter can't postpone the check.
     private static let sameInterfaceDelay: Duration = .milliseconds(500)
 
-    func pathChanged(online: Bool, interfaces: [String], localRoute: Bool = true) {
+    func pathChanged(online: Bool, interfaces: [String], localRoute: Bool) {
         // Security: an HTTP server's address can be another machine on the new network (café Wi-Fi
         // on the same subnet), and Wi-Fi to Wi-Fi keeps the same interfaces, so any path update
         // means it proves itself again before it gets the token.
@@ -217,6 +220,9 @@ final class Connectivity {
         // often shows up as same-interface chatter.
         let unreachable = !serverReachable && online
         guard cleartext || changed || unreachable else { return }
+        // A miss from before the network came or went says nothing about the new one.
+        if online != hasNetwork { missPending = false }
+        if changed { localRouteProven = false }
         hasNetwork = online
         hasLocalRoute = localRoute
         self.interfaces = interfaces
@@ -227,6 +233,10 @@ final class Connectivity {
             pathDebounce = nil
             if cleartext { announceNetworkChange(strict: true) }
             check()
+        } else if noRouteHome, !serverReachable {
+            // Cellular chatter can't bring a LAN server back, and with it unreachable no token is
+            // sent; the slow retry keeps looking.
+            return
         } else if !cleartext {
             // HTTPS, unreachable: no identity to re-prove, so keep the backoff and look sooner.
             retryNow()
