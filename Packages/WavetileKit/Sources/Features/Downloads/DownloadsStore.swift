@@ -22,9 +22,30 @@ final class Connectivity {
         let id: String
 
         var isCleartext: Bool { url.scheme?.lowercased() == "http" }
+
+        /// The address only exists on a local network (private or link-local IP, `.local` name),
+        /// so it needs Wi-Fi, Ethernet or a VPN to be reached; cellular alone never gets there.
+        var isLocalOnly: Bool {
+            guard let host = url.host(percentEncoded: false)?.lowercased()
+                .trimmingCharacters(in: CharacterSet(charactersIn: "[]")) else { return false }
+            if host.hasSuffix(".local") { return true }
+            if host.contains(":") {
+                return host.hasPrefix("fc") || host.hasPrefix("fd") || host.hasPrefix("fe8")
+                    || host.hasPrefix("fe9") || host.hasPrefix("fea") || host.hasPrefix("feb")
+            }
+            let octets = host.split(separator: ".").compactMap { UInt8($0) }
+            guard octets.count == 4 else { return false }
+            switch (octets[0], octets[1]) {
+            case (10, _), (192, 168), (169, 254): return true
+            case (172, 16...31): return true
+            default: return false
+            }
+        }
     }
 
     private(set) var hasNetwork = true
+    /// The path has Wi-Fi, Ethernet or a VPN, the routes a local-only server address can use.
+    private(set) var hasLocalRoute = true
     /// The current path costs money or is limited (cellular, hotspot, Low Data Mode): streams buffer less.
     private(set) var isMetered = false
     /// Whether the server answered its last check. Optimistic until a check says otherwise, so
@@ -43,6 +64,7 @@ final class Connectivity {
             // An HTTP server gets no requests until it proves itself (`ServerIdentity`), so it starts
             // offline rather than offering streams that can't start yet. On the LAN that's milliseconds.
             serverReachable = server?.isCleartext != true
+            missPending = false
             check()
         }
     }
@@ -62,6 +84,9 @@ final class Connectivity {
     @ObservationIgnored private var retryTask: Task<Void, Never>?
     /// Which step of the backoff the pending retry is on.
     @ObservationIgnored private var retryAttempt = 0
+    /// A probe has failed since the last good answer. Kept across checks, so path updates that
+    /// restart the check (common right after Wi-Fi drops) can't keep the confirmation from landing.
+    @ObservationIgnored private var missPending = false
     @ObservationIgnored private var lastProbe = ContinuousClock.now
     /// Waits out a burst of same-interface updates so they cost one check, not one each.
     @ObservationIgnored private var pathDebounce: Task<Void, Never>?
@@ -86,10 +111,11 @@ final class Connectivity {
         monitor.pathUpdateHandler = { [weak self] path in
             let online = path.status == .satisfied
             let interfaces = path.availableInterfaces.map(\.name)
+            let localRoute = path.availableInterfaces.contains { [.wifi, .wiredEthernet, .other].contains($0.type) }
             let metered = path.isExpensive || path.isConstrained
             Task { @MainActor in
                 self?.isMetered = metered
-                self?.pathChanged(online: online, interfaces: interfaces)
+                self?.pathChanged(online: online, interfaces: interfaces, localRoute: localRoute)
             }
         }
         monitor.start(queue: DispatchQueue(label: "com.derrellwilliams.wavetile.connectivity"))
@@ -119,6 +145,13 @@ final class Connectivity {
     /// even after a network change; HTTP identity checks still independently gate every token.
     private func recheck(attempt: Int) async {
         guard hasNetwork, let server else { return }
+        // Cellular only and a LAN address: no probe can answer, so say so now. The path update
+        // that brings Wi-Fi (or a VPN) back starts the next check.
+        if server.isLocalOnly, !hasLocalRoute {
+            serverReachable = false
+            retryTask?.cancel()
+            return
+        }
         lastProbe = .now
         var reachable = await probe(server.url)
         // A network change mid-check (Wi-Fi waking, roaming) voids the answer: ask again.
@@ -133,11 +166,13 @@ final class Connectivity {
         guard let reachable else { scheduleRetry(attempt: attempt); return }
         if reachable {
             serverReachable = true
+            missPending = false
             // May be this very retry's task: it has nothing left to await, so cancelling it is harmless.
             retryTask?.cancel()
             return
         }
-        if attempt == 0, serverReachable {
+        if attempt == 0, serverReachable, !missPending {
+            missPending = true
             do { try await wait(.seconds(1)) } catch { return }
             guard !Task.isCancelled, server == self.server, hasNetwork else { return }
             await recheck(attempt: 1)
@@ -172,17 +207,18 @@ final class Connectivity {
     /// fixed deadline from the first update, so steady chatter can't postpone the check.
     private static let sameInterfaceDelay: Duration = .milliseconds(500)
 
-    func pathChanged(online: Bool, interfaces: [String]) {
+    func pathChanged(online: Bool, interfaces: [String], localRoute: Bool = true) {
         // Security: an HTTP server's address can be another machine on the new network (café Wi-Fi
         // on the same subnet), and Wi-Fi to Wi-Fi keeps the same interfaces, so any path update
         // means it proves itself again before it gets the token.
         let cleartext = server?.isCleartext == true
-        let changed = online != hasNetwork || interfaces != self.interfaces
+        let changed = online != hasNetwork || interfaces != self.interfaces || localRoute != hasLocalRoute
         // While the server is out of reach, any update is a reason to look again: Wi-Fi settling
         // often shows up as same-interface chatter.
         let unreachable = !serverReachable && online
         guard cleartext || changed || unreachable else { return }
         hasNetwork = online
+        hasLocalRoute = localRoute
         self.interfaces = interfaces
 
         if changed {
