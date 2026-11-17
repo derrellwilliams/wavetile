@@ -81,7 +81,15 @@ struct NowPlayingView: View {
             albumID: track.albumID, albumTitle: track.albumTitle, albumArtist: track.artist,
             sourceID: "player-\(track.trackID)"
         )
-        songRoutes = SongRoutes(trackID: track.trackID, artist: routes.artist, album: routes.album)
+        // The route resolves the album artist, which can differ from the displayed performer
+        // on compilations and collaborations. Only link a name to its matching artist.
+        let artist: LibraryRoute?
+        if case let .artist(_, name) = routes.artist, name == track.artist {
+            artist = routes.artist
+        } else {
+            artist = nil
+        }
+        songRoutes = SongRoutes(trackID: track.trackID, artist: artist, album: routes.album)
     }
 
     /// The routes for the playing song only: `onChange` runs after the next track's first frame,

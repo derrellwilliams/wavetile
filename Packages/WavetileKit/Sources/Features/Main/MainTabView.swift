@@ -230,14 +230,24 @@ extension MainTabView {
     fileprivate func openLibraryRoute(_ route: LibraryRoute) {
         showNowPlaying = false
         showSettings = false
-        openFromPlayer(route, on: .music, path: $musicPath)
+        // Transition sources and refreshed display metadata do not change the destination.
+        let identity: AnyHashable
+        switch route {
+        case let .album(album): identity = AnyHashable("album:\(album.album.id)")
+        case let .artist(id, _): identity = AnyHashable("artist:\(id)")
+        default: identity = AnyHashable(route)
+        }
+        openFromPlayer(route, on: .music, path: $musicPath, identity: identity)
     }
 
-    private func openFromPlayer<Route: Hashable>(_ route: Route, on tab: AppTab, path: Binding<NavigationPath>) {
+    private func openFromPlayer<Route: Hashable>(
+        _ route: Route, on tab: AppTab, path: Binding<NavigationPath>, identity: AnyHashable? = nil
+    ) {
+        let identity = identity ?? AnyHashable(route)
         selection = tab
-        if let last = playerRoute, last.route == AnyHashable(route), last.tab == tab, last.path == path.wrappedValue { return }
+        if let last = playerRoute, last.route == identity, last.tab == tab, last.path == path.wrappedValue { return }
         path.wrappedValue.append(route)
-        playerRoute = (route, tab, path.wrappedValue)
+        playerRoute = (identity, tab, path.wrappedValue)
     }
 
     fileprivate func openPodcastSearch() {

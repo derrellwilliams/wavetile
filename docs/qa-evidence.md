@@ -662,3 +662,13 @@ Change: `UITests/AccessibilityAuditTests.swift` skips contrast issues on element
 Dependency advisories rechecked Nov 11: all 10 pins in `Packages/WavetileKit/Package.resolved` queried against OSV (SwiftURL ecosystem, `api.osv.dev` batch query) with no advisories, unchanged from Nov 10.
 
 Claims check Nov 11 (App Store description, site, `llms.txt` against the source): all feature claims match the code. Fixed on the site: `why-wavetile.html` said CarPlay was waiting on Apple's approval (granted Oct 30), and `llms.txt` listed a "From Your Library" Home shelf that doesn't exist. Device claims still rest on the Nov 8 sign-off; recheck on build 202611110730.
+
+## 1.0.1 prep regression run — November 16, 2026
+
+Code at `ac64f04` plus the uncommitted player-link fixes (`MainTabView.openLibraryRoute` dedupes by album/artist id; `NowPlayingView` links the artist only when the route's name matches the displayed performer). Xcode build (incl. test targets) passed. Package tests: 222 tests, 313 runs, 0 failures, no runtime warnings (`build/Logs/Test/Test-WavetileKit-Package-2026.11.16_19-51-14--0700.xcresult`). UI tests: 21 of 21 passed, including the accessibility audit, no runtime warnings (`build/Logs/Test/Test-Wavetile-2026.11.16_19-52-20--0700.xcresult`).
+
+Dependency advisories rechecked Nov 16: all 10 pins queried against OSV (SwiftURL batch), no advisories; the query was confirmed live by swift-nio 2.99.0 returning GHSA-cq87-8r7h-962v.
+
+Reviewer access Nov 16: `https://demo.jellyfin.org/stable` answers (Jellyfin 12.4.0) and `demo` with a blank password authenticates (HTTP 200).
+
+Not checked: Organizer crash and hang reports (Xcode reports the app isn't connected in Organizer); device checks of the player links and connectivity changes.
