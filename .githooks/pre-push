@@ -7,4 +7,15 @@ if ! command -v gitleaks >/dev/null 2>&1; then
   echo "Install Gitleaks before committing or pushing: brew install gitleaks" >&2
   exit 1
 fi
-exec gitleaks git --redact --no-banner --log-opts="--all" .
+zero=0000000000000000000000000000000000000000
+# Scan only the commits being pushed (git passes one line per ref on stdin).
+# CI scans the full history.
+while read -r _ local_sha _ remote_sha; do
+  [ "$local_sha" = "$zero" ] && continue # branch deletion
+  if [ "$remote_sha" = "$zero" ]; then
+    range="$local_sha --not --remotes"
+  else
+    range="$remote_sha..$local_sha"
+  fi
+  gitleaks git --redact --no-banner --log-opts="$range" .
+done

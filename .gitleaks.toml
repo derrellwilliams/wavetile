@@ -1,11 +1,13 @@
 [extend]
 useDefault = true
 
-# Secret files should never be committed even if a password has no recognizable prefix.
+# Secret files should never be committed even if a password has no recognizable
+# prefix. Path-only rule: it fires once per file, not once per line. (Gitleaks
+# skips completely empty files, so an empty .env is not reported.)
 [[rules]]
 id = "private-config-file"
 description = "Private environment or device credential file"
-path = '''(^|/)(\.env(\.[^/]+)?|\.dev\.vars|secrets\.h|Secrets\.xcconfig)$'''
-regex = '''.+'''
+path = '''(^|/)(\.env(\.[^/]+)?|\.dev\.vars(\.[^/]+)?|secrets\.h|Secrets\.xcconfig)$'''
 [[rules.allowlists]]
-paths = ['''(^|/)\.env\.(example|sample|template)$''']
+# Templates such as .env.example, .env.local.example, .dev.vars.sample.
+paths = ['''\.(example|sample|template)$''']
