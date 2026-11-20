@@ -1,19 +1,20 @@
 # Wavetile release & launch plan
 
-The working checklist for engineering, App Store preparation, launch and follow-up. Version 1.0 (build 202611110730) was submitted to App Review on 2026-11-11 and approved on 2026-11-12 ("eligible for distribution", automatic release). Update status here with a date and evidence; don't keep competing checklists in agent memory. An unchecked item is unfinished or unverified, not necessarily a known defect.
+The working checklist for engineering, App Store preparation, launch and follow-up. Version 1.0 (build 202611110730) was submitted to App Review on 2026-11-11 and approved on 2026-11-12 ("eligible for distribution", automatic release). Version 1.0.1 (build 202611162050) was submitted to App Review on 2026-11-18. Update status here with a date and evidence; don't keep competing checklists in agent memory. An unchecked item is unfinished or unverified, not necessarily a known defect.
 
 - Evidence behind the gates: [qa-evidence.md](qa-evidence.md) (security, privacy, Release/config, sanitizer records).
 - App Store, web search and LLM discoverability notes (ASO, SEO, GEO): [search-optimization.md](search-optimization.md).
 - Submission copy: [app-review-notes.md](app-review-notes.md) (pasted into App Store Connect Nov 11), [privacy-answers.md](privacy-answers.md). The listing text lives in App Store Connect; the old `app-store-listing.md` was removed Nov 11 (git history keeps it).
 - Reviewer server plan (fallback only; the public demo is in use): [reviewer-server.md](reviewer-server.md).
-- Device checks: signed off 2026-11-08 (build 202611072135); build 202611110730 device-checked by the user 2026-11-11 before submitting.
+- Device checks: signed off 2026-11-08 (build 202611072135); build 202611110730 device-checked by the user 2026-11-11 before submitting; 1.0.1 build 202611162050 tested on TestFlight by the user before submitting Nov 18.
 
 Consolidated 2026-11-06 and reorganized 2026-11-07 (tiers below, evidence and search notes split out). Historical test results are preserved, not rerun or certification of the latest build. This plan doesn't itself authorize uploads, CI setup, delegation, commits or public posts.
 
-## Current status — 2026-11-12
+## Current status — 2026-11-18
 
 | Area | State |
 |---|---|
+| 1.0.1 | Nov 18: version 1.0.1, build 202611162050 (`d9f38c3`, main) added for review after the user tested it on TestFlight. Changes: Artist • Album player links; connectivity fixes (offline notice at once when Wi-Fi goes off, LAN server comes back over VPN). QA: Nov 16 regression run in qa-evidence.md |
 | Submission | Nov 11 ~1:39 PM MST: version 1.0, build 202611110730 (`8f83647`, main) submitted. **Approved Nov 12**: App Store Connect email 3:25 PM, "Review of your submission has been completed. It is now eligible for distribution." App name "Wavetile Music", `https://apps.apple.com/app/wavetile-music/id6826722664`. Automatic release |
 | Code | `main` is what the build was cut from; later commits touch only a UI test, docs and the site. Plain-HTTP token risk accepted (see QA-2 / QA-3 remaining) |
 | Automated QA | Nov 11: package 214/214, no runtime warnings; UI 20/21, the one failure (Now Playing time-label contrast, measured 4.95:1+) is a false positive now skipped in the audit. Details in qa-evidence.md |

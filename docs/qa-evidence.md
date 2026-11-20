@@ -671,4 +671,6 @@ Dependency advisories rechecked Nov 16: all 10 pins queried against OSV (SwiftUR
 
 Reviewer access Nov 16: `https://demo.jellyfin.org/stable` answers (Jellyfin 12.4.0) and `demo` with a blank password authenticates (HTTP 200).
 
-Not checked: Organizer crash and hang reports (Xcode reports the app isn't connected in Organizer); device checks of the player links and connectivity changes.
+Not checked: Organizer crash and hang reports (Xcode reports the app isn't connected in Organizer).
+
+Device check Nov 18: the user tested build 202611162050 (`d9f38c3`) from TestFlight, covering the player links and connectivity changes, and added it for review.
