@@ -316,14 +316,19 @@ public final class AudioPlayer {
     // MARK: - Queue → AVQueuePlayer
 
     /// Rebuilds the player around the queue's current track and starts it if playing.
-    private func loadCurrent(startAt position: Double? = nil) {
+    /// `waitsForServer`: a stream the server isn't trusted with yet waits for its check once.
+    private func loadCurrent(startAt position: Double? = nil, waitsForServer: Bool = true) {
         loadGeneration += 1
         reloadingStreams = false
         reportStopped()
         forgetAllItems()
         errorMessage = nil
         currentTime = 0
-        guard let track = queue.current, let item = makeItem(for: track) else { return }
+        guard let track = queue.current else { return }
+        guard let item = makeItem(for: track) else {
+            if waitsForServer, awaitsServerCheck(track) { loadOnceServerChecks(startAt: position) }
+            return
+        }
         player.insert(item, after: nil)
         duration = track.duration.map { Double($0.components.seconds) } ?? 0
         enqueueNext()
@@ -368,9 +373,49 @@ public final class AudioPlayer {
             statusObservations.removeValue(forKey: ObjectIdentifier(item))
         }
         guard !loopsCurrent, let next = target, next.queueID != queue.current?.queueID,
-              let currentItem = player.currentItem, let item = makeItem(for: next)
+              let currentItem = player.currentItem
         else { return }
+        guard let item = makeItem(for: next) else {
+            // A downloaded song plays while the server is still checked: preload the stream after.
+            if awaitsServerCheck(next) { enqueueOnceServerChecks() }
+            return
+        }
         player.insert(item, after: currentItem)
+    }
+
+    /// The track streams from the server and its stream was held back only because the server
+    /// hasn't proved itself on this network yet (just after launch, see `ServerIdentity`).
+    private func awaitsServerCheck(_ track: QueuedTrack) -> Bool {
+        track.podcast == nil && localFile?(track.trackID) == nil
+            && !ServerIdentity.shared.allowsToken(to: library.session.serverURL)
+    }
+
+    /// The current track waits for the server's check, then loads; if the server fails it,
+    /// playback pauses with the offline notice instead of silently doing nothing.
+    private func loadOnceServerChecks(startAt position: Double?) {
+        // The empty player isn't the end of the queue meanwhile.
+        reloadingStreams = true
+        let generation = loadGeneration
+        Task {
+            let allowed = await serverMayGetToken()
+            // Unless the listener has moved on in the meantime.
+            guard generation == loadGeneration else { return }
+            if allowed {
+                loadCurrent(startAt: position, waitsForServer: false)
+            } else {
+                reloadingStreams = false
+                if isPlaying { pause() }
+                notifyOffline()
+            }
+        }
+    }
+
+    private func enqueueOnceServerChecks() {
+        let generation = loadGeneration
+        Task {
+            guard await serverMayGetToken(), generation == loadGeneration else { return }
+            enqueueNext()
+        }
     }
 
     /// The automatic next track, or the first playable one after it, so the gapless item isn't a

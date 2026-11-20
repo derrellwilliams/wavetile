@@ -135,7 +135,17 @@ struct ConnectivityTests {
         await fixture.connectivity.recheck()
         #expect(!fixture.connectivity.serverReachable)
         #expect(fixture.probeCount == 1)
-        #expect(fixture.onlineDuringWait.allSatisfy { !$0 })
+        // The only wait is the retry after the miss (offline), not a confirmation (still online).
+        try await fixture.waitUntil { fixture.waits.count == 1 }
+        #expect(fixture.onlineDuringWait == [false])
+    }
+
+    @Test func anHTTPServerWhoseFirstCheckNeverAnswersGoesOffline() async throws {
+        let fixture = ConnectivityFixture([nil, nil, nil, nil], url: "http://192.168.1.5:8096")
+        fixture.holdsConfirmation = true
+        await fixture.connectivity.recheck()
+        #expect(fixture.probeCount == 4)
+        #expect(!fixture.connectivity.serverReachable)
     }
 
     @Test func turningWiFiOffMarksALocalServerUnreachableAtOnce() async throws {

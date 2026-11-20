@@ -63,7 +63,9 @@ struct PlayableRow<Label: View>: View {
         HStack(spacing: 0) {
             tapAction
                 // Offline, only downloaded songs can play; dim the rest (tapping one says why).
-                .opacity(isAvailable ? 1 : theme.unavailableOpacity)
+                // Scoped animation, like `offlineDimmed`: a row a lazy list builds mid-change
+                // can't keep a stale dim.
+                .animation(theme.motion.smooth) { $0.opacity(isAvailable ? 1 : theme.unavailableOpacity) }
                 .accessibilityHint(isAvailable ? "" : "Not downloaded")
                 .contextMenu { menuItems }
             if showsMore {

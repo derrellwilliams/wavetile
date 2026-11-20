@@ -74,10 +74,12 @@ final class Connectivity {
     /// A probe has failed since the last good answer. Kept across checks, so path updates that
     /// restart the check (common right after Wi-Fi drops) can't keep the confirmation from landing.
     @ObservationIgnored private var missPending = false
-    /// No check has answered for this HTTP server yet. It shows online meanwhile: it gets
-    /// no token until it proves itself (`ServerIdentity`, which the player and downloads wait on),
-    /// so showing it offline for the milliseconds that takes on the LAN only flashed the dimming.
-    /// Away from home the first miss marks it unreachable at once, without the 1 s confirmation.
+    /// No check has answered for this HTTP server yet. It shows online meanwhile: it gets no
+    /// token until it proves itself (`ServerIdentity`; API calls, downloads and the player's
+    /// streams wait for that, see `AudioPlayer.loadCurrent`), so showing it offline for the
+    /// milliseconds that takes on the LAN only flashed the dimming. Away from home the first miss
+    /// marks it unreachable at once, without the 1 s confirmation, and so does a first check that
+    /// never gets an answer.
     @ObservationIgnored private var unverified = false
     /// The current path runs over Wi-Fi, Ethernet or a full-tunnel VPN, the routes a local-only
     /// server address can use.
@@ -165,7 +167,12 @@ final class Connectivity {
         guard !Task.isCancelled, server == self.server, hasNetwork else { return }
         // Still voided after three asks (path updates keep landing): look again soon, as if this
         // one hadn't happened. Returning would end the retry chain and leave the last answer standing.
-        guard let reachable else { scheduleRetry(attempt: attempt); return }
+        guard let reachable else {
+            // Never answered at all: don't keep showing an unchecked server online.
+            if unverified { serverReachable = false }
+            scheduleRetry(attempt: attempt)
+            return
+        }
         if reachable {
             if noRouteHome { localRouteProven = true }
             serverReachable = true

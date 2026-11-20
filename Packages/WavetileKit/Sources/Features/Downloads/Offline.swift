@@ -80,10 +80,10 @@ private struct OfflineDim: ViewModifier {
     func body(content: Content) -> some View {
         let dimmed = !connectivity.isOnline && !available
         content
-            .opacity(dimmed ? theme.unavailableOpacity : 1)
             // Animated here as well as by the container: a tile a lazy stack builds mid-change
-            // can miss the container's animation and keep a stale dim until it's rebuilt.
-            .animation(theme.motion.smooth, value: dimmed)
+            // can miss the container's animation and keep a stale dim until it's rebuilt. Scoped
+            // to the opacity, so the tile's other updates (artwork, badges) don't animate with it.
+            .animation(theme.motion.smooth) { $0.opacity(dimmed ? theme.unavailableOpacity : 1) }
             .modifier(DimmedHint(isDimmed: dimmed))
     }
 }
