@@ -186,6 +186,29 @@ struct PodcastDatabaseTests {
         #expect(Set(try db.autoDownloadCandidates(perShow: 2)) == [id("b")])
     }
 
+    @Test func stoppedEpisodesAreFinishedAfterAnHourNearTheEndOrFourDaysAnywhere() async throws {
+        let db = try PodcastDatabase.temporary()
+        _ = try await db.upsert(feed: feed(["near", "mid", "saved", "playing"].map { episode($0, daysAgo: 1) }), feedURL: feedURL, validators: nil, follow: true)
+        try await db.savePosition(episodeID: id("near"), position: 3545, duration: 3600)
+        try await db.savePosition(episodeID: id("mid"), position: 1800, duration: 3600)
+        try await db.savePosition(episodeID: id("saved"), position: 1800, duration: 3600)
+        try await db.setSaved(episodeID: id("saved"), true)
+        try await db.savePosition(episodeID: id("playing"), position: 3545, duration: 3600)
+        try await db.enqueue(episodeID: id("near"), atFront: false)
+
+        #expect(try await db.finishAbandoned(except: id("playing"), now: Date().addingTimeInterval(30 * 60)).isEmpty, "too soon")
+        #expect(try await db.finishAbandoned(except: id("playing"), now: Date().addingTimeInterval(2 * 3600)) == [id("near")])
+        let near = try #require(try db.episodeNow(id: id("near"))).episode
+        #expect(near.isPlayed && near.position == 0)
+        #expect(near.playedAt == near.lastPlayedAt, "played as of the last listen, so sync keeps a later listen elsewhere")
+        #expect(try db.queueNow().isEmpty)
+
+        #expect(try await db.finishAbandoned(except: id("playing"), now: Date().addingTimeInterval(3 * 86400)).isEmpty)
+        #expect(try await db.finishAbandoned(except: id("playing"), now: Date().addingTimeInterval(4 * 86400 + 60)) == [id("mid")])
+        #expect(try db.episodeNow(id: id("saved"))?.episode.isInProgress == true, "saved episodes are kept")
+        #expect(try db.episodeNow(id: id("playing"))?.episode.isInProgress == true, "the player's episode is kept")
+    }
+
     @Test func remoteStateAppliesNewerPositionsAndFinishes() async throws {
         let db = try PodcastDatabase.temporary()
         _ = try await db.upsert(feed: feed([episode("a", daysAgo: 2), episode("b", daysAgo: 1)]), feedURL: feedURL, validators: nil, follow: true)

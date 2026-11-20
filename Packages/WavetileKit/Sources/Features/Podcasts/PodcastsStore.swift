@@ -175,6 +175,7 @@ final class PodcastsStore {
 
     /// Checks enabled podcast feeds on launch and return, using the one-hour freshness window.
     func refreshIfNeeded() async {
+        tidyEpisodes()
         guard isEnabled else { return }
         let stale = ((try? database.followedShowsNow()) ?? []).contains { ($0.lastRefreshed ?? .distantPast) < Date().addingTimeInterval(-3600) }
         if stale { await refreshAll() }
@@ -319,10 +320,7 @@ final class PodcastsStore {
         let id = track.trackID
         write {
             let finished = try await self.database.savePosition(episodeID: id, position: position, duration: duration)
-            if finished, self.deletePlayedDownloads, let item = try? self.database.episodeNow(id: id), !item.episode.isSaved,
-               item.download != nil, self.player.current?.trackID != id {
-                try await self.downloads?.remove(episodeID: id)
-            }
+            if finished { try await self.removePlayedDownloads() }
             // The 5 s ticks while playing only need to reach the server now and then; a pause,
             // stop or finish goes out soon after.
             if finished || !self.player.isPlaying {
@@ -383,13 +381,7 @@ final class PodcastsStore {
     func setPlayed(_ ids: [String], _ played: Bool) {
         write {
             try await self.database.setPlayed(episodeIDs: ids, played)
-            if played, self.deletePlayedDownloads {
-                for id in ids where self.player.current?.trackID != id {
-                    if let item = try? self.database.episodeNow(id: id), item.download != nil, !item.episode.isSaved {
-                        try await self.downloads?.remove(episodeID: id)
-                    }
-                }
-            }
+            if played { try await self.removePlayedDownloads() }
             self.schedulePush()
         }
     }
@@ -397,7 +389,28 @@ final class PodcastsStore {
     func markAllPlayed(_ show: ShowRecord) {
         write {
             try await self.database.markAllPlayed(showID: show.id)
+            try await self.removePlayedDownloads()
             self.schedulePush()
+        }
+    }
+
+    /// Launch and return: marks played what the user stopped and didn't come back to (see
+    /// `PodcastDatabase.finishAbandoned`), then removes played downloads, including ones
+    /// finished on another device or skipped earlier because they were still in the player.
+    func tidyEpisodes() {
+        write {
+            let finished = try await self.database.finishAbandoned(except: self.player.current?.trackID)
+            try await self.removePlayedDownloads()
+            if !finished.isEmpty { self.schedulePush() }
+        }
+    }
+
+    /// With "Delete Played Downloads" on, removes every played, unsaved download except the
+    /// episode loaded in the player (the next sweep gets it).
+    private func removePlayedDownloads() async throws {
+        guard deletePlayedDownloads else { return }
+        for id in try database.playedDownloads() where player.current?.trackID != id {
+            try await downloads?.remove(episodeID: id)
         }
     }
 
@@ -657,6 +670,7 @@ final class PodcastsStore {
         let played = merged.played.filter { local.played[$0.key] == nil }
         if !positions.isEmpty || !played.isEmpty {
             try await database.applyRemote(positions: positions, played: played)
+            if !played.isEmpty { tidyEpisodes() }
         }
     }
 }

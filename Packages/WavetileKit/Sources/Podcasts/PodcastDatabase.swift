@@ -637,6 +637,33 @@ public extension PodcastDatabase {
         }
     }
 
+    /// A stopped episode within this many seconds of the end counts as finished once left alone
+    /// for `nearlyFinishedIdle`.
+    static let nearlyFinishedRemaining: Double = 60
+    static let nearlyFinishedIdle: TimeInterval = 3600
+    /// Any started episode left alone this long counts as finished.
+    static let abandonedIdle: TimeInterval = 4 * 24 * 3600
+
+    /// Marks played the episodes the user stopped and didn't come back to: within a minute of
+    /// the end and untouched for an hour, or untouched for 4 days. Saved episodes and `exceptID`
+    /// (the one loaded in the player) are left alone. The played date is the last listen, so a
+    /// later listen on another device still wins in sync. Returns the IDs it marked.
+    func finishAbandoned(except exceptID: String?, now: Date = Date()) async throws -> [String] {
+        try await pool.write { db in
+            let ids = try String.fetchAll(db, sql: """
+                SELECT id FROM episode
+                WHERE position > 0 AND playedAt IS NULL AND savedAt IS NULL AND lastPlayedAt IS NOT NULL AND id != ?
+                  AND (lastPlayedAt < ? OR (duration > 0 AND duration - position <= ? AND lastPlayedAt < ?))
+                """, arguments: [exceptID ?? "", now.addingTimeInterval(-Self.abandonedIdle),
+                                 Self.nearlyFinishedRemaining, now.addingTimeInterval(-Self.nearlyFinishedIdle)])
+            for id in ids {
+                try db.execute(sql: "UPDATE episode SET playedAt = lastPlayedAt, position = 0 WHERE id = ?", arguments: [id])
+                try UpNextRecord.deleteOne(db, key: id)
+            }
+            return ids
+        }
+    }
+
     func setSaved(episodeID: String, _ saved: Bool) async throws {
         try await pool.write { db in
             try db.execute(sql: "UPDATE episode SET savedAt = ? WHERE id = ?", arguments: [saved ? Date() : nil, episodeID])
