@@ -122,6 +122,22 @@ struct ConnectivityTests {
         #expect(fixture.probeCount == 0)
     }
 
+    @Test func anHTTPServerShowsOnlineWhileItsFirstCheckRuns() async {
+        let fixture = ConnectivityFixture([true], url: "http://192.168.1.5:8096")
+        #expect(fixture.connectivity.isOnline)
+        await fixture.connectivity.recheck()
+        #expect(fixture.connectivity.isOnline)
+    }
+
+    @Test func anHTTPServerMissingItsFirstCheckGoesOfflineWithoutConfirmation() async throws {
+        let fixture = ConnectivityFixture([false], url: "http://192.168.1.5:8096")
+        fixture.holdsConfirmation = true
+        await fixture.connectivity.recheck()
+        #expect(!fixture.connectivity.serverReachable)
+        #expect(fixture.probeCount == 1)
+        #expect(fixture.onlineDuringWait.allSatisfy { !$0 })
+    }
+
     @Test func turningWiFiOffMarksALocalServerUnreachableAtOnce() async throws {
         let fixture = ConnectivityFixture([true], url: "http://192.168.1.5:8096")
         fixture.connectivity.pathChanged(online: true, interfaces: ["en0", "pdp_ip0"], localRoute: true)

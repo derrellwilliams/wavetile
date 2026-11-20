@@ -81,6 +81,9 @@ private struct OfflineDim: ViewModifier {
         let dimmed = !connectivity.isOnline && !available
         content
             .opacity(dimmed ? theme.unavailableOpacity : 1)
+            // Animated here as well as by the container: a tile a lazy stack builds mid-change
+            // can miss the container's animation and keep a stale dim until it's rebuilt.
+            .animation(theme.motion.smooth, value: dimmed)
             .modifier(DimmedHint(isDimmed: dimmed))
     }
 }

@@ -37,8 +37,8 @@ final class Connectivity {
     private(set) var hasNetwork = true
     /// The current path costs money or is limited (cellular, hotspot, Low Data Mode): streams buffer less.
     private(set) var isMetered = false
-    /// Whether the server answered its last check. Optimistic until a check says otherwise, so
-    /// launch doesn't dim the library while the first check runs.
+    /// Whether the server answered its last check. Optimistic until a check says otherwise (HTTP
+    /// servers too, see `unverified`), so launch doesn't dim the library while the first check runs.
     private(set) var serverReachable = true
     /// Music can stream: the network is up and the server answers.
     var isOnline: Bool { hasNetwork && serverReachable }
@@ -50,9 +50,7 @@ final class Connectivity {
             pathDebounce?.cancel()
             pathDebounce = nil
             if let server { ServerIdentity.shared.register(server.url, serverID: server.id) }
-            // An HTTP server gets no requests until it proves itself (`ServerIdentity`), so it starts
-            // offline rather than offering streams that can't start yet. On the LAN that's milliseconds.
-            serverReachable = server?.isCleartext != true
+            startUnverified()
             missPending = false
             check()
         }
@@ -76,6 +74,11 @@ final class Connectivity {
     /// A probe has failed since the last good answer. Kept across checks, so path updates that
     /// restart the check (common right after Wi-Fi drops) can't keep the confirmation from landing.
     @ObservationIgnored private var missPending = false
+    /// No check has answered for this HTTP server yet. It shows online meanwhile: it gets
+    /// no token until it proves itself (`ServerIdentity`, which the player and downloads wait on),
+    /// so showing it offline for the milliseconds that takes on the LAN only flashed the dimming.
+    /// Away from home the first miss marks it unreachable at once, without the 1 s confirmation.
+    @ObservationIgnored private var unverified = false
     /// The current path runs over Wi-Fi, Ethernet or a full-tunnel VPN, the routes a local-only
     /// server address can use.
     @ObservationIgnored private var hasLocalRoute = true
@@ -104,7 +107,7 @@ final class Connectivity {
         self.probe = probe
         self.wait = wait
         if let server { ServerIdentity.shared.register(server.url, serverID: server.id) }
-        serverReachable = server?.isCleartext != true
+        startUnverified()
         guard monitorsNetwork else { return }
         monitor.pathUpdateHandler = { [weak self] path in
             let online = path.status == .satisfied
@@ -167,11 +170,12 @@ final class Connectivity {
             if noRouteHome { localRouteProven = true }
             serverReachable = true
             missPending = false
+            unverified = false
             // May be this very retry's task: it has nothing left to await, so cancelling it is harmless.
             retryTask?.cancel()
             return
         }
-        if attempt == 0, serverReachable, !missPending {
+        if attempt == 0, serverReachable, !missPending, !unverified {
             missPending = true
             do { try await wait(.seconds(1)) } catch { return }
             guard !Task.isCancelled, server == self.server, hasNetwork else { return }
@@ -179,7 +183,14 @@ final class Connectivity {
             return
         }
         serverReachable = false
+        unverified = false
         scheduleRetry(attempt: attempt + 1)
+    }
+
+    /// A new server (launch, sign-in) starts online until its first check answers.
+    private func startUnverified() {
+        serverReachable = true
+        unverified = server?.isCleartext == true
     }
 
     /// Looks again within 1, 2, 4, then 5 s, so recovered servers promptly restore the library.
