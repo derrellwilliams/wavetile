@@ -645,20 +645,22 @@ public extension PodcastDatabase {
     static let abandonedIdle: TimeInterval = 4 * 24 * 3600
 
     /// Marks played the episodes the user stopped and didn't come back to: within a minute of
-    /// the end and untouched for an hour, or untouched for 4 days. Saved episodes and `exceptID`
-    /// (the one loaded in the player) are left alone. The played date is the last listen, so a
-    /// later listen on another device still wins in sync. Returns the IDs it marked.
+    /// the end and untouched for an hour, or untouched for 4 days. Saved and Up Next episodes and
+    /// `exceptID` (the one loaded in the player) are left alone. Run it only after listening state
+    /// from other devices is in (a sync), or a listen elsewhere looks like an abandoned one. The
+    /// played date is the last listen, so a later listen on another device reopens the episode
+    /// (`applyRemote`). Returns the IDs it marked.
     func finishAbandoned(except exceptID: String?, now: Date = Date()) async throws -> [String] {
         try await pool.write { db in
             let ids = try String.fetchAll(db, sql: """
                 SELECT id FROM episode
                 WHERE position > 0 AND playedAt IS NULL AND savedAt IS NULL AND lastPlayedAt IS NOT NULL AND id != ?
+                  AND id NOT IN (SELECT episodeID FROM upNext)
                   AND (lastPlayedAt < ? OR (duration > 0 AND duration - position <= ? AND lastPlayedAt < ?))
                 """, arguments: [exceptID ?? "", now.addingTimeInterval(-Self.abandonedIdle),
                                  Self.nearlyFinishedRemaining, now.addingTimeInterval(-Self.nearlyFinishedIdle)])
             for id in ids {
                 try db.execute(sql: "UPDATE episode SET playedAt = lastPlayedAt, position = 0 WHERE id = ?", arguments: [id])
-                try UpNextRecord.deleteOne(db, key: id)
             }
             return ids
         }
@@ -750,12 +752,13 @@ public extension PodcastDatabase {
         }
     }
 
-    /// Downloads for played episodes (auto-delete), excluding ones the user saved.
+    /// Downloads for played episodes (auto-delete), finished or still running, excluding ones
+    /// the user saved.
     func playedDownloads() throws -> [String] {
         try pool.read { db in
             try String.fetchAll(db, sql: """
                 SELECT d.episodeID FROM episodeDownload d JOIN episode e ON e.id = d.episodeID
-                WHERE e.playedAt IS NOT NULL AND e.savedAt IS NULL AND d.state = 'done'
+                WHERE e.playedAt IS NOT NULL AND e.savedAt IS NULL
                 """)
         }
     }
@@ -796,11 +799,14 @@ public extension PodcastDatabase {
     }
 
     /// Applies listening state from another device: newer positions win, played dates fill in.
+    /// A listen elsewhere after this device marked the episode played reopens it.
     func applyRemote(positions: [String: (position: Double, updated: Date)], played: [String: Date]) async throws {
         try await pool.write { db in
             for (id, remote) in positions {
-                guard var episode = try EpisodeRecord.fetchOne(db, key: id), episode.playedAt == nil else { continue }
+                guard var episode = try EpisodeRecord.fetchOne(db, key: id) else { continue }
+                if let playedAt = episode.playedAt, playedAt >= remote.updated { continue }
                 guard (episode.lastPlayedAt ?? .distantPast) < remote.updated else { continue }
+                episode.playedAt = nil
                 episode.position = remote.position
                 episode.lastPlayedAt = remote.updated
                 try episode.update(db)

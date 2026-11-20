@@ -188,25 +188,53 @@ struct PodcastDatabaseTests {
 
     @Test func stoppedEpisodesAreFinishedAfterAnHourNearTheEndOrFourDaysAnywhere() async throws {
         let db = try PodcastDatabase.temporary()
-        _ = try await db.upsert(feed: feed(["near", "mid", "saved", "playing"].map { episode($0, daysAgo: 1) }), feedURL: feedURL, validators: nil, follow: true)
+        _ = try await db.upsert(feed: feed(["near", "mid", "saved", "queued", "playing"].map { episode($0, daysAgo: 1) }), feedURL: feedURL, validators: nil, follow: true)
         try await db.savePosition(episodeID: id("near"), position: 3545, duration: 3600)
         try await db.savePosition(episodeID: id("mid"), position: 1800, duration: 3600)
         try await db.savePosition(episodeID: id("saved"), position: 1800, duration: 3600)
         try await db.setSaved(episodeID: id("saved"), true)
         try await db.savePosition(episodeID: id("playing"), position: 3545, duration: 3600)
-        try await db.enqueue(episodeID: id("near"), atFront: false)
+        try await db.savePosition(episodeID: id("queued"), position: 3545, duration: 3600)
+        try await db.enqueue(episodeID: id("queued"), atFront: false)
 
         #expect(try await db.finishAbandoned(except: id("playing"), now: Date().addingTimeInterval(30 * 60)).isEmpty, "too soon")
         #expect(try await db.finishAbandoned(except: id("playing"), now: Date().addingTimeInterval(2 * 3600)) == [id("near")])
         let near = try #require(try db.episodeNow(id: id("near"))).episode
         #expect(near.isPlayed && near.position == 0)
         #expect(near.playedAt == near.lastPlayedAt, "played as of the last listen, so sync keeps a later listen elsewhere")
-        #expect(try db.queueNow().isEmpty)
 
         #expect(try await db.finishAbandoned(except: id("playing"), now: Date().addingTimeInterval(3 * 86400)).isEmpty)
         #expect(try await db.finishAbandoned(except: id("playing"), now: Date().addingTimeInterval(4 * 86400 + 60)) == [id("mid")])
         #expect(try db.episodeNow(id: id("saved"))?.episode.isInProgress == true, "saved episodes are kept")
         #expect(try db.episodeNow(id: id("playing"))?.episode.isInProgress == true, "the player's episode is kept")
+        #expect(try db.episodeNow(id: id("queued"))?.episode.isInProgress == true, "Up Next is kept")
+        #expect(try db.queueNow().map(\.id) == [id("queued")])
+    }
+
+    @Test func aLaterListenElsewhereReopensAnAutoFinishedEpisode() async throws {
+        let db = try PodcastDatabase.temporary()
+        _ = try await db.upsert(feed: feed([episode("a", daysAgo: 1), episode("b", daysAgo: 1)]), feedURL: feedURL, validators: nil, follow: true)
+        try await db.savePosition(episodeID: id("a"), position: 1800, duration: 3600)
+        try await db.savePosition(episodeID: id("b"), position: 1800, duration: 3600)
+        _ = try await db.finishAbandoned(except: nil, now: Date().addingTimeInterval(5 * 86400))
+        let finishedAt = try #require(try db.episodeNow(id: id("a"))?.episode.playedAt)
+
+        try await db.applyRemote(positions: [
+            id("a"): (position: 2400, updated: finishedAt.addingTimeInterval(86400)),
+            id("b"): (position: 2400, updated: finishedAt.addingTimeInterval(-60)),
+        ], played: [:])
+        let a = try #require(try db.episodeNow(id: id("a"))).episode
+        #expect(!a.isPlayed && a.position == 2400)
+        #expect(try db.episodeNow(id: id("b"))?.episode.isPlayed == true, "an older listen elsewhere doesn't reopen it")
+    }
+
+    @Test func playedDownloadsIncludeRunningOnesButNotSaved() async throws {
+        let db = try PodcastDatabase.temporary()
+        _ = try await db.upsert(feed: feed([episode("a", daysAgo: 1), episode("b", daysAgo: 1), episode("c", daysAgo: 1)]), feedURL: feedURL, validators: nil, follow: true)
+        for guid in ["a", "b", "c"] { _ = try await db.requestDownload(episodeID: id(guid), automatic: false) }
+        try await db.setSaved(episodeID: id("c"), true)
+        try await db.setPlayed(episodeIDs: [id("a"), id("c")], true)
+        #expect(try db.playedDownloads() == [id("a")])
     }
 
     @Test func remoteStateAppliesNewerPositionsAndFinishes() async throws {

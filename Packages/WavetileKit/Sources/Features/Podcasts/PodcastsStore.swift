@@ -169,14 +169,18 @@ final class PodcastsStore {
     private func startup() async {
         await downloads?.resumePending(allowCellular: allowCellular)
         if let names = try? await database.removeUnfollowedShows() { downloads?.deleteFiles(names) }
+        // With podcasts on, the scene's launch call to `refreshIfNeeded` syncs. With them off,
+        // a sync still picks up the setting from another device, and refreshes if it turned them on.
+        guard !isEnabled else { return }
         await sync()
-        await refreshIfNeeded()
+        if isEnabled { await refreshIfNeeded() }
     }
 
-    /// Checks enabled podcast feeds on launch and return, using the one-hour freshness window.
+    /// Launch and return: syncs listening state (the sync then runs `tidyEpisodes`, so it sees
+    /// listens on other devices), then checks feeds older than an hour.
     func refreshIfNeeded() async {
-        tidyEpisodes()
         guard isEnabled else { return }
+        if syncWithJellyfin { await sync() } else { tidyEpisodes() }
         let stale = ((try? database.followedShowsNow()) ?? []).contains { ($0.lastRefreshed ?? .distantPast) < Date().addingTimeInterval(-3600) }
         if stale { await refreshAll() }
     }
@@ -320,7 +324,6 @@ final class PodcastsStore {
         let id = track.trackID
         write {
             let finished = try await self.database.savePosition(episodeID: id, position: position, duration: duration)
-            if finished { try await self.removePlayedDownloads() }
             // The 5 s ticks while playing only need to reach the server now and then; a pause,
             // stop or finish goes out soon after.
             if finished || !self.player.isPlaying {
@@ -328,12 +331,26 @@ final class PodcastsStore {
             } else {
                 self.schedulePush(after: .seconds(120), restart: false)
             }
+            guard finished else { return }
+            // Still in the player as it finishes: its download goes when the player moves on.
+            if self.player.current?.trackID == id {
+                self.finishedInPlayer = id
+            } else {
+                await self.removePlayedDownloads(only: [id])
+            }
         }
     }
+
+    /// An episode that finished while still loaded in the player, for `playerChanged`.
+    @ObservationIgnored private var finishedInPlayer: String?
 
     /// The player moved to a new item: an episode that starts playing leaves Up Next, and
     /// picks up its show's speed.
     func playerChanged() {
+        if let finished = finishedInPlayer, player.current?.trackID != finished {
+            finishedInPlayer = nil
+            write { await self.removePlayedDownloads(only: [finished]) }
+        }
         guard let track = player.current, track.isEpisode else { return }
         let id = track.trackID
         player.podcastRate = Float(rate(forEpisode: id))
@@ -381,36 +398,45 @@ final class PodcastsStore {
     func setPlayed(_ ids: [String], _ played: Bool) {
         write {
             try await self.database.setPlayed(episodeIDs: ids, played)
-            if played { try await self.removePlayedDownloads() }
             self.schedulePush()
+            if played { await self.removePlayedDownloads(only: Set(ids)) }
         }
     }
 
     func markAllPlayed(_ show: ShowRecord) {
         write {
             try await self.database.markAllPlayed(showID: show.id)
-            try await self.removePlayedDownloads()
             self.schedulePush()
+            await self.removePlayedDownloads()
         }
     }
 
-    /// Launch and return: marks played what the user stopped and didn't come back to (see
-    /// `PodcastDatabase.finishAbandoned`), then removes played downloads, including ones
-    /// finished on another device or skipped earlier because they were still in the player.
-    func tidyEpisodes() {
+    /// After a sync (or on launch and return with sync off): marks played what the user stopped
+    /// and didn't come back to (see `PodcastDatabase.finishAbandoned`), then removes played
+    /// downloads, including ones finished on another device.
+    private func tidyEpisodes() {
+        guard isEnabled else { return }
         write {
             let finished = try await self.database.finishAbandoned(except: self.player.current?.trackID)
-            try await self.removePlayedDownloads()
             if !finished.isEmpty { self.schedulePush() }
+            await self.removePlayedDownloads()
         }
     }
 
-    /// With "Delete Played Downloads" on, removes every played, unsaved download except the
-    /// episode loaded in the player (the next sweep gets it).
-    private func removePlayedDownloads() async throws {
-        guard deletePlayedDownloads else { return }
-        for id in try database.playedDownloads() where player.current?.trackID != id {
-            try await downloads?.remove(episodeID: id)
+    /// With "Delete Played Downloads" on, removes played, unsaved downloads (all, or just `ids`),
+    /// finished or still running, except the episode loaded in the player. One failure is logged
+    /// and doesn't stop the rest.
+    private func removePlayedDownloads(only ids: Set<String>? = nil) async {
+        guard deletePlayedDownloads, let downloads else { return }
+        let played: [String]
+        do { played = try database.playedDownloads() } catch {
+            log.error("Played downloads read failed: \(String(describing: error))")
+            return
+        }
+        for id in played where (ids?.contains(id) ?? true) && player.current?.trackID != id {
+            do { try await downloads.remove(episodeID: id) } catch {
+                log.error("Removing a played download failed: \(String(describing: error))")
+            }
         }
     }
 
@@ -638,6 +664,8 @@ final class PodcastsStore {
             if pushed != remote.customPrefs {
                 try await library.saveCustomPreferences(pushed, id: PodcastSyncState.preferencesID)
             }
+            // Other devices' listens are in now; a failed sync skips this rather than guess.
+            tidyEpisodes()
         } catch is CancellationError {
         } catch {
             log.error("Podcast sync failed: \(error.localizedDescription, privacy: .public)")
@@ -670,7 +698,6 @@ final class PodcastsStore {
         let played = merged.played.filter { local.played[$0.key] == nil }
         if !positions.isEmpty || !played.isEmpty {
             try await database.applyRemote(positions: positions, played: played)
-            if !played.isEmpty { tidyEpisodes() }
         }
     }
 }
