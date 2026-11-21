@@ -91,7 +91,13 @@ final class AlbumDetailModel {
         isLoading = true
         defer { isLoading = false }
         do {
-            tracks = try await store.api.albumTracks(albumID: album.id)
+            let fetched = try await store.api.albumTracks(albumID: album.id)
+            // A server may answer an ID it no longer has with an empty list rather than an error.
+            if fetched.isEmpty, (try? store.database.isStaleAlbumDownload(id: album.id)) == true {
+                isNoLongerOnServer = true
+                return
+            }
+            tracks = fetched
             errorMessage = nil
             isNoLongerOnServer = false
         } catch {

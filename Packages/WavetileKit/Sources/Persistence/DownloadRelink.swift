@@ -9,19 +9,18 @@ import GRDB
 // that can't be matched says so on its page.
 
 public extension LibraryDatabase {
-    /// Album downloads whose album the library no longer has under that ID move to the album's
-    /// new ID, with its current songs queued (the old song rows are gone, so their files can't
-    /// be matched to anything and are let go). The new album is the only one with the same title
-    /// and album artist. Run after a complete sync. Returns the songs to download and the files
-    /// nothing uses any more.
-    func repairAlbumDownloads() async throws -> (queued: [String], orphanedFiles: [String]) {
+    /// Stale album downloads (see `isStaleAlbumDownload`) move to the album's new ID, with its
+    /// current songs queued (the old song rows are gone, so their files can't be matched to
+    /// anything and are let go). The new album is the only one with the same title and album
+    /// artist. Run after a complete sync. Returns how many moved, the songs to download, and the
+    /// files nothing uses any more.
+    func repairAlbumDownloads() async throws -> (moved: Int, queued: [String], orphanedFiles: [String]) {
         try await pool.write { db in
-            // A mirror with no songs says nothing about what's gone (see `syncedDownloadSource`).
-            guard try !TrackRecord.limit(1).isEmpty(db) else { return ([], []) }
-            let stale = try DownloadCollectionRecord.fetchAll(db, sql: """
-                SELECT * FROM downloadCollection
-                WHERE kind = 'album' AND id NOT IN (SELECT id FROM album)
-                """)
+            // Same rule as the page: an album downloaded during or since the last sync is left
+            // alone (the sync may have listed albums before it existed), as is everything when the
+            // mirror has no songs.
+            let stale = try DownloadCollectionRecord.fetchAll(db, sql: "SELECT * FROM downloadCollection WHERE id IN (\(Self.staleAlbumDownloads))")
+            var moved = 0
             var queued: [String] = []
             for download in stale {
                 guard let album = try Self.currentAlbum(for: download, in: db) else { continue }
@@ -29,24 +28,29 @@ public extension LibraryDatabase {
                     SELECT id FROM track WHERE albumID = ? ORDER BY discNumber, trackNumber, sortTitle
                     """, arguments: [album.id])
                 guard !trackIDs.isEmpty else { continue }
+                // A download the listener paused stays paused under its new ID: every song still to
+                // come is paused (one paused through a playlist that shares it doesn't count). One
+                // that already exists under the new ID keeps its own state.
+                var paused = false
                 if try !DownloadCollectionRecord.exists(db, key: album.id) {
                     try DownloadCollectionRecord(
                         id: album.id, kind: .album, name: album.title, subtitle: album.artistName,
                         imageTag: album.imageTag, addedAt: download.addedAt
                     ).insert(db)
+                    let states = try String.fetchAll(db, sql: """
+                        SELECT t.state FROM downloadMembership m JOIN downloadedTrack t ON t.trackID = m.trackID
+                        WHERE m.collectionID = ? AND t.state != 'done'
+                        """, arguments: [download.id])
+                    paused = !states.isEmpty && states.allSatisfy { $0 == "paused" }
                 }
-                // A download the listener paused stays paused under its new ID.
-                let paused = try Bool.fetchOne(db, sql: """
-                    SELECT EXISTS (SELECT 1 FROM downloadMembership m JOIN downloadedTrack t ON t.trackID = m.trackID
-                                   WHERE m.collectionID = ? AND t.state = 'paused')
-                    """, arguments: [download.id]) ?? false
                 for trackID in trackIDs where try Self.addToDownload(collectionID: album.id, trackID: trackID, paused: paused, in: db) {
                     queued.append(trackID)
                 }
                 // Its memberships go with it (cascade); songs only it held become orphans below.
                 _ = try download.delete(db)
+                moved += 1
             }
-            return (queued, try Self.deleteOrphans(db))
+            return (moved, queued, try Self.deleteOrphans(db))
         }
     }
 

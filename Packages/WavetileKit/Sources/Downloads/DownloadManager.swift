@@ -119,11 +119,11 @@ public final class DownloadManager: NSObject, Sendable {
     /// move to the new one (see `repairAlbumDownloads`), and playlists, collections and Favorites
     /// take on their current songs.
     public func syncPlaylists(quality: Quality, allowCellular: Bool) async {
-        if let (queued, orphans) = try? await database.repairAlbumDownloads() {
+        if let (moved, queued, orphans) = try? await database.repairAlbumDownloads(), moved > 0 {
+            // Transfers still running under an old ID stop (an unreadable queue cancels nothing).
+            if let pending = try? database.pendingDownloads().map(\.trackID) { await cancelTasks(notIn: pending) }
             await enqueue(queued, quality: quality, allowCellular: allowCellular)
             deleteFiles(orphans)
-            // Transfers still running under an old ID stop (an unreadable queue cancels nothing).
-            if !orphans.isEmpty, let pending = try? database.pendingDownloads().map(\.trackID) { await cancelTasks(notIn: pending) }
         }
         guard let downloads = try? database.syncedDownloads() else { return }
         for download in downloads {

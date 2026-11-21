@@ -261,7 +261,14 @@ struct LibrarySyncStubbedServerTests {
         #expect(db.downloadedFileName(trackID: "t1") == "t1.mp3")
         #expect(try db.isStaleAlbumDownload(id: "al1"))
 
-        let (queued, orphans) = try await db.repairAlbumDownloads()
+        // Had it been downloaded while that sync ran, it would be left alone.
+        let lastStarted = try db.syncState()?.lastStarted
+        try await db.pool.write { try $0.execute(sql: "UPDATE syncState SET lastStarted = ?", arguments: [Date.distantPast]) }
+        #expect(try await db.repairAlbumDownloads().moved == 0)
+        try await db.pool.write { try $0.execute(sql: "UPDATE syncState SET lastStarted = ?", arguments: [lastStarted]) }
+
+        let (moved, queued, orphans) = try await db.repairAlbumDownloads()
+        #expect(moved == 1)
         #expect(Set(queued) == ["n1", "n2", "n3"])
         #expect(orphans == ["t1.mp3"])
         #expect(try albumMembers(db, "al2") == ["n1", "n2", "n3"])
@@ -280,7 +287,8 @@ struct LibrarySyncStubbedServerTests {
         serve(FakeLibrary(albums: ["al2"], tracks: ["n1"], playlists: [:], trackAlbum: "al2", albumTitle: "Something Else"))
         try await sync.run()
 
-        let (queued, orphans) = try await db.repairAlbumDownloads()
+        let (moved, queued, orphans) = try await db.repairAlbumDownloads()
+        #expect(moved == 0)
         #expect(queued.isEmpty)
         #expect(orphans.isEmpty)
         try expectDownloadsIntact(db)
@@ -301,7 +309,7 @@ struct LibrarySyncStubbedServerTests {
 
         serve(movedLibrary())
         try await sync.run()
-        let (queued, _) = try await db.repairAlbumDownloads()
+        let (_, queued, _) = try await db.repairAlbumDownloads()
 
         #expect(queued.isEmpty)
         #expect(try db.pendingDownloads().isEmpty)

@@ -293,7 +293,11 @@ public extension LibraryDatabase {
     /// Every collection with its status and size, in one grouped query (download progress writes
     /// re-run this many times a second).
     func downloadedCollections() -> ValueObservation<ValueReducers.Fetch<[DownloadedCollection]>> {
-        ValueObservation.tracking { db in
+        // Tracked by the download tables and the sync state only: staleness reads the library mirror,
+        // which a sync writes page by page, but it can only change when a sync completes.
+        ValueObservation.tracking(
+            region: Table("downloadCollection"), Table("downloadMembership"), Table("downloadedTrack"), Table("syncState")
+        ) { db in
             let rows = try Row.fetchAll(db, sql: """
                 SELECT m.collectionID AS id, COUNT(*) AS total,
                        SUM(t.state = 'done') AS done,
