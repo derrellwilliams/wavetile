@@ -85,9 +85,12 @@ public struct PlaybackQueue: Sendable, Equatable {
     public var isEmpty: Bool { items.isEmpty }
     public var upNext: ArraySlice<QueuedTrack> { items.indices.contains(index) ? items[(index + 1)...] : [] }
 
+    /// Repeat as it applies now: episodes never repeat.
+    public var effectiveRepeat: RepeatMode { current?.isEpisode == true ? .off : repeatMode }
+
     /// Track that will play after the current one finishes on its own (respects repeat).
     public var automaticNext: QueuedTrack? {
-        switch repeatMode {
+        switch effectiveRepeat {
         case .one: current
         case .all: items.indices.contains(index + 1) ? items[index + 1] : items.first
         case .off: items.indices.contains(index + 1) ? items[index + 1] : nil
@@ -96,7 +99,7 @@ public struct PlaybackQueue: Sendable, Equatable {
 
     /// Advance when the current track ends by itself. Returns false when playback should stop.
     public mutating func advanceAutomatically() -> Bool {
-        switch repeatMode {
+        switch effectiveRepeat {
         case .one: return true
         case .all:
             guard !items.isEmpty else { return false }

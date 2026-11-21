@@ -293,10 +293,8 @@ public final class AudioPlayer {
     /// The current item plays again at its end: repeat-one, or repeat-all with a one-track
     /// queue (whose next track is itself, which AVQueuePlayer can't preload behind it).
     private var loopsCurrent: Bool {
-        // Episodes never repeat.
-        guard queue.current?.isEpisode != true else { return false }
-        return queue.repeatMode == .one
-            || (queue.repeatMode == .all && queue.current != nil && queue.automaticNext?.queueID == queue.current?.queueID)
+        queue.effectiveRepeat == .one
+            || (queue.effectiveRepeat == .all && queue.current != nil && queue.automaticNext?.queueID == queue.current?.queueID)
     }
 
     /// Stops playback and clears the queue (sign out).
@@ -329,7 +327,7 @@ public final class AudioPlayer {
         currentTime = 0
         guard let track = queue.current else { return }
         guard let item = makeItem(for: track) else {
-            if waitsForServer, awaitsServerCheck(track) { loadOnceServerChecks(startAt: position) }
+            if waitsForServer, awaitsServerCheck(track) { loadOnceServerChecks(startAt: position, fromStart: fromStart) }
             return
         }
         player.insert(item, after: nil)
@@ -397,7 +395,7 @@ public final class AudioPlayer {
 
     /// The current track waits for the server's check, then loads; if the server fails it,
     /// playback pauses with the offline notice instead of silently doing nothing.
-    private func loadOnceServerChecks(startAt position: Double?) {
+    private func loadOnceServerChecks(startAt position: Double?, fromStart: Bool) {
         // The empty player isn't the end of the queue meanwhile.
         reloadingStreams = true
         let generation = loadGeneration
@@ -406,7 +404,7 @@ public final class AudioPlayer {
             // Unless the listener has moved on in the meantime.
             guard generation == loadGeneration else { return }
             if allowed {
-                loadCurrent(startAt: position, waitsForServer: false)
+                loadCurrent(startAt: position, waitsForServer: false, fromStart: fromStart)
             } else {
                 reloadingStreams = false
                 if isPlaying { pause() }

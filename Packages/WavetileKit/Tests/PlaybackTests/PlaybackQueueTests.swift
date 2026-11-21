@@ -35,6 +35,24 @@ struct PlaybackQueueTests {
         #expect(queue.current?.trackID == "t0")
     }
 
+    @Test func episodesNeverRepeat() {
+        let media = PodcastMedia(audioURL: URL(string: "https://example.com/e.mp3")!, artworkURL: nil)
+        let episodes = (0 ..< 2).map {
+            QueuedTrack(trackID: "e\($0)", title: "E\($0)", artist: "A", albumTitle: "Show", albumID: nil, duration: .seconds(60), podcast: media)
+        }
+        for mode in [RepeatMode.one, .all] {
+            var queue = PlaybackQueue(tracks: episodes)
+            queue.repeatMode = mode
+            #expect(queue.automaticNext?.trackID == "e1")
+            let advanced = queue.advanceAutomatically()
+            #expect(advanced)
+            #expect(queue.automaticNext == nil)
+            let pastEnd = queue.advanceAutomatically()
+            #expect(!pastEnd)
+            #expect(queue.current?.trackID == "e1")
+        }
+    }
+
     @Test func skipForwardIgnoresRepeatOne() {
         var queue = PlaybackQueue(tracks: tracks(3))
         queue.repeatMode = .one

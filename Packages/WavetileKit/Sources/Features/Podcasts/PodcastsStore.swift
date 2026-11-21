@@ -302,9 +302,12 @@ final class PodcastsStore {
             return
         }
         var rest = ((try? database.queueNow()) ?? []).filter { $0.id != item.id }
+        continuation = []
         if source == .latest {
             let queued = Set(rest.map(\.id))
-            rest += latestAfter(item).filter { !queued.contains($0.id) }
+            let following = latestAfter(item).filter { !queued.contains($0.id) }
+            continuation = Set(following.map(\.id))
+            rest += following
         }
         // The saved position is read when the item loads; a requested time wins over it.
         pendingStart = seconds.map { (item.id, $0) }
@@ -314,14 +317,14 @@ final class PodcastsStore {
 
     @ObservationIgnored private var pendingStart: (id: String, seconds: Double)?
 
-    /// How many Latest episodes `play` lines up after the one chosen.
-    private static let latestContinuation = 50
+    /// Latest episodes `play` lined up after Up Next. They're the player's, not the listener's:
+    /// never saved to Up Next, and explicitly queued episodes go before them.
+    @ObservationIgnored private var continuation: Set<String> = []
 
-    /// The episodes after `item` in the Latest list; none if it isn't in the list.
+    /// The unstarted Latest episodes published before `item`, newest first.
     private func latestAfter(_ item: EpisodeItem) -> [EpisodeItem] {
-        let latest = (try? database.latestEpisodesNow()) ?? []
-        guard let index = latest.firstIndex(where: { $0.id == item.id }) else { return [] }
-        return Array(latest[(index + 1)...].prefix(Self.latestContinuation))
+        guard let date = item.episode.publishedAt else { return [] }
+        return (try? database.latestEpisodesNow(before: date, limit: 50)) ?? []
     }
 
     /// Where an episode should start (the player asks when it loads one).
@@ -388,13 +391,21 @@ final class PodcastsStore {
     }
 
     func playNext(_ item: EpisodeItem) {
+        continuation.remove(item.id)
         write { try await self.database.enqueue(episodeID: item.id, atFront: true) }
         if player.current?.isEpisode == true { player.playNext([queuedTrack(item)]) }
     }
 
     func playLast(_ item: EpisodeItem) {
         write { try await self.database.enqueue(episodeID: item.id, atFront: false) }
-        if player.current?.isEpisode == true { player.addToQueue([queuedTrack(item)]) }
+        continuation.remove(item.id)
+        guard player.current?.isEpisode == true else { return }
+        player.addToQueue([queuedTrack(item)])
+        // Ahead of the Latest episodes `play` lined up, matching the stored Up Next.
+        let upNext = Array(player.queue.upNext)
+        if let first = upNext.dropLast().firstIndex(where: { continuation.contains($0.trackID) }) {
+            player.moveUpNext(fromOffsets: [upNext.count - 1], toOffset: first)
+        }
     }
 
     func removeFromUpNext(_ id: String) {
@@ -404,7 +415,7 @@ final class PodcastsStore {
     /// Mirrors a reordered player queue (episodes only) to the stored Up Next.
     func syncQueueOrder() {
         guard player.current?.isEpisode == true else { return }
-        let ids = player.queue.upNext.filter(\.isEpisode).map(\.trackID)
+        let ids = player.queue.upNext.filter { $0.isEpisode && !continuation.contains($0.trackID) }.map(\.trackID)
         write { try await self.database.setQueue(ids) }
     }
 
