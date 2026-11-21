@@ -25,6 +25,7 @@ public final class ServerIdentity: Sendable {
         var pending: [String: Task<Bool?, Never>] = [:]
         /// Bumped on every network change, so a check from the old network can't vouch for the new one.
         var generation = 0
+        var reachabilityObserver: (@Sendable (URL, Bool) -> Void)?
     }
 
     private let state = OSAllocatedUnfairLock(initialState: State())
@@ -63,6 +64,18 @@ public final class ServerIdentity: Sendable {
         }
     }
 
+    /// Hears every real answer from a server (or a request that couldn't reach it): API
+    /// responses, transport failures and identity checks. The app's "can't reach your server"
+    /// state comes only from these, never from a guess.
+    public func observeReachability(_ observer: (@Sendable (URL, Bool) -> Void)?) {
+        state.withLock { $0.reachabilityObserver = observer }
+    }
+
+    /// `url` answered (`true`) or couldn't be reached (`false`).
+    public func report(_ url: URL, reachable: Bool) {
+        state.withLock { $0.reachabilityObserver }?(url, reachable)
+    }
+
     /// Whether the token may go to `url` right now, for callers that can't wait (stream requests).
     public func allowsToken(to url: URL) -> Bool {
         guard Self.isCleartext(url), let origin = Self.origin(url) else { return true }
@@ -91,13 +104,15 @@ public final class ServerIdentity: Sendable {
             let generation = state.generation
             let task = Task { [self] in
                 let matches = await Self.identify(server, session: session)
-                return self.state.withLock { (state) -> Bool? in
+                let answer = self.state.withLock { (state) -> Bool? in
                     // A check that started on another network says nothing about this one.
                     guard state.generation == generation else { return nil }
                     state.pending[origin] = nil
                     if matches { state.verified.insert(origin) } else { state.verified.remove(origin) }
                     return matches
                 }
+                if let answer { self.report(server.url, reachable: answer) }
+                return answer
             }
             state.pending[origin] = task
             return task
@@ -148,10 +163,27 @@ struct ServerIdentityCheck: APIClientDelegate {
            let token = Self.token(in: header) {
             authorization.reject(token: token)
         }
+        // The server answered. A gateway error is a reverse proxy saying Jellyfin itself is down.
+        if let url = task.originalRequest?.url {
+            ServerIdentity.shared.report(url, reachable: !(502...504).contains(response.statusCode))
+        }
         guard (200..<300).contains(response.statusCode) else {
             throw APIError.unacceptableStatusCode(response.statusCode)
         }
     }
+
+    /// Never retries; reports a request that couldn't reach the server (not one that was cancelled).
+    func client(_ client: APIClient, shouldRetry task: URLSessionTask, error: Error, attempts: Int) async throws -> Bool {
+        if let url = task.originalRequest?.url, let code = (error as? URLError)?.code, Self.unreachableCodes.contains(code) {
+            ServerIdentity.shared.report(url, reachable: false)
+        }
+        return false
+    }
+
+    private static let unreachableCodes: Set<URLError.Code> = [
+        .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed, .timedOut, .networkConnectionLost,
+        .notConnectedToInternet, .secureConnectionFailed, .cannotLoadFromNetwork,
+    ]
 
     private static func token(in header: String) -> String? {
         header.replacingOccurrences(of: "MediaBrowser ", with: "").components(separatedBy: ", ").first(where: { $0.hasPrefix("Token=") })

@@ -119,7 +119,8 @@ struct AlbumLink: View {
             AlbumTile(
                 title: album.title,
                 subtitle: album.artist,
-                artwork: store.artwork(itemID: album.id, tag: album.imageTag, maxPixelWidth: 480)
+                artwork: store.artwork(itemID: album.id, tag: album.imageTag, maxPixelWidth: 480),
+                isDownloaded: downloads.available.albumIDs.contains(album.id)
             )
             .zoomSource(route.sourceID, in: zoom)
         }

@@ -30,6 +30,11 @@ struct PlaylistsView: View {
                     NavigationLink(value: LibraryRoute.playlist(playlist)) {
                         VStack(alignment: .leading, spacing: theme.spacing.xs) {
                             ArtworkView(store.cover(for: playlist.id, tag: playlist.imageTag, maxPixelWidth: 480))
+                                .overlay(alignment: .topTrailing) {
+                                    if downloads.available.playlistIDs.contains(playlist.id) {
+                                        DownloadMark().padding(theme.spacing.xs + theme.spacing.xxs)
+                                    }
+                                }
                             Text(playlist.name)
                                 .font(theme.typography.itemTitle)
                                 .foregroundStyle(theme.palette.textPrimary)

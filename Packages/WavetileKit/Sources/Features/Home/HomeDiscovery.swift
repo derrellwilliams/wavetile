@@ -97,7 +97,8 @@ struct PlaylistLink: View {
                 title: playlist.name,
                 subtitle: "\(playlist.trackCount) song\(playlist.trackCount == 1 ? "" : "s")",
                 artwork: store.cover(for: playlist.id, tag: playlist.imageTag, maxPixelWidth: 480),
-                subtitleIsMetadata: true
+                subtitleIsMetadata: true,
+                isDownloaded: downloads.available.playlistIDs.contains(playlist.id)
             )
         }
         .buttonStyle(.pressable)
@@ -130,7 +131,8 @@ struct CollectionLink: View {
                 title: collection.name,
                 subtitle: "\(collection.albumCount) album\(collection.albumCount == 1 ? "" : "s")",
                 artwork: store.cover(for: collection.id, tag: collection.imageTag, maxPixelWidth: 480),
-                subtitleIsMetadata: true
+                subtitleIsMetadata: true,
+                isDownloaded: downloads.available.collectionIDs.contains(collection.id)
             )
         }
         .buttonStyle(.pressable)

@@ -62,7 +62,7 @@ struct PlayableRow<Label: View>: View {
     var body: some View {
         HStack(spacing: 0) {
             tapAction
-                // Offline, only downloaded songs can play; dim the rest (tapping one says why).
+                // With no network only downloaded songs can play; dim the rest (tapping one says why).
                 // Scoped animation, like `offlineDimmed`: a row a lazy list builds mid-change
                 // can't keep a stale dim.
                 .animation(theme.motion.smooth) { $0.opacity(isAvailable ? 1 : theme.unavailableOpacity) }
@@ -121,7 +121,8 @@ struct PlayableRow<Label: View>: View {
     }
 
     private var isAvailable: Bool {
-        connectivity.isOnline || downloads.isDownloaded(trackID)
+        // Dimmed only with no network: a song tapped while the server is down says why.
+        connectivity.hasNetwork || downloads.isDownloaded(trackID)
     }
 }
 

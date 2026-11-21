@@ -9,9 +9,15 @@ import Persistence
 import UIKit
 import WidgetShared
 
-/// Online/offline state: whether the device has a network, and whether the Jellyfin server
-/// answers on it (a LAN-only server is out of reach away from home, and remote access can be
-/// down). Screens dim music that isn't downloaded while either is missing.
+/// Online/offline state, from two signals that can't guess wrong:
+/// - `hasNetwork`: whether iOS has a usable path. Without one, screens dim music that isn't
+///   downloaded and say so.
+/// - `serverReachable`: false only after a real request to the server failed (an API call, a
+///   stream, an identity check; see `ServerIdentity.observeReachability`), true again at its next
+///   answer. It shows "Can't reach your server" and keeps streams from starting, but never dims
+///   the library: when dimming followed a guess about the server, a wrong guess dimmed everything.
+/// While the server is unreachable it's looked at again every few seconds, so the notice clears
+/// by itself.
 @Observable
 final class Connectivity {
     /// One monitor for the app, started at launch so Siri and CarPlay see the real state at once.
@@ -23,24 +29,22 @@ final class Connectivity {
 
         var isCleartext: Bool { url.scheme?.lowercased() == "http" }
 
-        /// The address only exists on a local network (private, link-local or loopback IP, `.local`
-        /// name), so cellular alone can't reach it. Tailscale addresses are left out: they go
-        /// through its tunnel from any network.
-        var isLocalOnly: Bool {
-            guard let address = try? ServerAddress(url.absoluteString), address.isLocalNetwork,
-                  let host = url.host()?.lowercased()
-            else { return false }
-            return !host.hasSuffix(".ts.net") && !host.hasPrefix("[fd7a:115c:a1e0:") && !host.hasPrefix("fd7a:115c:a1e0:")
+        /// `other` goes to this server (same scheme, host and port).
+        func isSameOrigin(_ other: URL) -> Bool {
+            func origin(_ url: URL) -> String? {
+                guard let scheme = url.scheme?.lowercased(), let host = url.host()?.lowercased() else { return nil }
+                return "\(scheme)://\(host):\(url.port ?? (scheme == "https" ? 443 : 80))"
+            }
+            return origin(url) != nil && origin(url) == origin(other)
         }
     }
 
     private(set) var hasNetwork = true
     /// The current path costs money or is limited (cellular, hotspot, Low Data Mode): streams buffer less.
     private(set) var isMetered = false
-    /// Whether the server answered its last check. Optimistic until a check says otherwise (HTTP
-    /// servers too, see `unverified`), so launch doesn't dim the library while the first check runs.
+    /// The server answered its last request, or nothing has been asked of it yet.
     private(set) var serverReachable = true
-    /// Music can stream: the network is up and the server answers.
+    /// Music can stream: the network is up and the server hasn't failed a request.
     var isOnline: Bool { hasNetwork && serverReachable }
 
     /// The signed-in server; nil when signed out (nothing to check).
@@ -49,49 +53,28 @@ final class Connectivity {
             guard server != oldValue else { return }
             pathDebounce?.cancel()
             pathDebounce = nil
+            checkTask?.cancel()
+            checkTask = nil
+            retryTask?.cancel()
             if let server { ServerIdentity.shared.register(server.url, serverID: server.id) }
-            startUnverified()
-            missPending = false
-            check()
+            serverReachable = true
         }
     }
 
-    /// Called when the device changes networks, before the server is checked again. `strict` is
-    /// false for an update that kept the same interfaces (see `AudioPlayer.networkChanged`).
+    /// Called when the device changes networks. `strict` is false for an update that kept the
+    /// same interfaces (see `AudioPlayer.networkChanged`).
     @ObservationIgnored var onNetworkChange: ((_ strict: Bool) async -> Void)?
 
     /// Called when the app returns to the foreground, where no network change was seen.
     @ObservationIgnored var onForeground: (() async -> Void)?
 
     @ObservationIgnored private let monitor = NWPathMonitor()
-    /// Which interfaces the last path used: Wi-Fi to cellular stays "connected" but can put a
-    /// LAN-only server out of reach, so any change means checking again.
+    /// Which interfaces the last path used: Wi-Fi to cellular stays "connected" but is a new network.
     @ObservationIgnored private var interfaces: [String] = []
     @ObservationIgnored private var checkTask: Task<Void, Never>?
     @ObservationIgnored private var retryTask: Task<Void, Never>?
-    /// Which step of the backoff the pending retry is on.
-    @ObservationIgnored private var retryAttempt = 0
-    /// A probe has failed since the last good answer. Kept across checks, so path updates that
-    /// restart the check (common right after Wi-Fi drops) can't keep the confirmation from landing.
-    @ObservationIgnored private var missPending = false
-    /// No check has answered for this HTTP server yet. It shows online meanwhile: it gets no
-    /// token until it proves itself (`ServerIdentity`; API calls, downloads and the player's
-    /// streams wait for that, see `AudioPlayer.loadCurrent`), so showing it offline for the
-    /// milliseconds that takes on the LAN only flashed the dimming. Away from home the first miss
-    /// marks it unreachable at once, without the 1 s confirmation, and so does a first check that
-    /// never gets an answer.
-    @ObservationIgnored private var unverified = false
-    /// The current path runs over Wi-Fi, Ethernet or a full-tunnel VPN, the routes a local-only
-    /// server address can use.
-    @ObservationIgnored private var hasLocalRoute = true
-    /// The local-only server answered on this path anyway (a split-tunnel VPN routing the home
-    /// subnet). Cleared when the interfaces change.
-    @ObservationIgnored private var localRouteProven = false
-    /// The server can't be reached from this path, so it is shown offline at once and only
-    /// looked at slowly, in case a VPN routes it.
-    private var noRouteHome: Bool { server?.isLocalOnly == true && !hasLocalRoute && !localRouteProven }
     @ObservationIgnored private var lastProbe = ContinuousClock.now
-    /// Waits out a burst of same-interface updates so they cost one check, not one each.
+    /// Waits out a burst of same-interface updates so they cost one re-verification, not one each.
     @ObservationIgnored private var pathDebounce: Task<Void, Never>?
     @ObservationIgnored private var foregroundToken: NSObjectProtocol?
 
@@ -109,18 +92,17 @@ final class Connectivity {
         self.probe = probe
         self.wait = wait
         if let server { ServerIdentity.shared.register(server.url, serverID: server.id) }
-        startUnverified()
         guard monitorsNetwork else { return }
+        ServerIdentity.shared.observeReachability { [weak self] url, reachable in
+            Task { @MainActor in self?.report(url, reachable: reachable) }
+        }
         monitor.pathUpdateHandler = { [weak self] path in
             let online = path.status == .satisfied
             let interfaces = path.availableInterfaces.map(\.name)
-            // The interfaces the path uses, not every one listed: iOS can list tunnels (Wi-Fi
-            // Calling) while only cellular carries traffic.
-            let localRoute = [.wifi, .wiredEthernet, .other].contains { path.usesInterfaceType($0) }
             let metered = path.isExpensive || path.isConstrained
             Task { @MainActor in
                 self?.isMetered = metered
-                self?.pathChanged(online: online, interfaces: interfaces, localRoute: localRoute)
+                self?.pathChanged(online: online, interfaces: interfaces)
             }
         }
         monitor.start(queue: DispatchQueue(label: "com.derrellwilliams.wavetile.connectivity"))
@@ -139,136 +121,68 @@ final class Connectivity {
         pathDebounce?.cancel()
     }
 
-    /// Confirms a failed stream against the server. All callers share the current check, so
-    /// overlapping stream errors can't overwrite a newer answer or cancel its recovery retry.
+    /// A request to `url` got an answer from the server, or couldn't reach it. Only the signed-in
+    /// server counts, and a failure with no network is already said by the offline notice.
+    func report(_ url: URL, reachable: Bool) {
+        guard let server, server.isSameOrigin(url) else { return }
+        if reachable {
+            markReachable()
+        } else if hasNetwork, serverReachable {
+            serverReachable = false
+            scheduleRetry(attempt: 1)
+        }
+    }
+
+    /// Asks the server now (a failed stream, the notice's Retry) and returns once the answer is
+    /// in. All callers share the current check.
     func recheck() async {
         if checkTask == nil { check() }
         await checkTask?.value
     }
 
-    /// One failed probe is not an outage. Keep the last good answer until a second probe fails,
-    /// even after a network change; HTTP identity checks still independently gate every token.
-    private func recheck(attempt: Int) async {
-        guard hasNetwork, let server else { return }
-        // Cellular only and a LAN address: the server is out of reach, so say so now rather than
-        // after the probes time out. Still look (slowly, see `scheduleRetry`), in case a VPN routes it.
-        if noRouteHome {
-            serverReachable = false
-            missPending = false
-        }
-        lastProbe = .now
-        var reachable = await probe(server.url)
-        // A network change mid-check (Wi-Fi waking, roaming) voids the answer: ask again.
-        var stale = 0
-        while reachable == nil, stale < 3, !Task.isCancelled {
-            stale += 1
-            reachable = await probe(server.url)
-        }
-        guard !Task.isCancelled, server == self.server, hasNetwork else { return }
-        // Still voided after three asks (path updates keep landing): look again soon, as if this
-        // one hadn't happened. Returning would end the retry chain and leave the last answer standing.
-        guard let reachable else {
-            // Never answered at all: don't keep showing an unchecked server online.
-            if unverified { serverReachable = false }
-            scheduleRetry(attempt: attempt)
-            return
-        }
-        if reachable {
-            if noRouteHome { localRouteProven = true }
-            serverReachable = true
-            missPending = false
-            unverified = false
-            // May be this very retry's task: it has nothing left to await, so cancelling it is harmless.
-            retryTask?.cancel()
-            return
-        }
-        if attempt == 0, serverReachable, !missPending, !unverified {
-            missPending = true
-            do { try await wait(.seconds(1)) } catch { return }
-            guard !Task.isCancelled, server == self.server, hasNetwork else { return }
-            await recheck(attempt: 1)
-            return
-        }
-        serverReachable = false
-        unverified = false
-        scheduleRetry(attempt: attempt + 1)
-    }
-
-    /// A new server (launch, sign-in) starts online until its first check answers.
-    private func startUnverified() {
-        serverReachable = true
-        unverified = server?.isCleartext == true
-    }
-
-    /// Looks again within 1, 2, 4, then 5 s, so recovered servers promptly restore the library.
-    /// A local-only server with no route home backs off to 30 s: Wi-Fi returning is a path
-    /// update, which checks at once, so this only covers a VPN that can reach it.
-    private func scheduleRetry(attempt: Int) {
-        retryTask?.cancel()
-        retryAttempt = attempt
-        let cap: Duration = noRouteHome ? .seconds(30) : .seconds(5)
-        let delay: Duration = attempt > 3 ? cap : .seconds(1 << max(attempt - 1, 0))
-        retryTask = Task { [weak self] in
-            do { try await self?.wait(delay) } catch { return }
-            guard !Task.isCancelled else { return }
-            self?.check(attempt: attempt)
-        }
-    }
-
-    /// Same-interface chatter while the server is out of reach brings the next look forward
-    /// without resetting the backoff, and at most once every 2 s.
-    private func retryNow() {
-        guard ContinuousClock.now - lastProbe >= .seconds(2) else { return }
-        retryTask?.cancel()
-        let attempt = max(retryAttempt, 1)
-        check(attempt: attempt)
-    }
-
-    /// How long a burst of same-interface updates is collected before the server is checked. A
-    /// fixed deadline from the first update, so steady chatter can't postpone the check.
-    private static let sameInterfaceDelay: Duration = .milliseconds(500)
-
-    func pathChanged(online: Bool, interfaces: [String], localRoute: Bool) {
+    func pathChanged(online: Bool, interfaces: [String]) {
         // Security: an HTTP server's address can be another machine on the new network (café Wi-Fi
         // on the same subnet), and Wi-Fi to Wi-Fi keeps the same interfaces, so any path update
         // means it proves itself again before it gets the token.
         let cleartext = server?.isCleartext == true
-        let changed = online != hasNetwork || interfaces != self.interfaces || localRoute != hasLocalRoute
+        let changed = online != hasNetwork || interfaces != self.interfaces
         // While the server is out of reach, any update is a reason to look again: Wi-Fi settling
         // often shows up as same-interface chatter.
         let unreachable = !serverReachable && online
         guard cleartext || changed || unreachable else { return }
-        // A miss from before the network came or went says nothing about the new one.
-        if online != hasNetwork { missPending = false }
-        if changed { localRouteProven = false }
         hasNetwork = online
-        hasLocalRoute = localRoute
         self.interfaces = interfaces
 
         if changed {
-            // A real change: no waiting, and any pending same-interface check is superseded.
+            // A real change: no waiting, and any pending same-interface work is superseded.
             pathDebounce?.cancel()
             pathDebounce = nil
             if cleartext { announceNetworkChange(strict: true) }
-            check()
-        } else if noRouteHome, !serverReachable {
-            // Cellular chatter can't bring a LAN server back, and with it unreachable no token is
-            // sent; the slow retry keeps looking.
-            return
-        } else if !cleartext {
-            // HTTPS, unreachable: no identity to re-prove, so keep the backoff and look sooner.
-            retryNow()
+            if !online {
+                checkTask?.cancel()
+                checkTask = nil
+                retryTask?.cancel()
+            } else if !serverReachable {
+                // Maybe back in reach (home Wi-Fi again): look now rather than at the next retry.
+                check(attempt: 1)
+            }
+        } else if unreachable {
+            // At most every 2 s, without resetting the backoff.
+            if ContinuousClock.now - lastProbe >= .seconds(2) { check(attempt: 1) }
         } else if pathDebounce == nil {
-            // Same interfaces: the player keeps its streams while the server proves itself again.
+            // HTTP, same interfaces: the player keeps its streams while the server proves itself again.
             pathDebounce = Task { [weak self] in
                 try? await Task.sleep(for: Self.sameInterfaceDelay)
                 guard !Task.isCancelled, let self else { return }
                 pathDebounce = nil
                 announceNetworkChange(strict: false)
-                check()
             }
         }
     }
+
+    /// How long a burst of same-interface updates is collected. A fixed deadline from the first
+    /// update, so steady chatter can't postpone it.
+    private static let sameInterfaceDelay: Duration = .milliseconds(500)
 
     private func announceNetworkChange(strict: Bool) {
         ServerIdentity.shared.networkChanged()
@@ -279,22 +193,59 @@ final class Connectivity {
     /// joined meanwhile can land after the first requests. An HTTP server proves itself again
     /// before any of them carries the token.
     private func enteredForeground() {
-        // This check covers whatever a pending same-interface one would have done.
         pathDebounce?.cancel()
         pathDebounce = nil
         if server?.isCleartext == true {
             ServerIdentity.shared.networkChanged()
             if let onForeground { Task { await onForeground() } }
         }
-        check()
+        if hasNetwork, !serverReachable { check(attempt: 1) }
+    }
+
+    private func markReachable() {
+        serverReachable = true
+        retryTask?.cancel()
+        retryTask = nil
     }
 
     private func check(attempt: Int = 0) {
         checkTask?.cancel()
         retryTask?.cancel()
         checkTask = Task {
-            await recheck(attempt: attempt)
+            await probeServer(attempt: attempt)
             if !Task.isCancelled { checkTask = nil }
+        }
+    }
+
+    private func probeServer(attempt: Int) async {
+        guard hasNetwork, let server else { return }
+        lastProbe = .now
+        var answer = await probe(server.url)
+        // A network change mid-check (Wi-Fi waking, roaming) voids the answer: ask again.
+        var stale = 0
+        while answer == nil, stale < 3, !Task.isCancelled {
+            stale += 1
+            answer = await probe(server.url)
+        }
+        guard !Task.isCancelled, server == self.server, hasNetwork else { return }
+        if answer == true {
+            markReachable()
+            return
+        }
+        // No answer at all leaves the last one standing; a miss marks it unreachable.
+        if answer == false { serverReachable = false }
+        if !serverReachable { scheduleRetry(attempt: attempt + 1) }
+    }
+
+    /// While unreachable: look again after 2 s, then every 5 s for a minute, then every 30 s.
+    /// Coming back in reach by another route (home Wi-Fi) is a path update, which looks at once.
+    private func scheduleRetry(attempt: Int) {
+        retryTask?.cancel()
+        let delay: Duration = attempt <= 1 ? .seconds(2) : attempt <= 13 ? .seconds(5) : .seconds(30)
+        retryTask = Task { [weak self] in
+            do { try await self?.wait(delay) } catch { return }
+            guard !Task.isCancelled else { return }
+            self?.check(attempt: attempt)
         }
     }
 }
@@ -310,7 +261,8 @@ final class DownloadsStore {
 
     /// Fully downloaded track IDs (row badges, offline availability).
     private(set) var downloadedTrackIDs: Set<String> = []
-    /// Albums, playlists and collections with something downloaded, for offline dimming.
+    /// Albums, playlists and collections with something downloaded: their download mark, and
+    /// what stays undimmed with no network.
     private(set) var available = OfflineAvailability()
     private(set) var totalBytes: Int64 = 0
 

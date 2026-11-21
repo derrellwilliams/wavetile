@@ -29,6 +29,11 @@ struct CollectionsView: View {
                     NavigationLink(value: LibraryRoute.collection(collection)) {
                         VStack(alignment: .leading, spacing: theme.spacing.xs) {
                             ArtworkView(store.cover(for: collection.id, tag: collection.imageTag, maxPixelWidth: 480))
+                                .overlay(alignment: .topTrailing) {
+                                    if downloads.available.collectionIDs.contains(collection.id) {
+                                        DownloadMark().padding(theme.spacing.xs + theme.spacing.xxs)
+                                    }
+                                }
                             Text(collection.name)
                                 .font(theme.typography.itemTitle)
                                 .foregroundStyle(theme.palette.textPrimary)

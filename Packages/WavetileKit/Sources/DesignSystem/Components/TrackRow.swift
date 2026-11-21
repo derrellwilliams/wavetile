@@ -55,7 +55,7 @@ public struct TrackRow: View {
             if isDownloaded {
                 Glyph.downloads.image
                     .resizable()
-                    .frame(width: 14, height: 14)
+                    .frame(width: theme.artwork.rowStatusIcon, height: theme.artwork.rowStatusIcon)
                     .foregroundStyle(theme.palette.textSecondary)
             }
             if !isAccessibilitySize, let duration {

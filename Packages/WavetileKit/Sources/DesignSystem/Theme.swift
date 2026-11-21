@@ -45,6 +45,11 @@ public struct Theme: Sendable, Identifiable, Hashable {
         public var separator: Color
         /// Behind artwork that hasn't loaded (widgets).
         public var artworkPlaceholder: Color
+        /// The download mark's dark grey disc on artwork. The same in both themes: it sits on
+        /// artwork, not on the canvas.
+        public var downloadMark = Color(hex: 0x262626).opacity(0.9)
+        /// The download mark's icon: the Dark theme's tan, in both themes.
+        public var downloadMarkIcon = Color(hex: 0xECE4D2)
     }
 
     /// One weight (Inter Regular), seven sizes: 12 · 14 · 16 · 18 · 20 · 22 · 36. Hierarchy comes from size,
@@ -126,6 +131,12 @@ public struct Theme: Sendable, Identifiable, Hashable {
         /// Leading thumbnail in track rows.
         public var rowThumbnail: CGFloat = 44
         public var miniPlayerThumbnail: CGFloat = 36
+        /// The download mark's disc in a tile's top-right corner (what plays offline).
+        public var downloadMark: CGFloat = 24
+        /// The icon inside the download mark.
+        public var downloadMarkIcon: CGFloat = 13
+        /// The download icon at the end of a track row.
+        public var rowStatusIcon: CGFloat = 14
         public var shadowRadius: CGFloat = 12
         public var shadowOpacity: Double = 0.18
     }
