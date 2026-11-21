@@ -206,6 +206,10 @@ public final class LibraryDatabase: Sendable {
                 t.column("playedAt", .datetime).notNull()
             }
         }
+        migrator.registerMigration("v9-sync-started") { db in
+            // When the last complete sync began; nil until the next one finishes.
+            try db.alter(table: "syncState") { t in t.add(column: "lastStarted", .datetime) }
+        }
         return migrator
     }
 }

@@ -150,6 +150,8 @@ struct LibrarySyncStubbedServerTests {
             $0.bytes = 1000
             $0.progress = 1
         }
+        // Dates are stored to the millisecond: keep the next sync's start strictly after the download.
+        try await Task.sleep(for: .milliseconds(5))
     }
 
     private func expectDownloadsIntact(_ db: LibraryDatabase) throws {
@@ -317,6 +319,27 @@ struct LibrarySyncStubbedServerTests {
         #expect(orphans.isEmpty)
         try expectDownloadsIntact(db)
         #expect(try db.isStaleAlbumDownload(id: "al1"))
+
+        // Downloaded while that sync ran (its album pass may have come first): not a call to make.
+        try await db.pool.write { try $0.execute(sql: "UPDATE syncState SET lastStarted = ?", arguments: [Date.distantPast]) }
+        #expect(try !db.isStaleAlbumDownload(id: "al1"))
+    }
+
+    @Test func pausedAlbumStaysPausedUnderItsNewID() async throws {
+        let db = try LibraryDatabase.temporary()
+        serve(FakeLibrary())
+        let sync = makeSync(db)
+        try await sync.run()
+        try await seedDownloads(db)
+        try await db.setDownloadPaused(collectionID: "al1", paused: true)
+
+        serve(movedLibrary(keepTitles: false))
+        try await sync.run()
+        let (queued, _) = try await db.repairAlbumDownloads()
+
+        #expect(queued.isEmpty)
+        #expect(try db.pendingDownloads().isEmpty)
+        #expect(try db.downloadStatusNow(collectionID: "al2").paused == 3)
     }
 
     @Test func songsThatCantBeToldApartAreNotMoved() async throws {

@@ -123,7 +123,10 @@ public final class DownloadManager: NSObject, Sendable {
             await enqueue(queued, quality: quality, allowCellular: allowCellular)
             deleteFiles(orphans)
         }
-        // Songs moved to a new ID mid-transfer were queued again under it (`relinkDownloadedTracks`).
+        // Songs moved to a new ID mid-transfer were queued again under it (`relinkDownloadedTracks`):
+        // stop the transfers still running under the old ID, then start the new ones.
+        // An unreadable queue cancels nothing.
+        if let pending = try? database.pendingDownloads().map(\.trackID) { await cancelTasks(notIn: pending) }
         await resumePending(quality: quality, allowCellular: allowCellular, retryFailed: false)
         guard let downloads = try? database.syncedDownloads() else { return }
         for download in downloads {

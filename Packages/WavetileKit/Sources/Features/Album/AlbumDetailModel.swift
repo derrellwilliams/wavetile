@@ -88,17 +88,19 @@ final class AlbumDetailModel {
     /// Falls back to the server when the album isn't in the local library yet (first sync running).
     func load() async {
         guard let store, tracks.isEmpty else { return }
-        if (try? store.database.isStaleAlbumDownload(id: album.id)) == true {
-            isNoLongerOnServer = true
-            return
-        }
         isLoading = true
         defer { isLoading = false }
         do {
             tracks = try await store.api.albumTracks(albumID: album.id)
             errorMessage = nil
+            isNoLongerOnServer = false
         } catch {
-            errorMessage = "Couldn't load tracks."
+            // The server is asked first, so a wrong call here can't hide an album it still has.
+            if (try? store.database.isStaleAlbumDownload(id: album.id)) == true {
+                isNoLongerOnServer = true
+            } else {
+                errorMessage = "Couldn't load tracks."
+            }
         }
     }
 }

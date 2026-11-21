@@ -67,7 +67,6 @@ public extension LibraryDatabase {
                 SELECT * FROM downloadCollection
                 WHERE kind = 'album' AND id NOT IN (SELECT id FROM album)
                 """)
-            guard !stale.isEmpty else { return ([], []) }
             var queued: [String] = []
             for download in stale {
                 guard let album = try Self.currentAlbum(for: download, in: db) else { continue }
@@ -81,24 +80,26 @@ public extension LibraryDatabase {
                         imageTag: album.imageTag, addedAt: download.addedAt
                     ).insert(db)
                 }
-                for trackID in trackIDs {
-                    try db.execute(sql: "INSERT OR IGNORE INTO downloadMembership (collectionID, trackID) VALUES (?, ?)", arguments: [album.id, trackID])
-                    let existing = try DownloadedTrackRecord.fetchOne(db, key: trackID)
-                    if existing == nil || existing?.state == .failed {
-                        try DownloadedTrackRecord(trackID: trackID, state: .queued).upsert(db)
-                        queued.append(trackID)
-                    }
+                // A download the listener paused stays paused under its new ID.
+                let paused = try Bool.fetchOne(db, sql: """
+                    SELECT EXISTS (SELECT 1 FROM downloadMembership m JOIN downloadedTrack t ON t.trackID = m.trackID
+                                   WHERE m.collectionID = ? AND t.state = 'paused')
+                    """, arguments: [download.id]) ?? false
+                for trackID in trackIDs where try Self.addToDownload(collectionID: album.id, trackID: trackID, paused: paused, in: db) {
+                    queued.append(trackID)
                 }
                 // Its memberships go with it (cascade); songs only it held become orphans below.
                 _ = try download.delete(db)
             }
+            // Also collects old rows `relinkDownloadedTracks` left behind for a finished copy.
             return (queued, try Self.deleteOrphans(db))
         }
     }
 
-    /// True when a downloaded album's ID isn't in the library and a complete sync since the
-    /// download didn't see it: the album was moved or removed on the server, and the download
-    /// couldn't be moved to it. Never a guess: a library that hasn't synced since says false.
+    /// True when a downloaded album's ID isn't in the library and a complete sync that began after
+    /// the download didn't see it: the album was moved or removed on the server, and the download
+    /// couldn't be moved to it. Never a guess: an album downloaded during or since the last sync
+    /// (its album pass may have run before the album existed) says false.
     func isStaleAlbumDownload(id: String) throws -> Bool {
         try pool.read { db in
             try Bool.fetchOne(db, sql: "SELECT EXISTS (\(Self.staleAlbumDownloads) AND d.id = ?)", arguments: [id]) ?? false
@@ -111,7 +112,7 @@ public extension LibraryDatabase {
         WHERE d.kind = 'album'
           AND NOT EXISTS (SELECT 1 FROM album a WHERE a.id = d.id)
           AND EXISTS (SELECT 1 FROM track)
-          AND d.addedAt < (SELECT lastCompleted FROM syncState WHERE lastCompleted IS NOT NULL)
+          AND d.addedAt < (SELECT lastStarted FROM syncState WHERE lastStarted IS NOT NULL)
         """
 
     private static func currentAlbum(for download: DownloadCollectionRecord, in db: Database) throws -> AlbumRecord? {
@@ -124,22 +125,17 @@ public extension LibraryDatabase {
         guard homes.isEmpty else { return nil }
         // Otherwise by title and album artist, when exactly one album has both.
         let title = TrackMatch.fold(download.name), artist = TrackMatch.fold(download.subtitle)
-        let matches = try AlbumRecord.filter(sql: "title = ? COLLATE NOCASE", arguments: [download.name]).fetchAll(db)
+        // NOCASE narrows by title (it folds ASCII only); the folded comparison decides.
+        let found = try AlbumRecord.filter(sql: "title = ? COLLATE NOCASE", arguments: [download.name]).fetchAll(db)
             .filter { TrackMatch.fold($0.title) == title && TrackMatch.fold($0.artistName) == artist }
-        // NOCASE only folds ASCII: try the folded comparison over every album when that missed.
-        let found = matches.isEmpty
-            ? try AlbumRecord.fetchAll(db).filter { TrackMatch.fold($0.title) == title && TrackMatch.fold($0.artistName) == artist }
-            : matches
         return found.count == 1 ? found[0] : nil
     }
 
-    /// Points a downloaded song's row and memberships at its new ID. If the new ID already has a
-    /// finished download, that one is kept and the old row is left to the orphan sweep; otherwise
-    /// the old row (and its file) takes the new ID's place.
+    /// Points a downloaded song's row and memberships at its new ID; the old row (and its file)
+    /// takes the new ID's place. If the new ID already has a row of its own (downloaded or under
+    /// way through another download), that one is kept: replacing it would leave its transfer
+    /// writing over the moved row's file name. The old row is then left to the orphan sweep.
     private static func moveDownload(from oldID: String, to newID: String, in db: Database) throws {
-        if let existing = try DownloadedTrackRecord.fetchOne(db, key: newID) {
-            if existing.state != .done { try existing.delete(db) }
-        }
         if try !DownloadedTrackRecord.exists(db, key: newID) {
             // A transfer under the old ID finds no row when it ends and deletes its file; the
             // song is queued again under the new ID.

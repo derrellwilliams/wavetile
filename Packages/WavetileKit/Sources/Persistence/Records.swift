@@ -152,10 +152,14 @@ public struct SyncStateRecord: Codable, Hashable, Sendable, FetchableRecord, Per
     public var id: Int = 1
     public var generation: Int
     public var lastCompleted: Date?
+    /// When the last complete sync began. Anything added to the server after that may be missing
+    /// from the mirror without being gone (`LibraryDatabase.isStaleAlbumDownload`).
+    public var lastStarted: Date?
 
-    public init(generation: Int, lastCompleted: Date?) {
+    public init(generation: Int, lastCompleted: Date?, lastStarted: Date? = nil) {
         self.generation = generation
         self.lastCompleted = lastCompleted
+        self.lastStarted = lastStarted
     }
 }
 

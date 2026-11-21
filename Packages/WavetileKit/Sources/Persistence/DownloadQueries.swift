@@ -36,13 +36,8 @@ public extension LibraryDatabase {
         try await pool.write { db in
             try collection.upsert(db)
             var toFetch: [String] = []
-            for trackID in trackIDs {
-                try DownloadMembershipRecord(collectionID: collection.id, trackID: trackID).upsert(db)
-                let existing = try DownloadedTrackRecord.fetchOne(db, key: trackID)
-                if existing == nil || existing?.state == .failed {
-                    try DownloadedTrackRecord(trackID: trackID, state: .queued).upsert(db)
-                    toFetch.append(trackID)
-                }
+            for trackID in trackIDs where try Self.addToDownload(collectionID: collection.id, trackID: trackID, in: db) {
+                toFetch.append(trackID)
             }
             return toFetch
         }
@@ -100,6 +95,16 @@ public extension LibraryDatabase {
             }
             return true
         }
+    }
+
+    /// Adds a song to a download, and queues it (or holds it paused) when it has no download yet
+    /// or the last one failed. Returns true when it needs fetching.
+    internal static func addToDownload(collectionID: String, trackID: String, paused: Bool = false, in db: Database) throws -> Bool {
+        try DownloadMembershipRecord(collectionID: collectionID, trackID: trackID).upsert(db)
+        let existing = try DownloadedTrackRecord.fetchOne(db, key: trackID)
+        guard existing == nil || existing?.state == .failed else { return false }
+        try DownloadedTrackRecord(trackID: trackID, state: paused ? .paused : .queued).upsert(db)
+        return !paused
     }
 
     internal static func deleteOrphans(_ db: Database) throws -> [String] {
@@ -305,10 +310,11 @@ public extension LibraryDatabase {
             )
             let stale = Set(try String.fetchAll(db, sql: Self.staleAlbumDownloads))
             return try DownloadCollectionRecord.order(Column("addedAt").desc).fetchAll(db).map { collection in
-                guard let row = stats[collection.id] else {
-                    return DownloadedCollection(collection: collection, status: .none, bytes: 0, isStale: stale.contains(collection.id))
-                }
-                return DownloadedCollection(collection: collection, status: Self.status(row), bytes: row["bytes"] ?? 0, isStale: stale.contains(collection.id))
+                let row = stats[collection.id]
+                return DownloadedCollection(
+                    collection: collection, status: row.map(Self.status) ?? .none,
+                    bytes: row?["bytes"] ?? 0, isStale: stale.contains(collection.id)
+                )
             }
         }
     }

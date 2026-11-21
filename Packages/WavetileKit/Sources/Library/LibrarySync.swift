@@ -64,6 +64,7 @@ public actor LibrarySync {
         isRunning = true
         refreshedDuringRun = [:]
         defer { isRunning = false }
+        let started = Date()
 
         let generation = (try database.syncState()?.generation ?? 0) + 1
         // IDs seen per table, for passes that saw every item.
@@ -89,7 +90,7 @@ public actor LibrarySync {
             for (table, seen) in tables {
                 try LibraryDatabase.prune(table, keeping: seen, in: db)
             }
-            try SyncStateRecord(generation: generation, lastCompleted: Date()).upsert(db)
+            try SyncStateRecord(generation: generation, lastCompleted: Date(), lastStarted: started).upsert(db)
         }
     }
 
