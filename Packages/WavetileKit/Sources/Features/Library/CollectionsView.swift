@@ -168,6 +168,8 @@ struct CollectionDetailView: View {
         // Full-bleed art: no bar background or blur band under the navigation bar.
         .detailPageChrome()
         .detailBarButtons {
+            // First in the capsule, as on albums and the tab roots.
+            AirPlayButton(iconSize: 24, tapSize: nil)
             DownloadButton(collectionID: collection.id, canDownload: !albums.isEmpty) {
                 let trackIDs = (try? store.database.trackIDs(collectionID: collection.id)) ?? []
                 downloads.download(collection: collection, trackIDs: trackIDs, albumIDs: albums.map(\.id))

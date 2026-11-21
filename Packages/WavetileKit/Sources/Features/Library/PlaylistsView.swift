@@ -174,6 +174,8 @@ struct PlaylistDetailView: View {
         // Full-bleed art: no bar background or blur band under the navigation bar.
         .detailPageChrome()
         .detailBarButtons {
+            // First in the capsule, as on albums and the tab roots.
+            AirPlayButton(iconSize: 24, tapSize: nil)
             DownloadButton(collectionID: playlist.id, canDownload: !items.isEmpty) {
                 downloads.download(playlist: playlist, trackIDs: tracks.map(\.id), albumIDs: tracks.compactMap(\.albumID))
             }
