@@ -48,6 +48,20 @@ Shelves are read from the local DB on init (first frame, works offline), then `l
 - Recommended for You (`PodcastRecommender`) is a shelf on the Podcasts tab under Latest Episodes, not on Home: scoring and caching are documented in `Podcasts/Recommendations.swift`. Only show titles and genre IDs may leave the device.
 - Random picks change on launch and pull to refresh, not on the server refresh.
 
+## Offline design
+Goal: always clear what plays without a connection, and never a wrong guess across the whole library. Only certain signals change what's shown.
+
+| Signal | Source | What it drives |
+|---|---|---|
+| Downloaded | The file is on the device (`DownloadsStore.available`, `downloadedTrackIDs`) | The download mark, online and off: `DownloadMark` via `downloadMarked(_:)` on tile artwork (`AlbumTile(isDownloaded:)`, the Playlists/Collections grids), the icon in `TrackRow`, VoiceOver "Downloaded" |
+| No network | `NWPathMonitor` (`Connectivity.hasNetwork`) | "You're offline" `OfflineNotice`; dims what isn't downloaded (`offlineDimmed(available:)`, `PlayableRow`); disables `requiresServer()` actions; Home's Downloaded row first |
+| Server unreachable | A real request failed (`ServerIdentity.observeReachability`: API responses incl. 502–504, transport errors, identity checks → `Connectivity.report`), confirmed by a probe 1 s later | "Can't reach your server" `OfflineNotice` with Retry, Home's Downloaded row, no new streams (`canStream` reads `isOnline`). **No dimming**, server actions stay enabled and say if they fail. Clears at the next answer; retries at 2 s, every 5 s for a minute, then every 30 s, and at once on a new network or foreground |
+
+- Never dim, disable or hide on a guess about the server. The old predictive rules (grace periods, local-route and VPN detection, launch "unverified" state) were removed on 2026-11-21 after repeated bugs; don't bring them back.
+- Security is separate from display: a plain-HTTP server proves its ID (`ServerIdentity`) after every path update (same-interface ones too, even while unreachable) and on foreground before the token is sent, and the player drops or holds token streams until it has (`AudioPlayer.networkChanged`, `loadOnceServerChecks`). This never changes what's shown.
+- Podcasts only count a lost network: episodes stream from their feeds.
+- Code: `Connectivity` (in `Features/Downloads/DownloadsStore.swift`), `Features/Downloads/Offline.swift`, `DesignSystem/Components/AlbumTile.swift` (`DownloadMark`); tests in `ConnectivityTests` and `ServerIdentityTests`.
+
 ## Conventions
 - Icons: Phosphor Bold via `Glyph` only. Never SF Symbols.
 - Type: Inter Regular and Geist Mono Regular only, regular weight for text (hierarchy is size, color and mono); the playback-speed control is the one Geist Mono Bold. Seven sizes in `Theme.Typography.scale`; use the theme tokens. Metadata (years, counts, durations, times, dates, sizes) is mono via `itemMetadata` or `typography.mono(_:)`; names under an item (artist, author) are Inter via `itemSubtitle`. Bar titles and tab labels are styled in `applyNavigationBarAppearance` (SwiftUI's per-bar appearances ignore the proxy, so the back-chevron controller in `MainTabView.swift` copies titles onto them). No red in the brand.
@@ -55,7 +69,7 @@ Shelves are read from the local DB on init (first frame, works offline), then `l
 - Match the surrounding code's comment style; screens observe GRDB via `store.observe(...)`.
 - Bar buttons hide the bar's glass and draw their own (`TintedBar.drawsGlass`; the types are in `MainTabView.swift`). Keep the system Back, drawn tinted; never hide it for a custom one (on iOS 27 that kills the swipe back inside UIKit, past any gesture delegate).
 - Song/album/artist actions (favorite, add to playlist, Start Radio = Jellyfin Instant Mix replacing the queue) live in `Features/Library/LibraryActions.swift`.
-- Offline (`Features/Downloads/Offline.swift`): downloaded songs and album/playlist/collection tiles always carry the download mark (`TrackRow`, `AlbumTile`/`DownloadMark`), online and off. Only a lost network (certain) dims what isn't downloaded (`PlayableRow`, `offlineDimmed(available:)`) and disables `requiresServer()` actions. A server that failed a real request, confirmed by a probe a second later (`Connectivity.report`, fed by `ServerIdentity.observeReachability` from API responses, transport errors and identity checks), only shows `OfflineNotice` with Retry and stops new streams; it retries by itself. Never dim on a guess about the server. Every main tab shows `OfflineNotice` under its title. Podcasts only count a lost network, since episodes stream from their feeds.
+- Offline: follow the rules in "Offline design" above.
 - Plain HTTP only to LAN hosts; `NSAllowsArbitraryLoadsInMedia` is for podcast audio only. Keep the token off cleartext. A network change or foreground makes an HTTP server prove itself again, and the player drops its loaded streams until it has (`AudioPlayer.networkChanged`); a same-interface path update keeps playing while the server is re-verified (dropping streams on every update stalled playback). Accepted risk (user, 2026-11-10): token exposure for about a second after a same-subnet Wi-Fi hop; details in `docs/LAUNCH.md`, fix is HTTPS. Streams buffer 120 s ahead, 30 s on a metered path (`isMeteredNetwork`).
 - Swift 6: closures handed to MediaPlayer/AVFoundation must be built nonisolated.
 - CarPlay (`Features/CarPlay`, `App/CarPlaySceneDelegate.swift`) uses the `com.apple.developer.carplay-audio` entitlement (set in `project.yml`, which writes `App/Wavetile.entitlements`). Device signing needs CarPlay Audio enabled on the App ID. Test with the CarPlay simulator (I/O → External Displays → CarPlay). Siri phrases live in `App/MusicIntents.swift`.

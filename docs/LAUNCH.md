@@ -10,10 +10,11 @@ The working checklist for engineering, App Store preparation, launch and follow-
 
 Consolidated 2026-11-06 and reorganized 2026-11-07 (tiers below, evidence and search notes split out). Historical test results are preserved, not rerun or certification of the latest build. This plan doesn't itself authorize uploads, CI setup, delegation, commits or public posts.
 
-## Current status — 2026-11-18
+## Current status — 2026-11-21
 
 | Area | State |
 |---|---|
+| Next (unreleased) | Nov 21, on `main` (`83f8213`, `7f95e68`, not pushed): simpler offline design. Download mark on downloaded albums, playlists and collections; only a lost network dims; an unreachable server only shows the notice with Retry after a confirmed request failure. Before the next build: device check (Airplane Mode, server stopped, leaving home, CarPlay) and confirm the 3 accessibility audit failures predate it (see qa-evidence.md, Nov 21) |
 | 1.0.1 | Nov 18: version 1.0.1, build 202611162050 (`d9f38c3`, main) added for review after the user tested it on TestFlight. Changes: Artist • Album player links; connectivity fixes (offline notice at once when Wi-Fi goes off, LAN server comes back over VPN). QA: Nov 16 regression run in qa-evidence.md |
 | Submission | Nov 11 ~1:39 PM MST: version 1.0, build 202611110730 (`8f83647`, main) submitted. **Approved Nov 12**: App Store Connect email 3:25 PM, "Review of your submission has been completed. It is now eligible for distribution." App name "Wavetile Music", `https://apps.apple.com/app/wavetile-music/id6826722664`. Automatic release |
 | Code | `main` is what the build was cut from; later commits touch only a UI test, docs and the site. Plain-HTTP token risk accepted (see QA-2 / QA-3 remaining) |

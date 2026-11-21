@@ -674,3 +674,15 @@ Reviewer access Nov 16: `https://demo.jellyfin.org/stable` answers (Jellyfin 12.
 Not checked: Organizer crash and hang reports (Xcode reports the app isn't connected in Organizer).
 
 Device check Nov 18: the user tested build 202611162050 (`d9f38c3`) from TestFlight, covering the player links and connectivity changes, and added it for review.
+
+## Offline redesign — November 21, 2026
+
+Code at `7f95e68` (`a48ce10`, `258e4ab`, `83f8213`, `7f95e68`): download mark on downloaded tiles; dimming only with no network; "Can't reach your server" only after a real request failure confirmed by a probe 1 s later; guessing rules removed (see CLAUDE.md, Offline design). A medium code review of `83f8213` found 9 issues, all fixed in `7f95e68`, including one security fix: an HTTP server marked unreachable skipped re-verification after a same-interface Wi-Fi hop.
+
+- Package tests: 234/234, no runtime warnings.
+- App build: succeeds (iPhone 18 Pro Max simulator, iOS 27.0).
+- Simulator: download mark shown on a downloaded album on Home; autoplay at launch streams at once (HTTP LAN server); nothing dimmed while online.
+- UI tests: 18/21. The 3 failures are accessibility audit "Potentially inaccessible text" on Album, Now Playing and Settings. They still fail with the download mark disabled; most report no element, and the first album on the simulator (Hail to the Thief) has a text-covered cover. Not yet run on the pre-redesign code, so not confirmed as pre-existing. The Album audit also reports a clipped track title ("Sail to the Moon…").
+
+Not checked: Airplane Mode, server stopped while on Wi-Fi, leaving home, CarPlay, VoiceOver on the new mark.
+
