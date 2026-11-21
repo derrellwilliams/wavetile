@@ -102,7 +102,7 @@ public extension LibraryDatabase {
         }
     }
 
-    private static func deleteOrphans(_ db: Database) throws -> [String] {
+    internal static func deleteOrphans(_ db: Database) throws -> [String] {
         let orphans = try DownloadedTrackRecord.fetchAll(db, sql: """
             SELECT * FROM downloadedTrack
             WHERE trackID NOT IN (SELECT trackID FROM downloadMembership)
@@ -303,9 +303,12 @@ public extension LibraryDatabase {
                 rows.compactMap { row in (row["id"] as String?).map { ($0, row) } },
                 uniquingKeysWith: { first, _ in first }
             )
+            let stale = Set(try String.fetchAll(db, sql: Self.staleAlbumDownloads))
             return try DownloadCollectionRecord.order(Column("addedAt").desc).fetchAll(db).map { collection in
-                guard let row = stats[collection.id] else { return DownloadedCollection(collection: collection, status: .none, bytes: 0) }
-                return DownloadedCollection(collection: collection, status: Self.status(row), bytes: row["bytes"] ?? 0)
+                guard let row = stats[collection.id] else {
+                    return DownloadedCollection(collection: collection, status: .none, bytes: 0, isStale: stale.contains(collection.id))
+                }
+                return DownloadedCollection(collection: collection, status: Self.status(row), bytes: row["bytes"] ?? 0, isStale: stale.contains(collection.id))
             }
         }
     }

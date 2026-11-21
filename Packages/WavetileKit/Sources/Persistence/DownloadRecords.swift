@@ -106,5 +106,8 @@ public struct DownloadedCollection: Sendable, Equatable, Identifiable {
     public var collection: DownloadCollectionRecord
     public var status: DownloadStatus
     public var bytes: Int64
+    /// An album the server moved or removed, whose download couldn't follow it (see
+    /// `LibraryDatabase.isStaleAlbumDownload`). Its songs can't be listed or played.
+    public var isStale = false
     public var id: String { collection.id }
 }

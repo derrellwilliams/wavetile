@@ -12,6 +12,7 @@ struct AlbumDetailView: View {
     @Environment(DownloadsStore.self) private var downloads
     @Environment(LibraryActions.self) private var actions
     @Environment(LibraryStore.self) private var store
+    @Environment(\.dismiss) private var dismiss
     @State var model: AlbumDetailModel
     /// The release date, fetched when the page opens (it isn't synced).
     @State private var details: ItemDetails?
@@ -136,6 +137,14 @@ struct AlbumDetailView: View {
     @ViewBuilder private var trackList: some View {
         if model.isLoading {
             LoadingMark().padding(theme.spacing.xxl)
+        } else if model.isNoLongerOnServer {
+            EmptyState("No Longer on Your Server", message: "This album was moved or removed on your server, so its download can't play. If it was moved, download it again from Music.") {
+                Button("Remove Download", glyph: .trash) {
+                    downloads.remove(collectionID: model.album.id)
+                    dismiss()
+                }
+                .buttonStyle(.tinted)
+            }
         } else if let error = model.errorMessage {
             EmptyState("Something Went Wrong", message: error) {
                 Button("Retry") { Task { await model.load() } }

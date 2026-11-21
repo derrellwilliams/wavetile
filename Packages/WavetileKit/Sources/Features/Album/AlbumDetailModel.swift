@@ -22,6 +22,10 @@ final class AlbumDetailModel {
     private(set) var discs: [Disc] = []
     private(set) var isLoading = false
     private(set) var errorMessage: String?
+    /// A downloaded album the server moved or removed, whose download couldn't follow it
+    /// (`LibraryDatabase.isStaleAlbumDownload`): there's nothing to list, so the page offers to
+    /// remove the download instead of a retry that can't work.
+    private(set) var isNoLongerOnServer = false
     /// The album artist, from the synced library; nil if the album isn't synced yet.
     private(set) var artistID: String?
     private let store: LibraryStore?
@@ -84,6 +88,10 @@ final class AlbumDetailModel {
     /// Falls back to the server when the album isn't in the local library yet (first sync running).
     func load() async {
         guard let store, tracks.isEmpty else { return }
+        if (try? store.database.isStaleAlbumDownload(id: album.id)) == true {
+            isNoLongerOnServer = true
+            return
+        }
         isLoading = true
         defer { isLoading = false }
         do {

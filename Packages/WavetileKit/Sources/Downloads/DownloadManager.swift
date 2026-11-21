@@ -115,8 +115,16 @@ public final class DownloadManager: NSObject, Sendable {
         deleteFiles(files)
     }
 
-    /// Keeps downloaded playlists, collections and Favorites matching the library after a sync.
+    /// Keeps downloads matching the library after a sync: albums whose ID changed on the server
+    /// move to the new one (see `repairAlbumDownloads`), and playlists, collections and Favorites
+    /// take on their current songs.
     public func syncPlaylists(quality: Quality, allowCellular: Bool) async {
+        if let (queued, orphans) = try? await database.repairAlbumDownloads() {
+            await enqueue(queued, quality: quality, allowCellular: allowCellular)
+            deleteFiles(orphans)
+        }
+        // Songs moved to a new ID mid-transfer were queued again under it (`relinkDownloadedTracks`).
+        await resumePending(quality: quality, allowCellular: allowCellular, retryFailed: false)
         guard let downloads = try? database.syncedDownloads() else { return }
         for download in downloads {
             await sync(download, quality: quality, allowCellular: allowCellular)

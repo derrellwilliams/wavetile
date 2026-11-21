@@ -165,6 +165,7 @@ struct DownloadedView: View {
     }
 
     private func subtitle(_ item: DownloadedCollection) -> String {
+        if item.isStale { return "Not on your server" }
         if item.status.paused > 0 { return "Paused · \(item.status.done) of \(item.status.total) songs" }
         if item.status.isInProgress { return "\(item.status.done) of \(item.status.total) songs" }
         if item.status.failed > 0 { return "\(item.status.failed) failed" }
