@@ -137,6 +137,8 @@ public struct Theme: Sendable, Identifiable, Hashable {
         public var downloadMarkIcon: CGFloat = 13
         /// The download icon at the end of a track row.
         public var rowStatusIcon: CGFloat = 14
+        /// The AirPlay icon (drawn by the system route picker) in bar capsules and the player.
+        public var airPlayIcon: CGFloat = 24
         public var shadowRadius: CGFloat = 12
         public var shadowOpacity: Double = 0.18
     }

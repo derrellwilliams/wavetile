@@ -325,7 +325,7 @@ struct NowPlayingView: View {
             Spacer()
             SleepTimerMenu()
             Spacer()
-            AirPlayButton(iconSize: 24)
+            AirPlayButton()
             // Only for episodes that have chapters; the Spacers spread the rest evenly without it.
             if !chapters.isEmpty {
                 Spacer()
@@ -351,7 +351,7 @@ struct NowPlayingView: View {
             Spacer()
             SleepTimerMenu()
             Spacer()
-            AirPlayButton(iconSize: 24)
+            AirPlayButton()
             Spacer()
             Button("Repeat", glyph: player.queue.repeatMode == .one ? .repeatOne : .repeat) { player.cycleRepeat() }
                 .frame(minWidth: 44, minHeight: 44)
@@ -447,13 +447,12 @@ struct Scrubber: View {
 /// Tapping opens the system speaker list (AirPlay, Bluetooth, this iPhone).
 struct AirPlayButton: View {
     @Environment(\.theme) private var theme
-    var iconSize: CGFloat = 28
     /// Square tap area; nil in a navigation bar, which sizes its own items.
     var tapSize: CGFloat? = 44
 
     var body: some View {
         RoutePicker(tint: UIColor(theme.palette.accent))
-            .frame(width: iconSize, height: iconSize)
+            .frame(width: theme.artwork.airPlayIcon, height: theme.artwork.airPlayIcon)
             .frame(width: tapSize, height: tapSize)
             .accessibilityElement(children: .contain)
             .accessibilityLabel("AirPlay")

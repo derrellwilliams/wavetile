@@ -80,8 +80,6 @@ struct ArtistDetailView: View {
         // Full-bleed art: no bar background or blur band under the navigation bar.
         .detailPageChrome()
         .detailBarButtons {
-            // First in the capsule, as on albums and the tab roots.
-            AirPlayButton(iconSize: 24, tapSize: nil)
             FavoriteButton(itemID: artistID)
             Menu {
                 Button("Start Radio", glyph: .radio) { actions.startRadio(from: artistID, store: store, player: player) }

@@ -452,7 +452,7 @@ private struct DimmingMenu: View {
 }
 
 extension View {
-    /// A detail page's bar: the tinted system Back on the left and the page's buttons in one
+    /// A detail page's bar: the tinted system Back on the left and AirPlay plus the page's buttons in one
     /// capsule on the right. SwiftUI's bar rebuilds an item
     /// as a bar button (dropping the capsule and every button after the first), and the bar
     /// takes the taps of anything floated over it, so the capsule is a UIKit custom bar item.
@@ -467,7 +467,11 @@ private struct DetailBar<Buttons: View>: ViewModifier {
     func body(content: Content) -> some View {
         content
             .tintedSystemBack()
-            .background(CustomBarItem(content: TintedBarCapsule { buttons }))
+            // AirPlay first in every detail page's capsule, as on the tab roots.
+            .background(CustomBarItem(content: TintedBarCapsule {
+                AirPlayButton(tapSize: nil)
+                buttons
+            }))
     }
 }
 
@@ -812,7 +816,7 @@ private struct TabRootChrome<Trailing: View>: ViewModifier {
                 }
                 // AirPlay and the screen's buttons share one capsule; alone, it's a circle.
                 TintedBarGroup {
-                    AirPlayButton(iconSize: 24, tapSize: Self.itemSize)
+                    AirPlayButton(tapSize: Self.itemSize)
                     trailing
                 }
             }
