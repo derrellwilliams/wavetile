@@ -26,6 +26,8 @@ public final class ServerIdentity: Sendable {
         /// Bumped on every network change, so a check from the old network can't vouch for the new one.
         var generation = 0
         var reachabilityObserver: (@Sendable (URL, Bool) -> Void)?
+        /// The last state passed on, so a run of answers (a library sync) is passed on once.
+        var lastReachable: [String: Bool] = [:]
     }
 
     private let state = OSAllocatedUnfairLock(initialState: State())
@@ -71,9 +73,21 @@ public final class ServerIdentity: Sendable {
         state.withLock { $0.reachabilityObserver = observer }
     }
 
-    /// `url` answered (`true`) or couldn't be reached (`false`).
+    /// `url` answered (`true`) or couldn't be reached (`false`). Repeated answers after an answer
+    /// aren't passed on; every failure is.
     public func report(_ url: URL, reachable: Bool) {
-        state.withLock { $0.reachabilityObserver }?(url, reachable)
+        guard let origin = Self.origin(url) else { return }
+        let observer = state.withLock { state -> (@Sendable (URL, Bool) -> Void)? in
+            defer { state.lastReachable[origin] = reachable }
+            return reachable && state.lastReachable[origin] == true ? nil : state.reachabilityObserver
+        }
+        observer?(url, reachable)
+    }
+
+    /// Whether two URLs go to the same server (scheme, host and port, default ports filled in).
+    public static func isSameOrigin(_ a: URL, _ b: URL) -> Bool {
+        guard let origin = origin(a) else { return false }
+        return origin == Self.origin(b)
     }
 
     /// Whether the token may go to `url` right now, for callers that can't wait (stream requests).

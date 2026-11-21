@@ -29,11 +29,7 @@ struct CollectionsView: View {
                     NavigationLink(value: LibraryRoute.collection(collection)) {
                         VStack(alignment: .leading, spacing: theme.spacing.xs) {
                             ArtworkView(store.cover(for: collection.id, tag: collection.imageTag, maxPixelWidth: 480))
-                                .overlay(alignment: .topTrailing) {
-                                    if downloads.available.collectionIDs.contains(collection.id) {
-                                        DownloadMark().padding(theme.spacing.xs + theme.spacing.xxs)
-                                    }
-                                }
+                                .downloadMarked(downloads.available.collectionIDs.contains(collection.id))
                             Text(collection.name)
                                 .font(theme.typography.itemTitle)
                                 .foregroundStyle(theme.palette.textPrimary)
@@ -44,6 +40,7 @@ struct CollectionsView: View {
                         .lineLimit(1)
                     }
                     .buttonStyle(.pressable)
+                    .accessibilityValue(downloads.available.collectionIDs.contains(collection.id) ? "Downloaded" : "")
                     .offlineDimmed(available: downloads.available.collectionIDs.contains(collection.id))
                     .contextMenu {
                         CoverMenuItems(itemID: collection.id, imageTag: collection.imageTag, owner: .collection, pickingCover: $pickingCover)

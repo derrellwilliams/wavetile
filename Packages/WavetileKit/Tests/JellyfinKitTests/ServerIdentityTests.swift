@@ -1,4 +1,5 @@
 import Foundation
+import os
 import Testing
 @testable import JellyfinKit
 
@@ -22,6 +23,23 @@ final class PublicInfoStub: URLProtocol, @unchecked Sendable {
 struct ServerIdentityTests {
     private let home = URL(string: "http://192.168.50.1:8096")!
     private let savedID = "abcdef1234567890abcdef1234567890"
+
+    @Test func reachabilityPassesOnEveryFailureButOnlyTheFirstOfARunOfAnswers() {
+        let identity = ServerIdentity(protocolClasses: [PublicInfoStub.self])
+        let seen = OSAllocatedUnfairLock(initialState: [Bool]())
+        identity.observeReachability { _, reachable in seen.withLock { $0.append(reachable) } }
+        let items = home.appending(path: "Items")
+        for reachable in [true, true, false, false, true, true] { identity.report(items, reachable: reachable) }
+        #expect(seen.withLock { $0 } == [true, false, false, true])
+    }
+
+    @Test(arguments: [
+        ("http://192.168.50.1:8096/Items", true), ("HTTP://192.168.50.1:8096", true),
+        ("http://192.168.50.1/Items", false), ("https://192.168.50.1:8096", false), ("http://192.168.50.9:8096", false),
+    ])
+    func sameOrigin(url: String, matches: Bool) {
+        #expect(ServerIdentity.isSameOrigin(home, URL(string: url)!) == matches)
+    }
 
     @Test func matchingIDReleasesTheToken() async {
         let identity = ServerIdentity(protocolClasses: [PublicInfoStub.self])

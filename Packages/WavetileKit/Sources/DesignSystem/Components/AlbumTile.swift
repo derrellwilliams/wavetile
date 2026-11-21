@@ -32,9 +32,7 @@ public struct AlbumTile: View {
                         .fill(theme.palette.background)
                         .shadow(color: .black.opacity(theme.artwork.shadowOpacity), radius: theme.artwork.shadowRadius, y: 4)
                 }
-                .overlay(alignment: .topTrailing) {
-                    if isDownloaded { DownloadMark().padding(theme.spacing.xs + theme.spacing.xxs) }
-                }
+                .downloadMarked(isDownloaded)
                 .padding(.bottom, theme.spacing.xs + theme.spacing.xxs)
             Text(title)
                 .font(theme.typography.itemTitle)
@@ -68,6 +66,24 @@ public struct DownloadMark: View {
             .frame(width: theme.artwork.downloadMark, height: theme.artwork.downloadMark)
             .background(theme.palette.downloadMark, in: .circle)
             .accessibilityHidden(true)
+    }
+}
+
+public extension View {
+    /// Puts the download mark in the top-right corner of this artwork when `isDownloaded`.
+    func downloadMarked(_ isDownloaded: Bool) -> some View {
+        modifier(DownloadMarked(isDownloaded: isDownloaded))
+    }
+}
+
+private struct DownloadMarked: ViewModifier {
+    @Environment(\.theme) private var theme
+    let isDownloaded: Bool
+
+    func body(content: Content) -> some View {
+        content.overlay(alignment: .topTrailing) {
+            if isDownloaded { DownloadMark().padding(theme.spacing.xs + theme.spacing.xxs) }
+        }
     }
 }
 

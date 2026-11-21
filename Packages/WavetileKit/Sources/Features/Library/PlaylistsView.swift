@@ -30,11 +30,7 @@ struct PlaylistsView: View {
                     NavigationLink(value: LibraryRoute.playlist(playlist)) {
                         VStack(alignment: .leading, spacing: theme.spacing.xs) {
                             ArtworkView(store.cover(for: playlist.id, tag: playlist.imageTag, maxPixelWidth: 480))
-                                .overlay(alignment: .topTrailing) {
-                                    if downloads.available.playlistIDs.contains(playlist.id) {
-                                        DownloadMark().padding(theme.spacing.xs + theme.spacing.xxs)
-                                    }
-                                }
+                                .downloadMarked(downloads.available.playlistIDs.contains(playlist.id))
                             Text(playlist.name)
                                 .font(theme.typography.itemTitle)
                                 .foregroundStyle(theme.palette.textPrimary)
@@ -45,6 +41,7 @@ struct PlaylistsView: View {
                         .lineLimit(1)
                     }
                     .buttonStyle(.pressable)
+                    .accessibilityValue(downloads.available.playlistIDs.contains(playlist.id) ? "Downloaded" : "")
                     .offlineDimmed(available: downloads.available.playlistIDs.contains(playlist.id))
                     .contextMenu {
                         CoverMenuItems(itemID: playlist.id, imageTag: playlist.imageTag, owner: .playlist, pickingCover: $pickingCover)

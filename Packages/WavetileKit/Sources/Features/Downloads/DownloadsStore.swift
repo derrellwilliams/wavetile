@@ -13,8 +13,8 @@ import WidgetShared
 /// - `hasNetwork`: whether iOS has a usable path. Without one, screens dim music that isn't
 ///   downloaded and say so.
 /// - `serverReachable`: false only after a real request to the server failed (an API call, a
-///   stream, an identity check; see `ServerIdentity.observeReachability`), true again at its next
-///   answer. It shows "Can't reach your server" and keeps streams from starting, but never dims
+///   stream, an identity check; see `ServerIdentity.observeReachability`) and a probe a second
+///   later failed too, so one slow page or Wi-Fi blip doesn't count. True again at its next answer. It shows "Can't reach your server" and keeps streams from starting, but never dims
 ///   the library: when dimming followed a guess about the server, a wrong guess dimmed everything.
 /// While the server is unreachable it's looked at again every few seconds, so the notice clears
 /// by itself.
@@ -30,13 +30,7 @@ final class Connectivity {
         var isCleartext: Bool { url.scheme?.lowercased() == "http" }
 
         /// `other` goes to this server (same scheme, host and port).
-        func isSameOrigin(_ other: URL) -> Bool {
-            func origin(_ url: URL) -> String? {
-                guard let scheme = url.scheme?.lowercased(), let host = url.host()?.lowercased() else { return nil }
-                return "\(scheme)://\(host):\(url.port ?? (scheme == "https" ? 443 : 80))"
-            }
-            return origin(url) != nil && origin(url) == origin(other)
-        }
+        func isSameOrigin(_ other: URL) -> Bool { ServerIdentity.isSameOrigin(url, other) }
     }
 
     private(set) var hasNetwork = true
@@ -56,6 +50,7 @@ final class Connectivity {
             checkTask?.cancel()
             checkTask = nil
             retryTask?.cancel()
+            retryAttempt = 0
             if let server { ServerIdentity.shared.register(server.url, serverID: server.id) }
             serverReachable = true
         }
@@ -73,6 +68,9 @@ final class Connectivity {
     @ObservationIgnored private var interfaces: [String] = []
     @ObservationIgnored private var checkTask: Task<Void, Never>?
     @ObservationIgnored private var retryTask: Task<Void, Never>?
+    /// Which step of the backoff the pending retry is on, so extra looks (path updates, foreground)
+    /// don't restart it.
+    @ObservationIgnored private var retryAttempt = 0
     @ObservationIgnored private var lastProbe = ContinuousClock.now
     /// Waits out a burst of same-interface updates so they cost one re-verification, not one each.
     @ObservationIgnored private var pathDebounce: Task<Void, Never>?
@@ -122,14 +120,16 @@ final class Connectivity {
     }
 
     /// A request to `url` got an answer from the server, or couldn't reach it. Only the signed-in
-    /// server counts, and a failure with no network is already said by the offline notice.
+    /// server counts, and a failure with no network is already said by the offline notice. A
+    /// failure is confirmed by a probe before anything changes (a report still in flight from a
+    /// previous server at the same address only costs that probe).
     func report(_ url: URL, reachable: Bool) {
         guard let server, server.isSameOrigin(url) else { return }
         if reachable {
-            markReachable()
-        } else if hasNetwork, serverReachable {
-            serverReachable = false
-            scheduleRetry(attempt: 1)
+            // An answer also voids a confirmation probe still running.
+            if !serverReachable || checkTask != nil { markReachable() }
+        } else if hasNetwork, serverReachable, checkTask == nil {
+            check()
         }
     }
 
@@ -164,13 +164,13 @@ final class Connectivity {
                 retryTask?.cancel()
             } else if !serverReachable {
                 // Maybe back in reach (home Wi-Fi again): look now rather than at the next retry.
-                check(attempt: 1)
+                check(attempt: retryAttempt)
             }
-        } else if unreachable {
-            // At most every 2 s, without resetting the backoff.
-            if ContinuousClock.now - lastProbe >= .seconds(2) { check(attempt: 1) }
-        } else if pathDebounce == nil {
-            // HTTP, same interfaces: the player keeps its streams while the server proves itself again.
+            return
+        }
+        // Same interfaces. Security first: an HTTP server proves itself again whatever its state.
+        if cleartext, pathDebounce == nil {
+            // The player keeps its streams while the server proves itself again.
             pathDebounce = Task { [weak self] in
                 try? await Task.sleep(for: Self.sameInterfaceDelay)
                 guard !Task.isCancelled, let self else { return }
@@ -178,6 +178,8 @@ final class Connectivity {
                 announceNetworkChange(strict: false)
             }
         }
+        // At most every 2 s, without resetting the backoff.
+        if unreachable, ContinuousClock.now - lastProbe >= .seconds(2) { check(attempt: retryAttempt) }
     }
 
     /// How long a burst of same-interface updates is collected. A fixed deadline from the first
@@ -199,13 +201,17 @@ final class Connectivity {
             ServerIdentity.shared.networkChanged()
             if let onForeground { Task { await onForeground() } }
         }
-        if hasNetwork, !serverReachable { check(attempt: 1) }
+        if hasNetwork, !serverReachable { check(attempt: retryAttempt) }
     }
 
+    /// Also stops a probe still running, so its late miss can't undo this answer.
     private func markReachable() {
         serverReachable = true
+        retryAttempt = 0
         retryTask?.cancel()
         retryTask = nil
+        checkTask?.cancel()
+        checkTask = nil
     }
 
     private func check(attempt: Int = 0) {
@@ -228,11 +234,18 @@ final class Connectivity {
             answer = await probe(server.url)
         }
         guard !Task.isCancelled, server == self.server, hasNetwork else { return }
+        if answer == false, serverReachable {
+            // One miss isn't an outage (a slow page, a Wi-Fi blip): ask once more a second later.
+            do { try await wait(.seconds(1)) } catch { return }
+            guard !Task.isCancelled, server == self.server, hasNetwork else { return }
+            answer = await probe(server.url)
+            guard !Task.isCancelled, server == self.server, hasNetwork else { return }
+        }
         if answer == true {
             markReachable()
             return
         }
-        // No answer at all leaves the last one standing; a miss marks it unreachable.
+        // No answer at all leaves the last one standing; a confirmed miss marks it unreachable.
         if answer == false { serverReachable = false }
         if !serverReachable { scheduleRetry(attempt: attempt + 1) }
     }
@@ -241,6 +254,7 @@ final class Connectivity {
     /// Coming back in reach by another route (home Wi-Fi) is a path update, which looks at once.
     private func scheduleRetry(attempt: Int) {
         retryTask?.cancel()
+        retryAttempt = attempt
         let delay: Duration = attempt <= 1 ? .seconds(2) : attempt <= 13 ? .seconds(5) : .seconds(30)
         retryTask = Task { [weak self] in
             do { try await self?.wait(delay) } catch { return }
