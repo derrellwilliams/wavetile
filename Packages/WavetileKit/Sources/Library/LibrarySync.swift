@@ -83,10 +83,6 @@ public actor LibrarySync {
         // writes after the prune.
         let tables = complete.merging(refreshedDuringRun) { $0.union($1) }
         try await database.pool.write { db in
-            // Before the prune deletes them: downloads of songs that only changed ID follow them.
-            if let tracks = tables[TrackRecord.databaseTableName] {
-                try LibraryDatabase.relinkDownloadedTracks(keptTracks: tracks, in: db)
-            }
             for (table, seen) in tables {
                 try LibraryDatabase.prune(table, keeping: seen, in: db)
             }

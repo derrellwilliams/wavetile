@@ -63,8 +63,6 @@ nonisolated private struct FakeLibrary: Sendable {
     var tracksReportTotal: Int?
     /// A playlist pass that fails with this HTTP status.
     var playlistFailure: Int?
-    /// Track titles by ID (default "Track <id>"), for songs that keep their title under a new ID.
-    var titles: [String: String] = [:]
     /// The album every track is on, and the title albums report (default "Album <id>").
     var trackAlbum = "al1"
     var albumTitle: String?
@@ -96,7 +94,7 @@ nonisolated private struct FakeLibrary: Sendable {
             }
             if types.contains("Audio") {
                 let items = tracks.map {
-                    #"{"Id":"\#($0)","Name":"\#(titles[$0] ?? "Track \($0)")","Type":"Audio","AlbumId":"\#(trackAlbum)","Album":"Album al1","AlbumArtist":"Artist ar1","RunTimeTicks":1800000000}"#
+                    #"{"Id":"\#($0)","Name":"Track \#($0)","Type":"Audio","AlbumId":"\#(trackAlbum)","Album":"Album al1","AlbumArtist":"Artist ar1","RunTimeTicks":1800000000}"#
                 }
                 return page(items, total: tracksReportTotal)
             }
@@ -241,12 +239,8 @@ struct LibrarySyncStubbedServerTests {
     // MARK: IDs that change on the server (a folder renamed or moved)
 
     /// The same album and songs under new IDs, as Jellyfin reports them after a folder move.
-    private func movedLibrary(keepTitles: Bool = true) -> FakeLibrary {
-        FakeLibrary(
-            albums: ["al2"], tracks: ["n1", "n2", "n3"], playlists: ["pl1": ["n1", "n2"]],
-            titles: keepTitles ? ["n1": "Track t1", "n2": "Track t2", "n3": "Track t3"] : [:],
-            trackAlbum: "al2", albumTitle: "Album al1"
-        )
+    private func movedLibrary() -> FakeLibrary {
+        FakeLibrary(albums: ["al2"], tracks: ["n1", "n2", "n3"], playlists: ["pl1": ["n1", "n2"]], trackAlbum: "al2", albumTitle: "Album al1")
     }
 
     private func albumMembers(_ db: LibraryDatabase, _ id: String) throws -> [String] {
@@ -255,7 +249,7 @@ struct LibrarySyncStubbedServerTests {
         }
     }
 
-    @Test func downloadsFollowSongsToNewIDsWithoutDownloadingAgain() async throws {
+    @Test func movedAlbumDownloadsAgainUnderItsNewID() async throws {
         let db = try LibraryDatabase.temporary()
         serve(FakeLibrary())
         let sync = makeSync(db)
@@ -263,34 +257,6 @@ struct LibrarySyncStubbedServerTests {
         try await seedDownloads(db)
 
         serve(movedLibrary())
-        try await sync.run()
-
-        // The finished file now belongs to the new ID; the queued song is queued under its new ID.
-        #expect(try trackIDs(db) == ["n1", "n2", "n3"])
-        #expect(db.downloadedFileName(trackID: "n1") == "t1.mp3")
-        #expect(db.downloadedFileName(trackID: "t1") == nil)
-        #expect(try db.pendingDownloads().map(\.trackID) == ["n2"])
-
-        // The album download moves to the album's new ID, with the song it didn't have yet.
-        let (queued, orphans) = try await db.repairAlbumDownloads()
-        #expect(queued == ["n3"])
-        #expect(orphans.isEmpty)
-        #expect(try albumMembers(db, "al1").isEmpty)
-        #expect(try albumMembers(db, "al2") == ["n1", "n2", "n3"])
-        #expect(db.downloadedFileName(trackID: "n1") == "t1.mp3")
-        #expect(try !db.isStaleAlbumDownload(id: "al2"))
-    }
-
-    @Test func albumBrokenBeforeTheFixDownloadsAgainUnderItsNewID() async throws {
-        let db = try LibraryDatabase.temporary()
-        serve(FakeLibrary())
-        let sync = makeSync(db)
-        try await sync.run()
-        try await seedDownloads(db)
-
-        // Song titles changed too, so the songs can't be matched; the album still matches by
-        // title and album artist.
-        serve(movedLibrary(keepTitles: false))
         try await sync.run()
         #expect(db.downloadedFileName(trackID: "t1") == "t1.mp3")
         #expect(try db.isStaleAlbumDownload(id: "al1"))
@@ -333,33 +299,13 @@ struct LibrarySyncStubbedServerTests {
         try await seedDownloads(db)
         try await db.setDownloadPaused(collectionID: "al1", paused: true)
 
-        serve(movedLibrary(keepTitles: false))
+        serve(movedLibrary())
         try await sync.run()
         let (queued, _) = try await db.repairAlbumDownloads()
 
         #expect(queued.isEmpty)
         #expect(try db.pendingDownloads().isEmpty)
         #expect(try db.downloadStatusNow(collectionID: "al2").paused == 3)
-    }
-
-    @Test func songsThatCantBeToldApartAreNotMoved() async throws {
-        let db = try LibraryDatabase.temporary()
-        serve(FakeLibrary())
-        let sync = makeSync(db)
-        try await sync.run()
-        try await seedDownloads(db)
-
-        // Two new songs fit t1's description: neither gets its file.
-        var library = movedLibrary()
-        library.tracks.append("n9")
-        library.titles["n9"] = "Track t1"
-        serve(library)
-        try await sync.run()
-
-        #expect(db.downloadedFileName(trackID: "n1") == nil)
-        #expect(db.downloadedFileName(trackID: "n9") == nil)
-        #expect(db.downloadedFileName(trackID: "t1") == "t1.mp3")
-        #expect(try db.pendingDownloads().map(\.trackID) == ["n2"])
     }
 
     @Test func understatedTotalFailsTheSyncAndKeepsEverything() async throws {
