@@ -10,6 +10,8 @@ struct EpisodeShelf: View {
     let title: String
     let items: [EpisodeItem]
     var showsStatus = true
+    /// Set on Latest shelves, so playing from them carries on into the next Latest episodes.
+    var playSource: EpisodeList?
 
     var body: some View {
         VStack(alignment: .leading, spacing: theme.spacing.md) {
@@ -31,6 +33,7 @@ struct EpisodeShelf: View {
             .scrollTargetBehavior(.viewAligned)
             .scrollIndicators(.hidden)
         }
+        .environment(\.episodePlaySource, playSource)
         .transition(.opacity)
     }
 }

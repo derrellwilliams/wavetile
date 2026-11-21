@@ -293,7 +293,9 @@ public final class AudioPlayer {
     /// The current item plays again at its end: repeat-one, or repeat-all with a one-track
     /// queue (whose next track is itself, which AVQueuePlayer can't preload behind it).
     private var loopsCurrent: Bool {
-        queue.repeatMode == .one
+        // Episodes never repeat.
+        guard queue.current?.isEpisode != true else { return false }
+        return queue.repeatMode == .one
             || (queue.repeatMode == .all && queue.current != nil && queue.automaticNext?.queueID == queue.current?.queueID)
     }
 
@@ -317,7 +319,8 @@ public final class AudioPlayer {
 
     /// Rebuilds the player around the queue's current track and starts it if playing.
     /// `waitsForServer`: a stream the server isn't trusted with yet waits for its check once.
-    private func loadCurrent(startAt position: Double? = nil, waitsForServer: Bool = true) {
+    /// `fromStart` skips an episode's saved position (it just finished; the save may not be in yet).
+    private func loadCurrent(startAt position: Double? = nil, waitsForServer: Bool = true, fromStart: Bool = false) {
         loadGeneration += 1
         reloadingStreams = false
         reportStopped()
@@ -333,8 +336,10 @@ public final class AudioPlayer {
         duration = track.duration.map { Double($0.components.seconds) } ?? 0
         enqueueNext()
         applyRate()
-        if let position, position > 1 { seekAfterLoad(to: position) } else { seekToResumePosition(track) }
-        if isPlaying { playOnceSessionIsActive() }
+        if let position, position > 1 { seekAfterLoad(to: position) } else if !fromStart { seekToResumePosition(track) }
+        // An AVQueuePlayer that ran out of items keeps its rate, so a new item would start by
+        // itself: at the end of the queue the last episode played again, from near its end.
+        if isPlaying { playOnceSessionIsActive() } else { player.pause() }
         didStart(track)
     }
 
@@ -491,7 +496,7 @@ public final class AudioPlayer {
             guard hasQueue, player.items().isEmpty, !isSeeking, !reloadingStreams else { return }
             reportStopped()
             isPlaying = false
-            loadCurrent()
+            loadCurrent(fromStart: true)
             return
         }
         guard let entry = entries[ObjectIdentifier(item)], entry.track.queueID != queue.current?.queueID else { return }

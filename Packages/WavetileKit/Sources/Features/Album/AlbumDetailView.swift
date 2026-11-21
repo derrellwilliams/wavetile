@@ -38,6 +38,8 @@ struct AlbumDetailView: View {
         // Full-bleed art: no bar background or blur band under the navigation bar.
         .detailPageChrome()
         .detailBarButtons {
+            // First in the capsule, as on the tab roots.
+            AirPlayButton(iconSize: 24, tapSize: nil)
             DownloadButton(collectionID: model.album.id) {
                 downloads.download(album: model.album, trackIDs: model.tracks.map(\.id))
             }

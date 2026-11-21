@@ -9,6 +9,7 @@ struct EpisodeRow: View {
     @Environment(\.theme) private var theme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.pushPodcastRoute) private var push
+    @Environment(\.episodePlaySource) private var playSource
     let item: EpisodeItem
     /// Hidden on the show's own page.
     var showsArtwork = true
@@ -54,11 +55,11 @@ struct EpisodeRow: View {
         }
         .padding(.vertical, theme.spacing.md)
         .contentShape(.rect)
-        .onTapGesture { push(.episode(id: item.id)) }
+        .onTapGesture { push(.episode(id: item.id, playSource: playSource)) }
         .opacity(item.episode.isPlayed ? 0.6 : 1)
         .contextMenu { EpisodeMenu(item: item) }
         .accessibilityElement(children: .contain)
-        .accessibilityAction(named: "Show Episode") { push(.episode(id: item.id)) }
+        .accessibilityAction(named: "Show Episode") { push(.episode(id: item.id, playSource: playSource)) }
     }
 
     private var caption: String {
@@ -72,6 +73,7 @@ struct EpisodePlayButton: View {
     @Environment(\.theme) private var theme
     @Environment(AudioPlayer.self) private var player
     @Environment(PodcastsStore.self) private var podcasts
+    @Environment(\.episodePlaySource) private var playSource
     let item: EpisodeItem
     @State private var taps = 0
 
@@ -81,7 +83,7 @@ struct EpisodePlayButton: View {
     var body: some View {
         Button {
             taps += 1
-            if isCurrent { player.togglePlayPause() } else { podcasts.play(item) }
+            if isCurrent { player.togglePlayPause() } else { podcasts.play(item, source: playSource) }
         } label: {
             HStack(spacing: theme.spacing.xs) {
                 (isPlaying ? Glyph.pause : Glyph.play).image
@@ -264,12 +266,13 @@ struct EpisodeMenu: View {
     @Environment(PodcastsStore.self) private var podcasts
     @Environment(AudioPlayer.self) private var player
     @Environment(\.pushPodcastRoute) private var push
+    @Environment(\.episodePlaySource) private var playSource
     let item: EpisodeItem
     var includeGoToShow = true
 
     var body: some View {
         let episode = item.episode
-        Button(episode.isInProgress ? "Resume" : "Play", glyph: .play) { podcasts.play(item) }
+        Button(episode.isInProgress ? "Resume" : "Play", glyph: .play) { podcasts.play(item, source: playSource) }
         Button("Play Next", glyph: .playNext) { podcasts.playNext(item) }
         Button("Play Last", glyph: .addToQueue) { podcasts.playLast(item) }
         Divider()
@@ -299,6 +302,7 @@ struct EpisodeCard: View {
     @Environment(\.theme) private var theme
     @Environment(\.pushPodcastRoute) private var push
     @Environment(\.zoomNamespace) private var zoom
+    @Environment(\.episodePlaySource) private var playSource
     let item: EpisodeItem
     /// Disambiguates the same episode on several shelves of one screen.
     var context = ""
@@ -308,7 +312,7 @@ struct EpisodeCard: View {
     var body: some View {
         let sourceID = "\(context)-\(item.id)"
         // A button, not a tap gesture, so the card presses in under the finger like album tiles.
-        Button { push(.episode(id: item.id, sourceID: sourceID)) } label: {
+        Button { push(.episode(id: item.id, sourceID: sourceID, playSource: playSource)) } label: {
             VStack(alignment: .leading, spacing: theme.spacing.sm) {
                 ArtworkView(.unsized(item.artworkURL, maxPixelWidth: 840), cornerRadius: theme.radius.small)
                 // Title and show read as one unit, so they sit closer than the rest of the card.

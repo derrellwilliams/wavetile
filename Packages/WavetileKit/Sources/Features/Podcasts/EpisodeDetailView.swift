@@ -11,6 +11,7 @@ struct EpisodeDetailView: View {
     @Environment(PodcastsStore.self) private var podcasts
     @Environment(AudioPlayer.self) private var player
     @Environment(\.pushPodcastRoute) private var push
+    @Environment(\.episodePlaySource) private var playSource
     let episodeID: String
     @State private var item: EpisodeItem?
     @State private var notes: AttributedString?
@@ -48,7 +49,7 @@ struct EpisodeDetailView: View {
         // Notes come from the feed, so other schemes (tel:, sms:, other apps' links) are ignored.
         .environment(\.openURL, OpenURLAction { url in
             if let seconds = ShowNotes.seekTime(url), let item {
-                podcasts.play(item, from: seconds)
+                podcasts.play(item, from: seconds, source: playSource)
                 return .handled
             }
             switch url.scheme?.lowercased() {
@@ -77,7 +78,7 @@ struct EpisodeDetailView: View {
         }
         .sheet(isPresented: $showTranscript) {
             if let item {
-                TranscriptSheet(paragraphs: transcript) { podcasts.play(item, from: $0) }
+                TranscriptSheet(paragraphs: transcript) { podcasts.play(item, from: $0, source: playSource) }
             }
         }
         .enableInjection()
@@ -138,7 +139,7 @@ struct EpisodeDetailView: View {
             VStack(alignment: .leading, spacing: theme.spacing.xl) {
                 VStack(spacing: theme.spacing.md) {
                     PrimaryButton(playTitle(item), glyph: player.current?.trackID == item.id && player.isPlaying ? .pause : .play) {
-                        if player.current?.trackID == item.id { player.togglePlayPause() } else { podcasts.play(item) }
+                        if player.current?.trackID == item.id { player.togglePlayPause() } else { podcasts.play(item, source: playSource) }
                     }
                     if item.episode.isInProgress {
                         ProgressView(value: item.episode.progress)
@@ -176,7 +177,7 @@ struct EpisodeDetailView: View {
                             .foregroundStyle(theme.palette.textPrimary)
                             .accessibilityAddTraits(.isHeader)
                             .padding(.bottom, theme.spacing.sm)
-                        EpisodeChapterList(chapters: chapters, episodeID: item.id) { podcasts.play(item, from: $0.start) }
+                        EpisodeChapterList(chapters: chapters, episodeID: item.id) { podcasts.play(item, from: $0.start, source: playSource) }
                     }
                 }
 

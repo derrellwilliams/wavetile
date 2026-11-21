@@ -195,7 +195,7 @@ struct HomeView: View {
     /// Latest Podcast Episodes: after Most Played (see `podcastAnchor`).
     @ViewBuilder private var podcastUpNextShelf: some View {
         if podcasts.isEnabled, !podcastUpNext.isEmpty, !DebugFlags.freshHome {
-            EpisodeShelf(title: "Latest Podcast Episodes", items: podcastUpNext, showsStatus: false)
+            EpisodeShelf(title: "Latest Podcast Episodes", items: podcastUpNext, showsStatus: false, playSource: .latest)
         }
     }
 

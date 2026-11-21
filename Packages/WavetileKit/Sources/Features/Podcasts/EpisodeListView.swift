@@ -27,6 +27,7 @@ struct EpisodeListView: View {
         .overlay {
             if didLoad && items.isEmpty { emptyState }
         }
+        .environment(\.episodePlaySource, list == .latest ? .latest : nil)
         .themedBackground()
         .navigationTitle(list.title)
         .listBar()

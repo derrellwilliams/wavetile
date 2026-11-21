@@ -6,7 +6,8 @@ import SwiftUI
 enum PodcastRoute: Hashable {
     case show(ShowRoute)
     /// `sourceID` is set when opened from an artwork tile, so the page zooms out of it.
-    case episode(id: String, sourceID: String? = nil)
+    /// `playSource` is the list it was opened from (see `episodePlaySource`).
+    case episode(id: String, sourceID: String? = nil, playSource: EpisodeList? = nil)
     case list(EpisodeList)
     case shows
 }
@@ -67,6 +68,9 @@ extension EnvironmentValues {
     /// Closes the player and opens a podcast route on the Podcasts tab's stack, or Home's when
     /// podcasts are off (the player sits above the tabs).
     @Entry var openPodcastRoute: (PodcastRoute) -> Void = { _ in }
+    /// The list episodes here are played from: `.latest` (the Latest Episodes list and shelves)
+    /// carries on into the next Latest episodes after Up Next (`PodcastsStore.play`).
+    @Entry var episodePlaySource: EpisodeList? = nil
 }
 
 extension View {
@@ -93,8 +97,9 @@ private struct PodcastDestination: View {
         case let .show(show):
             ShowDetailView(route: show)
                 .zoomTransition(from: show.sourceID, in: zoom)
-        case let .episode(id, sourceID):
+        case let .episode(id, sourceID, playSource):
             EpisodeDetailView(episodeID: id)
+                .environment(\.episodePlaySource, playSource)
                 .zoomTransition(from: sourceID, in: zoom)
         case let .list(list):
             EpisodeListView(list: list)

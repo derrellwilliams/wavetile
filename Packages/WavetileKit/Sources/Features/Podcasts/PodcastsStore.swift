@@ -293,14 +293,19 @@ final class PodcastsStore {
         )
     }
 
-    /// Plays an episode, followed by the rest of Up Next.
-    func play(_ item: EpisodeItem, from seconds: Double? = nil) {
+    /// Plays an episode, followed by the rest of Up Next. From the Latest list or shelves
+    /// (`source == .latest`), the Latest episodes after it follow Up Next, in the list's order.
+    func play(_ item: EpisodeItem, from seconds: Double? = nil, source: EpisodeList? = nil) {
         if player.current?.trackID == item.id {
             if let seconds { player.seek(to: seconds) }
             if !player.isPlaying { player.resume() }
             return
         }
-        let rest = ((try? database.queueNow()) ?? []).filter { $0.id != item.id }
+        var rest = ((try? database.queueNow()) ?? []).filter { $0.id != item.id }
+        if source == .latest {
+            let queued = Set(rest.map(\.id))
+            rest += latestAfter(item).filter { !queued.contains($0.id) }
+        }
         // The saved position is read when the item loads; a requested time wins over it.
         pendingStart = seconds.map { (item.id, $0) }
         player.play([queuedTrack(item)] + rest.map(queuedTrack))
@@ -308,6 +313,16 @@ final class PodcastsStore {
     }
 
     @ObservationIgnored private var pendingStart: (id: String, seconds: Double)?
+
+    /// How many Latest episodes `play` lines up after the one chosen.
+    private static let latestContinuation = 50
+
+    /// The episodes after `item` in the Latest list; none if it isn't in the list.
+    private func latestAfter(_ item: EpisodeItem) -> [EpisodeItem] {
+        let latest = (try? database.latestEpisodesNow()) ?? []
+        guard let index = latest.firstIndex(where: { $0.id == item.id }) else { return [] }
+        return Array(latest[(index + 1)...].prefix(Self.latestContinuation))
+    }
 
     /// Where an episode should start (the player asks when it loads one).
     func resumePosition(for track: QueuedTrack) -> Double? {

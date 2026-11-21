@@ -275,15 +275,22 @@ public extension PodcastDatabase {
 
     /// Newest unplayed episodes across followed shows.
     func latestEpisodes(limit: Int = 50) -> ValueObservation<ValueReducers.Fetch<[EpisodeItem]>> {
-        ValueObservation.tracking { db in
-            let followed = ShowRecord.filter(Column("followedAt") != nil).select(Column("id"))
-            let request = EpisodeRecord
-                .filter(followed.contains(Column("showID")))
-                .filter(Column("playedAt") == nil)
-                .order(Column("publishedAt").desc)
-                .limit(limit)
-            return try Self.items(request).fetchAll(db)
-        }
+        ValueObservation.tracking { db in try Self.latestItems(db, limit: limit) }
+    }
+
+    /// The Latest list right now, for carrying on from an episode played from it.
+    func latestEpisodesNow(limit: Int = 200) throws -> [EpisodeItem] {
+        try pool.read { db in try Self.latestItems(db, limit: limit) }
+    }
+
+    private static func latestItems(_ db: Database, limit: Int) throws -> [EpisodeItem] {
+        let followed = ShowRecord.filter(Column("followedAt") != nil).select(Column("id"))
+        let request = EpisodeRecord
+            .filter(followed.contains(Column("showID")))
+            .filter(Column("playedAt") == nil)
+            .order(Column("publishedAt").desc)
+            .limit(limit)
+        return try items(request).fetchAll(db)
     }
 
     /// Home's Continue Listening: episodes started but not finished, most recent first.

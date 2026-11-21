@@ -59,7 +59,7 @@ struct PodcastsView: View {
                     EpisodeShelf(title: "Continue Listening", items: continueListening)
                 }
                 if !latest.isEmpty {
-                    EpisodeShelf(title: "Latest Episodes", items: latest)
+                    EpisodeShelf(title: "Latest Episodes", items: latest, playSource: .latest)
                 }
                 if !recommended.isEmpty {
                     ShelfSection("Recommended for You", items: recommended) { RecommendedShowLink(show: $0) }
