@@ -165,6 +165,19 @@ public extension LibraryDatabase {
         }
     }
 
+    /// Songs whose transfer starts over from the first byte: back to queued with nothing received,
+    /// so the status doesn't count bytes from an attempt that no longer runs.
+    func restartDownloads(trackIDs: [String]) async throws {
+        try await pool.write { db in
+            for trackID in trackIDs {
+                try db.execute(sql: """
+                    UPDATE downloadedTrack SET state = 'queued', bytes = 0, progress = 0, updatedAt = ?
+                    WHERE trackID = ? AND state IN ('queued', 'downloading')
+                    """, arguments: [Date(), trackID])
+            }
+        }
+    }
+
     /// Puts failed downloads back in the queue (a retry on launch) and returns their track IDs.
     func requeueFailedDownloads() async throws -> [String] {
         try await pool.write { db in

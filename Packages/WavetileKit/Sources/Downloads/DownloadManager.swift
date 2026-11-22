@@ -35,6 +35,8 @@ public final class DownloadManager: NSObject, Sendable {
     private struct MutableState {
         var session: URLSession?
         var reconciling = false
+        /// A reconcile asked for while one was running; it runs as soon as that one ends.
+        var reconcileAgain: Reconcile?
         var generation = 0
         var mutations = 0
         var securityStopped = false
@@ -45,6 +47,12 @@ public final class DownloadManager: NSObject, Sendable {
         /// The settings of the last enqueue, for retries that start a fresh request.
         var quality: Quality = .high
         var allowCellular = true
+    }
+
+    private struct Reconcile {
+        var quality: Quality
+        var allowCellular: Bool
+        var retryFailed: Bool
     }
 
     /// The most one song may write. A lossless track is a few hundred MB at most; a server that
@@ -162,13 +170,34 @@ public final class DownloadManager: NSObject, Sendable {
 
     /// Restarts queued downloads that have no running task (e.g. after the app was killed), and
     /// gives failed ones another go.
+    /// A call made while one is running isn't dropped: one more pass follows it, so transfers
+    /// cancelled by a network change restart now rather than at the next 30 s check.
     public func resumePending(quality: Quality, allowCellular: Bool, retryFailed: Bool = true) async {
+        var request = Reconcile(quality: quality, allowCellular: allowCellular, retryFailed: retryFailed)
         guard state.withLock({ state in
-            guard !state.reconciling, !state.securityStopped else { return false }
+            guard !state.securityStopped else { return false }
+            if state.reconciling {
+                let retry = retryFailed || state.reconcileAgain?.retryFailed == true
+                state.reconcileAgain = Reconcile(quality: quality, allowCellular: allowCellular, retryFailed: retry)
+                return false
+            }
             state.reconciling = true
             return true
         }) else { return }
-        defer { state.withLock { $0.reconciling = false } }
+        while true {
+            await reconcile(request)
+            guard let next = state.withLock({ state -> Reconcile? in
+                let next = state.reconcileAgain
+                state.reconcileAgain = nil
+                if next == nil { state.reconciling = false }
+                return next
+            }) else { return }
+            request = next
+        }
+    }
+
+    private func reconcile(_ request: Reconcile) async {
+        let (quality, allowCellular, retryFailed) = (request.quality, request.allowCellular, request.retryFailed)
         let running = Set(await session.allTasks.filter { $0.state == .running || $0.state == .suspended }.compactMap(\.taskDescription))
         await requeueMissingFiles()
         if retryFailed { _ = try? await database.requeueFailedDownloads() }
@@ -194,6 +223,10 @@ public final class DownloadManager: NSObject, Sendable {
     /// Security: the system carries a background transfer over to a new network on its own,
     /// token and all, so transfers from a plain-HTTP server stop here and wait for
     /// `resumePending` to restart them once the server has proved itself (see `ServerIdentity`).
+    /// Only for a move to other interfaces: an update on the same ones keeps its transfers
+    /// (cancelling restarted every song, and Jellyfin's conversion with it, on each Wi-Fi blip, so
+    /// songs never finished); new ones still wait for the server's proof in `enqueue`. Same
+    /// accepted risk as the player's streams (CLAUDE.md, Conventions).
     public func networkChanged() async {
         guard library.session.serverURL.scheme?.lowercased() == "http" else { return }
         for task in await session.allTasks { task.cancel() }
@@ -226,8 +259,20 @@ public final class DownloadManager: NSObject, Sendable {
         }
         let running = Set(await session.allTasks.filter { $0.state == .running || $0.state == .suspended }.compactMap(\.taskDescription))
         let pending = Set((try? database.pendingDownloads().map(\.trackID)) ?? [])
+        let starting = trackIDs.filter { pending.contains($0) && !running.contains($0) }
+        guard !starting.isEmpty else { return }
+        // A fresh request starts from the first byte: the row and the write throttle forget the
+        // last attempt, or its bytes would show as received and hold back progress writes until
+        // the new attempt passed them (a song looked stalled while it downloaded).
+        try? await database.restartDownloads(trackIDs: starting)
+        state.withLock { state in
+            for trackID in starting {
+                state.lastProgressWrite[trackID] = nil
+                state.lastByteWrite[trackID] = nil
+            }
+        }
         let transferSession = session
-        for trackID in trackIDs where pending.contains(trackID) && !running.contains(trackID) {
+        for trackID in starting {
             guard let stream = library.streamRequest(trackID: trackID, maxBitrate: quality.maxBitrate) else { continue }
             var request = URLRequest(url: stream.url)
             // Header auth: the token isn't written into the URL (or the system's transfer logs).

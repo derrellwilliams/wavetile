@@ -356,9 +356,10 @@ final class DownloadsStore {
         await manager?.resumePending(quality: quality, allowCellular: allowCellular)
     }
 
-    /// Transfers from an HTTP server stop on a network change and restart once it has proved itself.
-    func networkChanged() async {
-        await manager?.networkChanged()
+    /// Transfers from an HTTP server stop on a move to other interfaces and restart once it has
+    /// proved itself; a same-interface update (`strict` false) keeps them running.
+    func networkChanged(strict: Bool) async {
+        if strict { await manager?.networkChanged() }
         await resumePending()
     }
 

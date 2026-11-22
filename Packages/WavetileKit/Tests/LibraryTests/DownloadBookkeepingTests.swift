@@ -34,6 +34,23 @@ struct DownloadBookkeepingTests {
         #expect(try db.pendingDownloads().map(\.trackID) == ["pending"])
     }
 
+    @Test func restartForgetsTheLastAttemptsBytes() async throws {
+        let db = try LibraryDatabase.temporary()
+        _ = try await db.requestDownload(album, trackIDs: ["partial", "done"])
+        try await finish(db, "done")
+        try await db.updateDownload(trackID: "partial") {
+            $0.state = .downloading
+            $0.bytes = 21_000_000
+            $0.progress = 0.05
+        }
+        try await db.restartDownloads(trackIDs: ["partial", "done"])
+        let rows = try await db.pool.read { try DownloadedTrackRecord.fetchAll($0) }
+        let partial = try #require(rows.first { $0.trackID == "partial" })
+        #expect(partial.state == .queued && partial.bytes == 0 && partial.progress == 0)
+        // A finished song is left alone.
+        #expect(db.downloadedFileName(trackID: "done") == "done.flac")
+    }
+
     @Test func requestQueuesOnlyMissingTracks() async throws {
         let db = try LibraryDatabase.temporary()
         #expect(try await db.requestDownload(album, trackIDs: ["t1", "t2"]) == ["t1", "t2"])
