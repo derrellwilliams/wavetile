@@ -357,10 +357,13 @@ final class DownloadsStore {
     }
 
     /// Transfers from an HTTP server stop on a move to other interfaces and restart once it has
-    /// proved itself; a same-interface update (`strict` false) keeps them running.
+    /// proved itself; a same-interface update (`strict` false) keeps them running unless the
+    /// server fails its check. Failed songs are retried only on a real network change: Wi-Fi
+    /// chatter would otherwise re-download a song that failed for good (too large, an error page)
+    /// every few seconds.
     func networkChanged(strict: Bool) async {
-        if strict { await manager?.networkChanged() }
-        await resumePending()
+        await manager?.networkChanged(strict: strict)
+        await manager?.resumePending(quality: quality, allowCellular: allowCellular, retryFailed: strict)
     }
 
     func isDownloaded(_ trackID: String) -> Bool { downloadedTrackIDs.contains(trackID) }

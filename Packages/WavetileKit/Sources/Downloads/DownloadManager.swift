@@ -34,9 +34,7 @@ public final class DownloadManager: NSObject, Sendable {
 
     private struct MutableState {
         var session: URLSession?
-        var reconciling = false
-        /// A reconcile asked for while one was running; it runs as soon as that one ends.
-        var reconcileAgain: Reconcile?
+        var reconciles = ReconcileQueue()
         var generation = 0
         var mutations = 0
         var securityStopped = false
@@ -49,10 +47,39 @@ public final class DownloadManager: NSObject, Sendable {
         var allowCellular = true
     }
 
-    private struct Reconcile {
+    struct Reconcile: Equatable {
         var quality: Quality
         var allowCellular: Bool
         var retryFailed: Bool
+    }
+
+    /// One reconcile at a time. One asked for while another runs isn't dropped: a single pass
+    /// follows (the latest settings; failed songs retried if any caller asked), so transfers
+    /// cancelled by a network change restart now rather than at the next 30 s check. Nothing
+    /// follows once downloads are stopped (an off-origin redirect, sign-out).
+    struct ReconcileQueue {
+        private(set) var running = false
+        private var again: Reconcile?
+
+        /// True when the caller should run `request` now; otherwise it runs after the current one.
+        mutating func begin(_ request: Reconcile) -> Bool {
+            guard running else {
+                running = true
+                return true
+            }
+            var next = request
+            next.retryFailed = request.retryFailed || again?.retryFailed == true
+            again = next
+            return false
+        }
+
+        /// The pass to run next, or nil when the queue is done (always nil once `stopped`).
+        mutating func next(stopped: Bool) -> Reconcile? {
+            let next = stopped ? nil : again
+            again = nil
+            if next == nil { running = false }
+            return next
+        }
     }
 
     /// The most one song may write. A lossless track is a few hundred MB at most; a server that
@@ -169,38 +196,27 @@ public final class DownloadManager: NSObject, Sendable {
     }
 
     /// Restarts queued downloads that have no running task (e.g. after the app was killed), and
-    /// gives failed ones another go.
-    /// A call made while one is running isn't dropped: one more pass follows it, so transfers
-    /// cancelled by a network change restart now rather than at the next 30 s check.
+    /// gives failed ones another go. Calls made meanwhile are coalesced (`ReconcileQueue`).
     public func resumePending(quality: Quality, allowCellular: Bool, retryFailed: Bool = true) async {
         var request = Reconcile(quality: quality, allowCellular: allowCellular, retryFailed: retryFailed)
-        guard state.withLock({ state in
-            guard !state.securityStopped else { return false }
-            if state.reconciling {
-                let retry = retryFailed || state.reconcileAgain?.retryFailed == true
-                state.reconcileAgain = Reconcile(quality: quality, allowCellular: allowCellular, retryFailed: retry)
-                return false
-            }
-            state.reconciling = true
-            return true
-        }) else { return }
+        let first = request
+        guard state.withLock({ !$0.securityStopped && $0.reconciles.begin(first) }) else { return }
         while true {
             await reconcile(request)
-            guard let next = state.withLock({ state -> Reconcile? in
-                let next = state.reconcileAgain
-                state.reconcileAgain = nil
-                if next == nil { state.reconciling = false }
-                return next
-            }) else { return }
+            guard let next = state.withLock({ $0.reconciles.next(stopped: $0.securityStopped) }) else { return }
             request = next
         }
     }
 
+    private var isStopped: Bool { state.withLock { $0.securityStopped } }
+
     private func reconcile(_ request: Reconcile) async {
         let (quality, allowCellular, retryFailed) = (request.quality, request.allowCellular, request.retryFailed)
         let running = Set(await session.allTasks.filter { $0.state == .running || $0.state == .suspended }.compactMap(\.taskDescription))
+        // Stopped meanwhile (a redirect marked the queue failed, or sign-out): write nothing.
+        guard !isStopped else { return }
         await requeueMissingFiles()
-        if retryFailed { _ = try? await database.requeueFailedDownloads() }
+        if retryFailed, !isStopped { _ = try? await database.requeueFailedDownloads() }
         let pending = (try? database.pendingDownloads().map(\.trackID)) ?? []
         await enqueue(pending.filter { !running.contains($0) }, quality: quality, allowCellular: allowCellular)
     }
@@ -223,13 +239,34 @@ public final class DownloadManager: NSObject, Sendable {
     /// Security: the system carries a background transfer over to a new network on its own,
     /// token and all, so transfers from a plain-HTTP server stop here and wait for
     /// `resumePending` to restart them once the server has proved itself (see `ServerIdentity`).
-    /// Only for a move to other interfaces: an update on the same ones keeps its transfers
-    /// (cancelling restarted every song, and Jellyfin's conversion with it, on each Wi-Fi blip, so
-    /// songs never finished); new ones still wait for the server's proof in `enqueue`. Same
-    /// accepted risk as the player's streams (CLAUDE.md, Conventions).
-    public func networkChanged() async {
-        guard library.session.serverURL.scheme?.lowercased() == "http" else { return }
+    ///
+    /// `strict` is false for an update that kept the same interfaces (Wi-Fi chatter): transfers
+    /// keep going while the server proves itself again, and stop only if it doesn't (cancelling
+    /// on every such update restarted each song, and Jellyfin's conversion with it, so songs never
+    /// finished). Same accepted risk as the player's streams (CLAUDE.md, Conventions).
+    public func networkChanged(strict: Bool = true) async {
+        let url = library.session.serverURL
+        let cancel = await Self.cancelsTransfers(strict: strict, serverURL: url) { await Self.serverMayGetToken(url) }
+        guard cancel else { return }
+        // Starts already past `confirmToken` in `enqueue` are dropped too.
+        state.withLock { $0.generation += 1 }
         for task in await session.allTasks { task.cancel() }
+    }
+
+    /// Whether a network change stops the running transfers. `serverProved` runs only for a
+    /// same-interface update from an HTTP server.
+    static func cancelsTransfers(strict: Bool, serverURL: URL, serverProved: () async -> Bool) async -> Bool {
+        guard serverURL.scheme?.lowercased() == "http" else { return false }
+        return strict ? true : !(await serverProved())
+    }
+
+    /// Like the player's check: a probe that straddles a second network change answers nil, so ask again.
+    private static func serverMayGetToken(_ url: URL) async -> Bool {
+        for _ in 0 ..< 3 {
+            if ServerIdentity.shared.allowsToken(to: url) { return true }
+            if let answer = await ServerIdentity.shared.probe(url) { return answer }
+        }
+        return false
     }
 
     /// Local file for a finished download, or nil. Cheap enough to call per player item.
@@ -260,7 +297,7 @@ public final class DownloadManager: NSObject, Sendable {
         let running = Set(await session.allTasks.filter { $0.state == .running || $0.state == .suspended }.compactMap(\.taskDescription))
         let pending = Set((try? database.pendingDownloads().map(\.trackID)) ?? [])
         let starting = trackIDs.filter { pending.contains($0) && !running.contains($0) }
-        guard !starting.isEmpty else { return }
+        guard !starting.isEmpty, !isStopped else { return }
         // A fresh request starts from the first byte: the row and the write throttle forget the
         // last attempt, or its bytes would show as received and hold back progress writes until
         // the new attempt passed them (a song looked stalled while it downloaded).
@@ -272,6 +309,7 @@ public final class DownloadManager: NSObject, Sendable {
             }
         }
         let transferSession = session
+        let serverURL = library.session.serverURL
         for trackID in starting {
             guard let stream = library.streamRequest(trackID: trackID, maxBitrate: quality.maxBitrate) else { continue }
             var request = URLRequest(url: stream.url)
@@ -280,7 +318,9 @@ public final class DownloadManager: NSObject, Sendable {
             request.allowsCellularAccess = allowCellular
             let preparedRequest = request
             state.withLock { state in
-                guard !state.securityStopped, state.mutations == 0, state.generation == generation else { return }
+                // `allowsToken` again: a network change since `confirmToken` cleared the server's proof.
+                guard !state.securityStopped, state.mutations == 0, state.generation == generation,
+                      ServerIdentity.shared.allowsToken(to: serverURL) else { return }
                 let task = transferSession.downloadTask(with: preparedRequest)
                 task.taskDescription = trackID
                 task.resume()
@@ -471,8 +511,10 @@ extension DownloadManager: URLSessionDownloadDelegate {
             guard await ServerIdentity.shared.confirmToken(to: library.session.serverURL) else { return }
             if let resumeData {
                 let transferSession = self.session
+                let serverURL = library.session.serverURL
                 state.withLock { state in
-                    guard !state.securityStopped, state.mutations == 0, state.generation == generation else { return }
+                    guard !state.securityStopped, state.mutations == 0, state.generation == generation,
+                          ServerIdentity.shared.allowsToken(to: serverURL) else { return }
                     let retry = transferSession.downloadTask(withResumeData: resumeData)
                     retry.taskDescription = trackID
                     retry.resume()

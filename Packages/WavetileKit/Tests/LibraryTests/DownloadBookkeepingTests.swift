@@ -1,5 +1,6 @@
 import Foundation
 import GRDB
+import os
 import Testing
 @testable import Downloads
 @testable import Persistence
@@ -49,6 +50,63 @@ struct DownloadBookkeepingTests {
         #expect(partial.state == .queued && partial.bytes == 0 && partial.progress == 0)
         // A finished song is left alone.
         #expect(db.downloadedFileName(trackID: "done") == "done.flac")
+    }
+
+    @Test func reconcilesAskedForMeanwhileRunOnceAfterwards() {
+        typealias Request = DownloadManager.Reconcile
+        var queue = DownloadManager.ReconcileQueue()
+        let first = Request(quality: .high, allowCellular: false, retryFailed: false)
+        let r1 = queue.begin(first)
+        #expect(r1)
+        // Two calls while it runs collapse into one pass with the latest settings, and failed
+        // songs are retried because one of them asked.
+        let r2 = queue.begin(Request(quality: .high, allowCellular: false, retryFailed: true))
+        #expect(!r2)
+        let r3 = queue.begin(Request(quality: .original, allowCellular: true, retryFailed: false))
+        #expect(!r3)
+        let r4 = queue.next(stopped: false)
+        #expect(r4 == Request(quality: .original, allowCellular: true, retryFailed: true))
+        #expect(queue.running)
+        let r5 = queue.next(stopped: false)
+        #expect(r5 == nil)
+        #expect(!queue.running)
+        // Free again: the next call runs at once.
+        let r6 = queue.begin(first)
+        #expect(r6)
+    }
+
+    @Test func nothingFollowsOnceDownloadsAreStopped() {
+        var queue = DownloadManager.ReconcileQueue()
+        let request = DownloadManager.Reconcile(quality: .high, allowCellular: false, retryFailed: true)
+        let r7 = queue.begin(request)
+        #expect(r7)
+        let r8 = queue.begin(request)
+        #expect(!r8)
+        let r9 = queue.next(stopped: true)
+        #expect(r9 == nil)
+        #expect(!queue.running)
+        // The dropped pass doesn't linger for the next run either.
+        let r10 = queue.begin(request)
+        #expect(r10)
+        let r11 = queue.next(stopped: false)
+        #expect(r11 == nil)
+    }
+
+    @Test func onlyAMoveOrAFailedCheckStopsTransfers() async {
+        let http = URL(string: "http://192.168.1.5:8096")!
+        let https = URL(string: "https://music.example.com")!
+        let asked = OSAllocatedUnfairLock(initialState: 0)
+        func check(_ answer: Bool) -> () async -> Bool { { asked.withLock { $0 += 1 }; return answer } }
+        // Another network: stop without waiting for a check.
+        #expect(await DownloadManager.cancelsTransfers(strict: true, serverURL: http, serverProved: check(true)))
+        #expect(asked.withLock { $0 } == 0)
+        // Same Wi-Fi: keep going while the server proves itself, stop if it doesn't.
+        #expect(!(await DownloadManager.cancelsTransfers(strict: false, serverURL: http, serverProved: check(true))))
+        #expect(await DownloadManager.cancelsTransfers(strict: false, serverURL: http, serverProved: check(false)))
+        // HTTPS: the certificate proves the host, nothing stops.
+        #expect(!(await DownloadManager.cancelsTransfers(strict: true, serverURL: https, serverProved: check(false))))
+        #expect(!(await DownloadManager.cancelsTransfers(strict: false, serverURL: https, serverProved: check(false))))
+        #expect(asked.withLock { $0 } == 2)
     }
 
     @Test func requestQueuesOnlyMissingTracks() async throws {
