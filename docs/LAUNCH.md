@@ -64,7 +64,7 @@ Supports a good launch; none of it blocks App Review.
 - [x] Public beta ran Oct 29 to Nov 12 (retired at launch).
 - [x] GitHub homepage/topics, MPL-2.0 license, user-facing README (Oct 29).
 - [ ] Domain hardening: transfer lock, DNSSEC, Cloudflare 2FA (User; quick win above).
-- [x] Verified Google Search Console (Domain property, DNS TXT) and submitted the sitemap; imported the site into Bing Webmaster Tools (Nov 24). Home page already indexed. Still to check: Bing sitemap status, and the 5 guide URLs in URL Inspection.
+- [x] Verified Google Search Console (Domain property, DNS TXT) and submitted the sitemap; imported the site into Bing Webmaster Tools (Nov 24). Home page already indexed. Indexing requested for the 5 guide URLs in Google and submitted to Bing (Nov 24). Still to check: Bing sitemap status, Google Pages and Performance reports.
 
 ## Launch day — after the App Store listing is live
 
