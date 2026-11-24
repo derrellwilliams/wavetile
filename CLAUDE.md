@@ -35,32 +35,15 @@ Native Jellyfin music + podcast player for iPhone (iOS 26.1+, Swift 6, SwiftUI).
 | `PreviewSupport` | Preview fixtures |
 | `Features` | Screens and view models, one folder per area. Tabs: Home, Music, Podcasts, Downloaded, Search; Settings is a side drawer |
 
-## Design system
-`DesignSystem/` is the single source of truth for how the app looks; `docs/design-system.html` is its gallery, the reference for every token, icon and component.
-- The gallery is generated, never hand-edited: `scripts/design-system.py` reads `Theme.swift` (palette, type, spacing, radius, artwork), `Motion.swift`, `Glyph.swift` with the `Icons.xcassets` SVGs, and `DesignSystem/Components`. It also scans the app's Swift files for each item's "Used in" list (file, line, code). Descriptions are the code's `///` doc comments, so document a token where it's defined.
-- Changing the system: edit the token in code → run `scripts/design-system.py` → check the gallery (and the sim) → commit the code and the regenerated HTML together. `scripts/design-system.py --check` exits 1 if the page is stale.
-- Views read tokens via `@Environment(\.theme)` (widgets: `Theme.dark`); don't add literal sizes, spacing, radii or hex colors to views. Type sizes live only in `Theme.Typography.scale`; the theme's fonts reference it. A new value goes into `Theme` first, with a doc comment.
-- An item showing "No direct references found" is unused (or used in a way the scan doesn't match); confirm with the build before deleting it.
+## Rules files
+- Design tokens, the generated gallery and how to change them: `.claude/rules/design-system.md` (loads when you touch `DesignSystem/`). Views read tokens via `@Environment(\.theme)`; no literal sizes, spacing, radii or hex colors in views. The gallery is generated: run `scripts/design-system.py`, never hand-edit `docs/design-system.html`.
+- Offline and server-unreachable behavior (what dims, what never dims): `.claude/rules/offline-design.md` (loads in `Features/`, `Downloads/`, `Persistence/`, `Playback/`). Never dim, disable or hide on a guess about the server.
 
 ## Home feed (`Features/Home`)
 Shelves are read from the local DB on init (first frame, works offline), then `load()` refreshes the history shelves from the server. Pull to refresh syncs music and enabled podcast feeds first; launch and foreground do the same when stale (>1h).
 - Order: Recently Played → Most Played → Latest Podcast Episodes (if enabled) → Playlists & Collections → Recently Added → up to 3 Artist Spotlights. A new listener (`HomeModel.isNewListener`) also gets a first-visit welcome card on top and 2 genre shelves after Recently Added. Offline puts the offline notice and a Downloaded row first.
 - Recommended for You (`PodcastRecommender`) is a shelf on the Podcasts tab under Latest Episodes, not on Home: scoring and caching are documented in `Podcasts/Recommendations.swift`. Only show titles and genre IDs may leave the device.
 - Random picks change on launch and pull to refresh, not on the server refresh.
-
-## Offline design
-Goal: always clear what plays without a connection, and never a wrong guess across the whole library. Only certain signals change what's shown.
-
-| Signal | Source | What it drives |
-|---|---|---|
-| Downloaded | The file is on the device (`DownloadsStore.available`, `downloadedTrackIDs`) | The download mark, online and off: `DownloadMark` via `downloadMarked(_:)` on tile artwork (`AlbumTile(isDownloaded:)`, the Playlists/Collections grids), the icon in `TrackRow`, VoiceOver "Downloaded" |
-| No network | `NWPathMonitor` (`Connectivity.hasNetwork`) | "You're offline" `OfflineNotice`; dims what isn't downloaded (`offlineDimmed(available:)`, `PlayableRow`); disables `requiresServer()` actions; Home's Downloaded row first |
-| Server unreachable | A real request failed (`ServerIdentity.observeReachability`: API responses incl. 502–504, transport errors, identity checks → `Connectivity.report`), confirmed by a probe 1 s later | "Can't reach your server" `OfflineNotice` with Retry, Home's Downloaded row, no new streams (`canStream` reads `isOnline`). **No dimming**, server actions stay enabled and say if they fail. Clears at the next answer; retries at 2 s, every 5 s for a minute, then every 30 s, and at once on a new network or foreground |
-
-- Never dim, disable or hide on a guess about the server. The old predictive rules (grace periods, local-route and VPN detection, launch "unverified" state) were removed on 2026-11-21 after repeated bugs; don't bring them back.
-- Security is separate from display: a plain-HTTP server proves its ID (`ServerIdentity`) after every path update (same-interface ones too, even while unreachable) and on foreground before the token is sent, and the player drops or holds token streams until it has (`AudioPlayer.networkChanged`, `loadOnceServerChecks`). This never changes what's shown.
-- Podcasts only count a lost network: episodes stream from their feeds.
-- Code: `Connectivity` (in `Features/Downloads/DownloadsStore.swift`), `Features/Downloads/Offline.swift`, `DesignSystem/Components/AlbumTile.swift` (`DownloadMark`); tests in `ConnectivityTests` and `ServerIdentityTests`.
 
 ## Conventions
 - Icons: Phosphor Bold via `Glyph` only. Never SF Symbols.
@@ -69,7 +52,7 @@ Goal: always clear what plays without a connection, and never a wrong guess acro
 - Match the surrounding code's comment style; screens observe GRDB via `store.observe(...)`.
 - Bar buttons hide the bar's glass and draw their own (`TintedBar.drawsGlass`; the types are in `MainTabView.swift`). Keep the system Back, drawn tinted; never hide it for a custom one (on iOS 27 that kills the swipe back inside UIKit, past any gesture delegate).
 - Song/album/artist actions (favorite, add to playlist, Start Radio = Jellyfin Instant Mix replacing the queue) live in `Features/Library/LibraryActions.swift`.
-- Offline: follow the rules in "Offline design" above.
+- Offline: see `.claude/rules/offline-design.md`.
 - Plain HTTP only to LAN hosts; `NSAllowsArbitraryLoadsInMedia` is for podcast audio only. Keep the token off cleartext. A network change or foreground makes an HTTP server prove itself again, and the player drops its loaded streams until it has (`AudioPlayer.networkChanged`); a same-interface path update keeps playing, and keeps background downloads running, while the server is re-verified, and both stop if it fails (dropping streams on every update stalled playback; cancelling downloads restarted every song so they never finished). Download starts re-check `allowsToken` right before each task is created. Accepted risk (user, 2026-11-10): token exposure for about a second after a same-subnet Wi-Fi hop; details in `docs/LAUNCH.md`, fix is HTTPS. Streams buffer 120 s ahead, 30 s on a metered path (`isMeteredNetwork`).
 - Swift 6: closures handed to MediaPlayer/AVFoundation must be built nonisolated.
 - CarPlay (`Features/CarPlay`, `App/CarPlaySceneDelegate.swift`) uses the `com.apple.developer.carplay-audio` entitlement (set in `project.yml`, which writes `App/Wavetile.entitlements`). Device signing needs CarPlay Audio enabled on the App ID. Test with the CarPlay simulator (I/O → External Displays → CarPlay). Siri phrases live in `App/MusicIntents.swift`.
@@ -83,4 +66,4 @@ Goal: always clear what plays without a connection, and never a wrong guess acro
 Version 1.0 is live on the App Store ("Wavetile Music", id6826722664, since 2026-11-12). Current status, open items and QA gates are in `docs/LAUNCH.md`: read it when resuming release work and record dated status there. Dated QA evidence goes in `docs/qa-evidence.md`; ASO/SEO/GEO notes in `docs/search-optimization.md`; review submission copy in `docs/app-review-notes.md`.
 
 ## Git
-Commit and push only when asked. When asked, the work lands on `main` (merge any branch into it) and `main` is pushed.
+Work lands on `main` (merge any branch into it) and `main` is pushed, when asked.
