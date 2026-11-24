@@ -8,8 +8,11 @@
 <link rel="canonical" href="https://wavetile.com/">
 <meta name="theme-color" content="#1A1A1A">
 <meta name="color-scheme" content="dark">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="alternate" type="text/plain" href="/llms.txt" title="Wavetile for LLMs">
 
 <meta property="og:type" content="website">
+<meta property="og:locale" content="en_US">
 <meta property="og:site_name" content="Wavetile">
 <meta property="og:url" content="https://wavetile.com/">
 <meta property="og:title" content="Wavetile: your Jellyfin music and your podcasts, in one app">
@@ -19,8 +22,12 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Wavetile screens: launch screen, Home, album, Now Playing and Podcasts">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Wavetile: your Jellyfin music and your podcasts, in one app">
+<meta name="twitter:description" content="A Jellyfin music player for iPhone with a full podcast player built in. Gapless, offline, private.">
+<meta name="twitter:image" content="https://wavetile.com/og.jpg?v=2">
+<meta name="twitter:image:alt" content="Wavetile screens: launch screen, Home, album, Now Playing and Podcasts">
 
-<!-- Uncomment at launch: shows Safari's Smart App Banner on iPhone. -->
+<!-- Shows Safari's Smart App Banner on iPhone. -->
 <meta name="apple-itunes-app" content="app-id=6826722664">
 
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -42,6 +49,9 @@
       "description": "A Jellyfin music player for iPhone with a full podcast player built in: gapless playback, offline downloads, Instant Mix radio, widgets, chapters and transcripts.",
       "operatingSystem": "iOS 26.1 or later",
       "applicationCategory": "MusicApplication",
+      "inLanguage": "en",
+      "isAccessibleForFree": true,
+      "datePublished": "2026-11-12",
       "url": "https://wavetile.com/",
       "image": "https://wavetile.com/og.jpg?v=2",
       "screenshot": [
@@ -58,6 +68,14 @@
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
       "author": { "@id": "https://wavetile.com/#org" },
       "sameAs": ["https://github.com/derrellwilliams/wavetile"]
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://wavetile.com/#website",
+      "name": "Wavetile",
+      "url": "https://wavetile.com/",
+      "inLanguage": "en",
+      "publisher": { "@id": "https://wavetile.com/#org" }
     },
     {
       "@type": "Organization",
@@ -95,21 +113,21 @@
   <section class="screens" aria-label="Screens">
     <!-- Two identical sets: the track slides left by one set, then loops seamlessly. -->
     <div class="marquee">
-      <span class="device"><img src="/assets/screens/home.webp?v=2" width="924" height="2000" alt="Wavetile Home: Recently Played, Latest Podcast Episodes and Most Played"></span>
+      <span class="device"><img src="/assets/screens/home.webp?v=2" width="924" height="2000" fetchpriority="high" alt="Wavetile Home: Recently Played, Latest Podcast Episodes and Most Played"></span>
       <span class="device"><img src="/assets/screens/music.webp?v=2" width="924" height="2000" alt="Music tab: Playlists, Collections, Favorites, Artists, Albums, Songs, Genres and Recently Added"></span>
       <span class="device"><img src="/assets/screens/album.webp?v=2" width="924" height="2000" alt="Album page for Hot Dreams by Timber Timbre with Play, Shuffle and the track list"></span>
       <span class="device"><img src="/assets/screens/nowplaying.webp?v=2" width="924" height="2000" alt="Now Playing: What's Missing by Alabaster dePlume"></span>
-      <span class="device"><img src="/assets/screens/podcasts.webp?v=2" width="924" height="2000" alt="Podcasts tab with Continue Listening and Latest Episodes"></span>
-      <span class="device"><img src="/assets/screens/downloads.webp?v=2" width="924" height="2000" alt="Downloads tab with downloaded albums and their sizes"></span>
-      <span class="device"><img src="/assets/screens/splash.webp?v=2" width="924" height="2000" alt="The Wavetile launch screen: the cube over the word Wavetile over the wave"></span>
+      <span class="device"><img src="/assets/screens/podcasts.webp?v=2" width="924" height="2000" loading="lazy" alt="Podcasts tab with Continue Listening and Latest Episodes"></span>
+      <span class="device"><img src="/assets/screens/downloads.webp?v=2" width="924" height="2000" loading="lazy" alt="Downloads tab with downloaded albums and their sizes"></span>
+      <span class="device"><img src="/assets/screens/splash.webp?v=2" width="924" height="2000" loading="lazy" alt="The Wavetile launch screen: the cube over the word Wavetile over the wave"></span>
       <span class="marquee__copy" aria-hidden="true">
-      <span class="device"><img src="/assets/screens/home.webp?v=2" width="924" height="2000" alt="" decoding="async"></span>
-      <span class="device"><img src="/assets/screens/music.webp?v=2" width="924" height="2000" alt="" decoding="async"></span>
-      <span class="device"><img src="/assets/screens/album.webp?v=2" width="924" height="2000" alt="" decoding="async"></span>
-      <span class="device"><img src="/assets/screens/nowplaying.webp?v=2" width="924" height="2000" alt="" decoding="async"></span>
-      <span class="device"><img src="/assets/screens/podcasts.webp?v=2" width="924" height="2000" alt="" decoding="async"></span>
-      <span class="device"><img src="/assets/screens/downloads.webp?v=2" width="924" height="2000" alt="" decoding="async"></span>
-      <span class="device"><img src="/assets/screens/splash.webp?v=2" width="924" height="2000" alt="" decoding="async"></span>
+      <span class="device"><img src="/assets/screens/home.webp?v=2" width="924" height="2000" alt="" loading="lazy" decoding="async"></span>
+      <span class="device"><img src="/assets/screens/music.webp?v=2" width="924" height="2000" alt="" loading="lazy" decoding="async"></span>
+      <span class="device"><img src="/assets/screens/album.webp?v=2" width="924" height="2000" alt="" loading="lazy" decoding="async"></span>
+      <span class="device"><img src="/assets/screens/nowplaying.webp?v=2" width="924" height="2000" alt="" loading="lazy" decoding="async"></span>
+      <span class="device"><img src="/assets/screens/podcasts.webp?v=2" width="924" height="2000" alt="" loading="lazy" decoding="async"></span>
+      <span class="device"><img src="/assets/screens/downloads.webp?v=2" width="924" height="2000" alt="" loading="lazy" decoding="async"></span>
+      <span class="device"><img src="/assets/screens/splash.webp?v=2" width="924" height="2000" alt="" loading="lazy" decoding="async"></span>
       </span>
     </div>
   </section>
