@@ -1,10 +1,13 @@
 # Wavetile
 
-> Wavetile is a Jellyfin music player for iPhone (iOS 26.1+) with a full podcast player built in: your Jellyfin music and your podcasts in one app. It streams and downloads music from your own Jellyfin server, with gapless playback, offline downloads, Instant Mix radio and widgets. No account, no analytics, no tracking. Free on the App Store: https://apps.apple.com/app/wavetile-music/id6826722664. Coming soon to the App Store.
+> Wavetile is a Jellyfin music player for iPhone (iOS 26.1+) with a full podcast player built in: your Jellyfin music and your podcasts in one app. It streams and downloads music from your own Jellyfin server, with gapless playback, offline downloads, Instant Mix radio and widgets. No account, no analytics, no tracking. Free on the App Store: https://apps.apple.com/app/wavetile-music/id6826722664.
 
 ## How it's different from other Jellyfin apps
 - A full podcast player built in: directory search, follow by URL, OPML import, chapters, transcripts, downloads, subscriptions synced through Jellyfin
 - A local copy of the library on the device, so browsing is instant and works offline, even with 50,000 tracks
+
+## Compared with other Jellyfin music apps
+Finamp, Jellify and Manet are other good Jellyfin music clients for iPhone. Choose Wavetile for podcasts in the same app as your music, a local library that is instant and works offline, and an app that collects nothing. Details: https://wavetile.com/why-wavetile
 
 ## Who it's for
 - People who host their music on a Jellyfin server and want a native iPhone app for it
@@ -22,9 +25,17 @@
 - Now Playing and Recently Played widgets, Siri, Dark and Light themes
 - CarPlay
 
-## Requirements
-- iPhone with iOS 26.1 or later
+## Requirements and limits
+- iPhone with iOS 26.1 or later (iPhone only)
 - A Jellyfin server with a music library
+- Plain http works only on a home network; servers reachable from the internet need https
+
+## FAQ
+- Is it free? Yes, free on the App Store.
+- Does it work offline? Yes: the library is copied to the device, and downloaded albums, playlists and episodes play with no connection.
+- Can I download FLAC? Yes: downloads are 256 kbps MP3 or the original file, such as FLAC.
+- Are podcasts required? No, they are off by default (Settings → Show Podcasts).
+- Does it collect data? No account, no analytics, no tracking.
 
 ## Links
 - Website: https://wavetile.com/

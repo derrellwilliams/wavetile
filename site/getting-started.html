@@ -38,6 +38,19 @@
   ]
 }
 </script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    { "@type": "Question", "name": "Is Wavetile free?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Wavetile is free on the App Store." } },
+    { "@type": "Question", "name": "Does Wavetile support Jellyfin Quick Connect?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Start Quick Connect in Wavetile and approve the code from Jellyfin on a device where you're already signed in. You can also sign in with your server address, username and password." } },
+    { "@type": "Question", "name": "Can I use a plain http Jellyfin server?", "acceptedAnswer": { "@type": "Answer", "text": "Only on your home network. Servers reachable from the internet need https, so your password and token never cross the internet unencrypted." } },
+    { "@type": "Question", "name": "Does Wavetile copy my music to my iPhone?", "acceptedAnswer": { "@type": "Answer", "text": "Not automatically. The first sync copies your library's details, not the music files. Music is only stored on your iPhone when you download an album or playlist." } },
+    { "@type": "Question", "name": "Which iPhones can run it?", "acceptedAnswer": { "@type": "Answer", "text": "iPhones on iOS 26.1 or later." } }
+  ]
+}
+</script>
 </head>
 <body>
 <header class="top">
@@ -110,6 +123,17 @@
     <h2>Send feedback</h2>
     <div class="guide__body">
       <p>Questions or a bug? Reach the developer from the <a class="link" href="/support">Support</a> page, or leave a review on the App Store.</p>
+    </div>
+  </section>
+  <section class="guide__row">
+    <span class="guide__num" aria-hidden="true"></span>
+    <h2>Common questions</h2>
+    <div class="guide__body">
+      <p><strong>Is Wavetile free?</strong><br>Yes. Wavetile is free on the App Store.</p>
+      <p><strong>Does Wavetile support Jellyfin Quick Connect?</strong><br>Yes. Start Quick Connect in Wavetile and approve the code from Jellyfin on a device where you're already signed in. You can also sign in with your server address, username and password.</p>
+      <p><strong>Can I use a plain http Jellyfin server?</strong><br>Only on your home network. Servers reachable from the internet need https, so your password and token never cross the internet unencrypted.</p>
+      <p><strong>Does Wavetile copy my music to my iPhone?</strong><br>Not automatically. The first sync copies your library's details, not the music files. Music is only stored on your iPhone when you download an album or playlist.</p>
+      <p><strong>Which iPhones can run it?</strong><br>iPhones on iOS 26.1 or later.</p>
     </div>
   </section>
   <div class="guide__cta"><a class="button" href="https://apps.apple.com/app/wavetile-music/id6826722664">Download on the App Store<span class="icon" data-icon="arrow-right" aria-hidden="true"></span></a></div>
